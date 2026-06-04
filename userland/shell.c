@@ -2372,7 +2372,7 @@ puts("\n");
 puts(motd_buf);
 }
 	}
-	puts("\033[0m\n linux 0.01 \033[37mþ\033[0m interactive shell\n\n");
+	puts("\033[0m\n linux 0.01 \033[37m\376\033[0m interactive shell\n\n");
 	load_history();
 
 	shell_loop();
