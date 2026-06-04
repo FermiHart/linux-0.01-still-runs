@@ -36,3 +36,6 @@ secrets/
 .local/
 *.local
 .tool-*
+
+# Local working folder for raw screenshots (curated copies live in docs/screenshots/)
+/Screenshots/

@@ -6,7 +6,7 @@
 
 Not emulated. Not behind glass. Running.
 
-<img src="docs/screenshot-shell.png" alt="linux-0.01-still-runs shell running in QEMU — full MOTD, IBM PC 8x8 font, colored prompt, date 2026" width="720"/>
+<img src="docs/screenshots/01-boot-motd.png" alt="linux-0.01-still-runs booting in QEMU — kernel boot, full MOTD, IBM PC 8x8 font, the year 2026" width="720"/>
 
 [![CI](https://github.com/fermihart/linux-0.01-still-runs/actions/workflows/build.yml/badge.svg)](https://github.com/fermihart/linux-0.01-still-runs/actions/workflows/build.yml)
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
@@ -55,6 +55,20 @@ fermihart@linux01:/$ uptime            # seconds since CMOS boot
 fermihart@linux01:/$ ps aux            # live task table from Linus' scheduler
 fermihart@linux01:/$ cat /etc/motd     # the letter above, on the VGA console
 ```
+
+---
+
+## Screenshots
+
+<div align="center">
+
+| | |
+|:---:|:---:|
+| <img src="docs/screenshots/04-shell-commands.png" width="400"/><br/>**Interactive shell** — a 1991 Unix command suite | <img src="docs/screenshots/05-shell-hello-c.png" width="400"/><br/>**C userland** — `/bin/hello` built with the cross toolchain |
+| <img src="docs/screenshots/02-build-splash.png" width="400"/><br/>**Cinematic build** — `make` with a Unicode splash | <img src="docs/screenshots/07-build-complete.png" width="400"/><br/>**Reproducible artifacts** — sha-stamped on every build |
+| <img src="docs/screenshots/08-build-stages.png" width="400"/><br/>**Ten-stage pipeline** — kernel → ISO → Minix v1 rootfs forge | <img src="docs/screenshots/06-make-help.png" width="400"/><br/>**`make help`** — every target, self-documenting |
+
+</div>
 
 ---
 
