@@ -35,6 +35,19 @@ This project exists to keep that spirit running. **Not frozen. Not emulated behi
 
 ## Quick start
 
+**Don't want to compile?** Grab the bootable ISO from the
+[**latest release**](https://github.com/FermiHart/linux-0.01-still-runs/releases/latest)
+— download, `gunzip root.img.gz`, and boot:
+
+```bash
+qemu-system-i386 -cdrom linux-0.01-still-runs.iso \
+  -drive file=root.img,format=raw,if=none,id=hd0 \
+  -device ide-hd,drive=hd0,bus=ide.0,unit=0,cyls=977,heads=5,secs=17 \
+  -boot d -m 8M -no-reboot
+```
+
+Or build it yourself:
+
 ```bash
 brew install x86_64-elf-gcc nasm qemu xorriso     # macOS
 # (apt: x86_64-elf-gcc nasm qemu-system-x86 xorriso on linux)
