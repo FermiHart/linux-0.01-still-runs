@@ -1,0 +1,134 @@
+name: linux-0.01-still-runs CI
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  BUILD_DIR: build
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            nasm \
+            qemu-system-x86 \
+            xorriso \
+            python3 \
+            x86_64-elf-gcc \
+            x86_64-elf-binutils
+
+      - name: Build Limine
+        run: |
+          git clone --depth=1 -b v8.x https://github.com/limine-bootloader/limine.git /tmp/limine-src
+          make -C /tmp/limine-src
+
+      - name: Build kernel + ISO
+        run: make all
+        env:
+          NO_COLOR: 1
+
+      - name: List artifacts
+        run: |
+          ls -lh build/
+          file build/kernel.elf build/kernel.bin build/bootstub.elf \
+               build/linux-0.01.iso build/root.img
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-0.01-build
+          path: |
+            build/linux-0.01.iso
+            build/root.img
+            build/kernel.elf
+            build/kernel.bin
+            build/bootstub.elf
+          retention-days: 30
+
+  boot-test:
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-0.01-build
+          path: build/
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-x86 \
+            python3
+
+      - name: Run boot test
+        run: python3 tests/test_boot.py --iso build/linux-0.01.iso --img build/root.img --timeout 30
+        continue-on-error: false
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    needs: [build, boot-test]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-0.01-build
+          path: build/
+
+      - name: Compute checksums
+        run: |
+          cd build
+          sha256sum linux-0.01.iso root.img kernel.elf kernel.bin bootstub.elf > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: linux-0.01-still-runs ${{ github.ref_name }}
+          body: |
+            ## linux-0.01-still-runs ${{ github.ref_name }}
+
+            Automated build from commit ${{ github.sha }}.
+
+            ### Artifacts
+            - `linux-0.01.iso` — Bootable ISO (BIOS + UEFI)
+            - `root.img` — Minix v1 root filesystem
+            - `kernel.elf` — Kernel ELF with debug symbols
+            - `kernel.bin` — Raw kernel binary
+            - `bootstub.elf` — Limine boot stub
+
+            ### Usage
+            ```bash
+            qemu-system-i386 -cdrom linux-0.01.iso \
+              -drive file=root.img,format=raw,if=none,id=hd0 \
+              -device ide-hd,drive=hd0,bus=ide.0,unit=0
+            ```
+          files: |
+            build/linux-0.01.iso
+            build/root.img
+            build/kernel.elf
+            build/kernel.bin
+            build/bootstub.elf
+            build/SHA256SUMS

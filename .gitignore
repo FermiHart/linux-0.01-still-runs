@@ -1,0 +1,38 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.bin
+*.elf
+*.iso
+__pycache__/
+*.pyc
+
+# OS / editor crumbs
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# Logs & local runs
+*.log
+serial.log
+qemu.log
+ci-serial.log
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+secrets/
+
+# Local editor / IDE / tool config (never committed)
+.cache/
+.local/
+*.local
+.tool-*
