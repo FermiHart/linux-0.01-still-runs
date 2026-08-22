@@ -213,6 +213,21 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 - **Test**: Userland C programs build and run.
 - **Status**: QUALIFIED
 
+## Classification summary
+
+| Category | Count | Motivation |
+|---|---|---|
+| Compiler | 7 | Modern GCC rejects or mis-optimizes 1991 constructs |
+| UndefinedBehavior | 2 | Code relies on behavior not guaranteed by the standard |
+| Hardware | 4 | bEMU/KVM devices differ from 1991 PC assumptions |
+| Time | 1 | CMOS century rollover |
+| Usability | 2 | Without these the shell becomes unresponsive or unusable |
+| Experience | 2 | Cosmetic/aesthetic choices that preserve or enhance feel |
+| HistoricalBug | 0 | Intentional fixes of original Linux 0.01 bugs |
+
+Counts are based on the ledger entries above. Entries marked QUALIFIED or
+UNDER_INVESTIGATION may be reclassified after Waves 075–083.
+
 ## Pending entries
 
 The following areas still need detailed ledger entries:
