@@ -191,7 +191,7 @@ endef
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
-        test-fs-write test-fs-mkdir test-fs-link toolchain
+        test-fs-write test-fs-mkdir test-fs-link test-fs-large toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -467,6 +467,11 @@ test-fs-mkdir: all
 test-fs-link: all
 	$(call STEP,fs link/unlink/rename test)
 	@PYTHONUNBUFFERED=1 python3 tests/test_fs_link.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
+
+test-fs-large: all
+	$(call STEP,fs multi-line file test)
+	@PYTHONUNBUFFERED=1 python3 tests/test_fs_large.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -808,6 +813,7 @@ help:
 	@printf '    $(CWH)test-fs-write$(CR)   write/append/truncate smoke test\n'
 	@printf '    $(CWH)test-fs-mkdir$(CR)  mkdir/rmdir smoke test\n'
 	@printf '    $(CWH)test-fs-link$(CR)   link/unlink/rename smoke test\n'
+	@printf '    $(CWH)test-fs-large$(CR)  multi-line file smoke test\n'
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
