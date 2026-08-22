@@ -104,21 +104,38 @@ are the ID within the category.
 
 ### Defined tags
 
-- `BBP_TAG_SMP` (core)
-- `BBP_TAG_MODULES` (core)
-- `BBP_TAG_CMDLINE` (core)
-- `BBP_TAG_MEMORY_MAP` (memory)
-- `BBP_TAG_HHDM` (memory)
-- `BBP_TAG_KERNEL_ADDRESS` (memory)
-- `BBP_TAG_FRAMEBUFFER` (device)
-- `BBP_TAG_PCIE` (device)
-- `BBP_TAG_SECURITY` (security)
-- `BBP_TAG_ACPI` (platform)
-- `BBP_TAG_DEVICETREE` (platform)
-- `BBP_TAG_EFI` (platform)
-- `BBP_TAG_HYPERVISOR` (platform)
-- `BBP_TAG_SMBIOS` (platform)
-- `BBP_TAG_METRICS` (debug)
+| Tag ID | Name | Category | Body structure |
+|---|---|---|---|
+| `0x0001000000000001` | `BBP_TAG_SMP` | Core | `bbp_tag_smp` |
+| `0x0001000000000002` | `BBP_TAG_MODULES` | Core | array of `bbp_module_entry` |
+| `0x0001000000000003` | `BBP_TAG_CMDLINE` | Core | `bbp_tag_cmdline` |
+| `0x0002000000000001` | `BBP_TAG_MEMORY_MAP` | Memory | `bbp_tag_memory_map` + entries |
+| `0x0002000000000002` | `BBP_TAG_HHDM` | Memory | `bbp_tag_hhdm` |
+| `0x0002000000000003` | `BBP_TAG_KERNEL_ADDRESS` | Memory | `bbp_tag_kernel_address` |
+| `0x0003000000000001` | `BBP_TAG_FRAMEBUFFER` | Device | `bbp_tag_framebuffer` |
+| `0x0003000000000002` | `BBP_TAG_PCIE` | Device | `bbp_tag_pcie` |
+| `0x0004000000000001` | `BBP_TAG_SECURITY` | Security | `bbp_tag_security` |
+| `0x0005000000000001` | `BBP_TAG_ACPI` | Platform | physical pointer to RSDP |
+| `0x0005000000000002` | `BBP_TAG_DEVICETREE` | Platform | physical pointer to DTB |
+| `0x0005000000000003` | `BBP_TAG_EFI` | Platform | `bbp_tag_efi` |
+| `0x0005000000000004` | `BBP_TAG_HYPERVISOR` | Platform | `bbp_tag_hypervisor` |
+| `0x0005000000000005` | `BBP_TAG_SMBIOS` | Platform | physical pointer to SMBIOS entry |
+| `0x0006000000000001` | `BBP_TAG_METRICS` | Debug | `bbp_tag_metrics` |
+
+## Limits
+
+| Limit | Value | Rationale |
+|---|---|---|
+| Maximum `bbp_info.info_size` | 64 KiB | Keeps the handoff inside a single low page on x86 |
+| Maximum tag count | 256 | Fast array scan; avoids unbounded walks |
+| Maximum cmdline length | 4 KiB | Fits in a page; keeps parsing simple |
+| Maximum memory-map entries | 128 | Typical x86/ACPI systems fit comfortably |
+| Maximum module count | 32 | Matches the small static kernel model |
+| Bootloader name/version | 31/15 bytes | Space inside `bbp_info` |
+| Kernel name | 63 bytes | Space inside `bbp_header` |
+
+These limits are advisory minimums for a compliant producer. A defensive parser
+must still reject out-of-range values even if a producer ignores them.
 
 ## Memory map entry
 
