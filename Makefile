@@ -181,7 +181,7 @@ endef
 
 # ──────────────────────────────────────────────── phony decls ───────────────
 .PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
-        sizes symbols hash checksums tree stats audit journey watch ci backup \
+        sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         banner require-artifacts test test-quick test-shell test-large-rootfs \
         toolchain
 
@@ -602,6 +602,9 @@ audit:
 	fi
 	@printf '\n'
 
+provenance:
+	@bash "$(REPO_ROOT)/scripts/provenance.sh" | tail -n 1 | xargs -I{} printf '\n  $(CG)$(G_OK)$(CR) wrote $(CWH){}$(CR)\n'
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              CI / WATCH                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
@@ -750,6 +753,7 @@ help:
 	@printf '    $(CWH)tree$(CR)           source layout\n'
 	@printf '    $(CWH)stats$(CR)          LOC vs upstream Linus 1991\n'
 	@printf '    $(CWH)audit$(CR)          diff against upstream\n'
+	@printf '    $(CWH)provenance$(CR)     write build/PROVENANCE.txt\n'
 	@printf '\n  $(CB)$(CM)test$(CR)\n'
 	@printf '    $(CWH)test$(CR)           build + full boot test in bEMU\n'
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
