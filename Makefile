@@ -188,8 +188,8 @@ endef
 # ──────────────────────────────────────────────── phony decls ───────────────
 .PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
-        reproducible verify-reproducible release-check banner require-artifacts test \
-        test-quick test-shell test-large-rootfs toolchain
+        reproducible verify-reproducible release-check artifact banner require-artifacts \
+        test test-quick test-shell test-large-rootfs toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -629,6 +629,9 @@ verify-reproducible:
 release-check:
 	@bash "$(REPO_ROOT)/scripts/release-check.sh"
 
+artifact:
+	@bash "$(REPO_ROOT)/scripts/make-artifact.sh"
+
 watch:
 	@printf '  $(CB)watching source tree for changes (Ctrl-C to stop)$(CR)\n\n'
 	@rebuild() { \
@@ -780,6 +783,7 @@ help:
 	@printf '    $(CWH)reproducible$(CR)   clean build with SOURCE_DATE_EPOCH\n'
 	@printf '    $(CWH)verify-reproducible$(CR) double-build byte compare\n'
 	@printf '    $(CWH)release-check$(CR)  independent release verification\n'
+	@printf '    $(CWH)artifact$(CR)       create release tarball\n'
 	@printf '    $(CWH)toolchain$(CR)      auto-install all tools (detects OS)\n'
 	@printf '    $(CWH)backup$(CR)         git tag with codename\n'
 	@printf '    $(CWH)journey$(CR)        cinematic 1991→2026 story\n'
