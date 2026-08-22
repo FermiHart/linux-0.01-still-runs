@@ -119,6 +119,56 @@ Emitted when host input is injected into the guest.
 }
 ```
 
+### `syscall`
+
+Emitted when the guest executes a system call.  On the KVM backend used by
+bEMU this event is produced only when explicit instrumentation is available
+(Wave 073); the schema contract is defined now so that record/replay tools can
+consume it.
+
+```json
+{
+  "ts": 1239,
+  "type": "syscall",
+  "data": {
+    "number": 1,
+    "args": [0, 1, 2, 0, 0, 0]
+  }
+}
+```
+
+### `interrupt`
+
+Emitted when the guest takes a hardware or software interrupt.
+
+```json
+{
+  "ts": 1240,
+  "type": "interrupt",
+  "data": {
+    "vector": 128
+  }
+}
+```
+
+### `process`
+
+Emitted on process lifecycle transitions when instrumentation is available.
+
+```json
+{
+  "ts": 1241,
+  "type": "process",
+  "data": {
+    "pid": 1,
+    "action": "fork",
+    "name": "init"
+  }
+}
+```
+
+Valid actions: `fork`, `exec`, `exit`, `wait`, `switch`.
+
 ### `shutdown`
 
 Emitted when the guest halts or bEMU gives up.
