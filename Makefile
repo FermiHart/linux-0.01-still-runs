@@ -87,6 +87,7 @@ HOSTCFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wformat-security \
               -D_FORTIFY_SOURCE=2 -fPIE
 HOSTLDFLAGS ?= -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
 BEMU_LDFLAGS ?= -static-pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
+BEMU_SANFLAGS ?= -fsanitize=undefined -fno-omit-frame-pointer
 
 # ──────────────────────────────────────────────── object lists ──────────────
 KERNEL_OBJS := \
@@ -187,12 +188,12 @@ define OK
 endef
 
 # ──────────────────────────────────────────────── phony decls ───────────────
-.PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
+.PHONY: help all clean run run-headless kernel image bemu bemu-sanitized dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices golden-trace toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-sanitized golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -363,6 +364,21 @@ $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h 
 	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bbp/bbp_build.c $(BEMU_LDFLAGS)
 	$(call OK,bemu-linux01 ready)
 
+$(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h \
+                        bemu/machine.c bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
+                        bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
+                        bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
+                        bemu/keyboard.c bemu/keyboard.h \
+                        bbp/bbp_build.c bbp/bbp_build.h \
+                        bbp/linux01_handoff.h bbp/include/bbp/bbp.h \
+                        bbp/include/bbp/bbp_crc64.h | dirs
+	$(call STAGE,8/10,building bEMU with ASan/UBSan)
+	@$(HOSTCC) $(HOSTCFLAGS) $(BEMU_SANFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bbp/bbp_build.c $(BEMU_LDFLAGS) $(BEMU_SANFLAGS) -lm
+	$(call OK,bemu-linux01-sanitized ready)
+
+bemu-sanitized: $(BUILD)/bemu-linux01-sanitized
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              RUN TARGETS                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
@@ -503,6 +519,11 @@ golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 test-bemu-devices: $(BUILD)/test-bemu-devices
 	$(call STAGE,9/10,running bEMU device unit tests)
 	@$(BUILD)/test-bemu-devices
+
+test-sanitized: bemu-sanitized require-artifacts
+	$(call STAGE,9/10,running boot test under ASan/UBSan)
+	@ASAN_OPTIONS=detect_leaks=0 python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01-sanitized \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 
 $(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/pic.h bemu/pit.h bemu/uart.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
