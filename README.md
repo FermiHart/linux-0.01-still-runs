@@ -4,7 +4,7 @@
 
 **Linus Torvalds' 1991 kernel, booting on 2026 silicon.**
 
-Not emulated. Not behind glass. Running.
+Hardware-virtualized and firmware-free. Not behind glass. Running.
 
 <img src="docs/screenshots/01-boot-motd.png" alt="linux-0.01-still-runs booting through bEMU — kernel boot, full MOTD, PC-compatible 8x8 font, the year 2026" width="720"/>
 
@@ -27,7 +27,7 @@ Not works in the sense of a museum exhibit under rope and velvet. Works in the s
 
 He was wrong about the scale. But he was right about the spirit.
 
-This project exists to keep that spirit running. **Not frozen. Not emulated behind a glass pane. Running.** The original linux-0.01 source — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a firmware-free KVM runner, a toolchain that speaks 2026 C while respecting 1991 conventions, and just enough runtime patches to make the thing boot without panicking on its own assumptions.
+This project exists to keep that spirit running. **Not frozen. Not emulated behind a glass pane. Running.** The historical Linux 0.01 core — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a firmware-free KVM runner, a toolchain that speaks 2026 C while respecting 1991 conventions, and just enough documented runtime patches to make the thing boot without panicking on its own assumptions.
 
 **Welcome to 1991. It still runs in 2026.**
 
@@ -171,7 +171,7 @@ Tab completion: press `Tab` once to complete, twice to list matches in columns. 
 
 ## Notable fixes & curiosities
 
-- **GCC -O2 mis-compiled `fs/buffer.c`'s free-list walk.** The original `while (tmp != free_list || (tmp=NULL))` trick discarded its side-effect on modern toolchains, causing the second `_open3(O_CREAT)` after any FS write to panic. Fixed by rewriting the loop AND dropping `fs/buffer.o`+`fs/bitmap.o` to `-O1`. Same class of Heisenbug as the existing `sys_ioctl` `volatile int ret` patch.
+- **`-O2` sensitivity in `fs/buffer.c`.** The original `while (tmp != free_list || (tmp=NULL))` idiom triggers a panic at `-O2` on modern GCC (the second `_open3(O_CREAT)` after any FS write fails). We keep the rewritten loop and compile `fs/buffer.o`+`fs/bitmap.o` at `-O1`. Whether this is a GCC optimization bug, undefined behavior in the 1991 code, or an ABI assumption is under investigation (see `docs/AUDIT-STATEMENTS.md` and Waves 075–083).
 - **CMOS Y2K rollover.** `kernel_mktime` reads `tm_year` as years-since-1900; CMOS gives 2-digit year, so `26` meant 1926 → epoch went negative → `date` showed Jan 1 1970. Treat `< 70` as `20yy`.
 - **Serial throughput.** UART was at 2400 baud with polled busy-wait; `printk` also routed every byte twice (`serial_puts` *and* `tty_write` → `con_write` → `serial_console_write`). At 26 commands the write_q saturated and the shell blocked. Bumped to 115200, dropped the duplicate path.
 - **CP437 on VGA.** Original `con_write` filtered to bytes 32–126. Since we ship the full PC-compatible 8×8 font in plane 2, loosened the filter to let extended slots through — `∞` at `0xEC`, box-drawing chars, math symbols.
@@ -183,7 +183,7 @@ Tab completion: press `Tab` once to complete, twice to list matches in columns. 
 | | |
 |---|---|
 | The supported build/test host is Linux KVM | bEMU requires Linux headers and writable `/dev/kvm`; no fallback backend is claimed |
-| Runtime file creation in the shell is session-local (VFS-only); a kernel-side Minix allocator audit remains pending for true on-disk `mkdir`/`creat` | shell `mkdir/touch/rm` work; they just don't survive a reboot |
+| Runtime file creation in the shell is session-local (VFS-only); real on-disk `mkdir`/`creat` is the focus of Waves 026–040 | shell `mkdir/touch/rm` work; they just don't survive a reboot yet |
 | External binary execution is explicit-by-path (`/bin/hello`). No `$PATH` resolution yet | by design — keeps the surface small |
 
 ---
