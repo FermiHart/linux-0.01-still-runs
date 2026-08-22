@@ -193,7 +193,8 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-sanitized static-analysis fuzz golden-trace toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-sanitized static-analysis fuzz \
+        bbp-golden-vectors golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -552,6 +553,14 @@ $(BUILD)/test-bbp-invalid: tests/bemu/test_bbp_invalid.c bbp/include/bbp/bbp.h b
 $(BUILD)/test-bbp-trunc: tests/bemu/test_bbp_trunc.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bbp_trunc.c
+
+bbp-golden-vectors: $(BUILD)/bbp-tool | dirs
+	@$(BUILD)/bbp-tool encode tests/bemu/golden/bbp-minimal.bin
+	$(call OK,wrote tests/bemu/golden/bbp-minimal.bin)
+
+$(BUILD)/test-bbp-golden: tests/bemu/test_bbp_golden.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" tests/bemu/test_bbp_golden.c
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              DIAGNOSTICS                                 ║
