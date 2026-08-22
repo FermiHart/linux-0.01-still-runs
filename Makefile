@@ -521,9 +521,10 @@ golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
 
-test-bemu-devices: $(BUILD)/test-bemu-devices
+test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid
 	$(call STAGE,9/10,running bEMU device unit tests)
 	@$(BUILD)/test-bemu-devices
+	@$(BUILD)/test-bbp-invalid
 
 test-sanitized: bemu-sanitized require-artifacts
 	$(call STAGE,9/10,running boot test under ASan/UBSan)
@@ -542,6 +543,10 @@ $(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bemu_devices.c \
 	  bemu/pic.c bemu/pit.c bemu/uart.c
+
+$(BUILD)/test-bbp-invalid: tests/bemu/test_bbp_invalid.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" tests/bemu/test_bbp_invalid.c
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              DIAGNOSTICS                                 ║
