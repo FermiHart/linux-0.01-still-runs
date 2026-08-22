@@ -5,9 +5,11 @@
  *   SPDX-License-Identifier: BSD-3-Clause
  *
  * BBP is a tag-based, UUID-versioned, multi-architecture boot-handoff layer
- * with CRC64-checksummed structures and a defensive, untrusted-input-safe
- * kernel-side parser. It is a stable on-the-wire ABI shared between a producer
- * (a bootloader, a UEFI-stub component, or an in-kernel adapter) and a
+ * with CRC64-checksummed structures and a defensive kernel-side parser that
+ * treats producer data as untrusted. CRC64 detects corruption; it does not
+ * authenticate a malicious producer. The stable on-the-wire ABI is shared
+ * between a producer
+ * (a machine runner or boot environment) and a
  * (possibly higher-half) kernel.
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -68,6 +70,7 @@ enum {
     BBP_ARCH_AARCH64   = 2,
     BBP_ARCH_RISCV64   = 3,
     BBP_ARCH_LOONGARCH = 4,
+    BBP_ARCH_X86_32    = 5,
 };
 
 enum {

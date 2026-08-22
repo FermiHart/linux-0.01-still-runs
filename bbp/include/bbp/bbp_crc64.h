@@ -2,7 +2,7 @@
  * bbp_crc64.h — CRC-64/XZ (ECMA-182) for the Bear Boot Protocol.
  *
  * Freestanding, header-only, zero global state, no libc.
- * Same parameters as the checksum used by Limine / xz:
+ * Same parameters as CRC-64/XZ:
  *
  *     width   = 64
  *     poly    = 0x42F0E1EBA9EA3693   (reflected: 0xC96C5795D7870F42)

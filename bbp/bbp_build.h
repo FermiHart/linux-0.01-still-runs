@@ -25,8 +25,9 @@ struct bbp_builder {
     int        overflow;    /* set if any append exceeded capacity */
 };
 
-/* Initialize a builder over [arena, arena+capacity). arena_phys is the
- * physical address corresponding to arena (equal when identity-mapped). */
+/* Initialize a builder over [arena, arena+capacity). arena and arena_phys must
+ * be 8-byte aligned; arena_phys is the physical address corresponding to arena
+ * (equal when identity-mapped). Invalid inputs set b->overflow. */
 void bbp_builder_init(struct bbp_builder *b, void *arena,
                       bbp_phys_t arena_phys, size_t capacity);
 
@@ -44,7 +45,8 @@ void *bbp_alloc_tag(struct bbp_builder *b, uint64_t tag_id,
 void bbp_seal_tag(struct bbp_builder *b, void *tag);
 
 /* Append a NUL-terminated string into the arena, returns its phys addr
- * (helper for cmdline / metadata blobs). 0 on overflow. */
+ * (helper for cmdline / metadata blobs). The scan is bounded by arena capacity
+ * and uint32_t length representation. 0 on overflow or missing terminator. */
 bbp_phys_t bbp_arena_strdup(struct bbp_builder *b, const char *s, uint32_t *out_len);
 
 /* Append an arbitrary blob, returns its phys addr (8-byte aligned). */
@@ -53,7 +55,8 @@ bbp_phys_t bbp_arena_blob(struct bbp_builder *b, const void *data, size_t len);
 /* Finalize: populate `info` (caller pre-fills bootloader_name/version/uuid/
  * timestamps/architecture/cpu_count), wire first_tag/tag_count/info_size,
  * re-seal EVERY tag's CRC (now that the next_tag chain is complete) and the
- * info CRC. Returns the physical address of `info` for the jump.
+ * info CRC. Returns the physical address of `info` for the jump, or 0 and sets
+ * b->overflow if the arena chain/arithmetic/contiguity checks fail.
  *
  * PRECONDITION (ADR-0008): for `info_size` to be correct, `info` MUST sit
  * immediately before the builder arena and be contiguous with it (the
