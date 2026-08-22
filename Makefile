@@ -188,8 +188,9 @@ endef
 # ──────────────────────────────────────────────── phony decls ───────────────
 .PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
-        reproducible verify-reproducible release-check artifact inspect-rootfs banner \
-        require-artifacts test test-quick test-shell test-large-rootfs toolchain
+        reproducible verify-reproducible release-check artifact inspect-rootfs \
+        fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
+        toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -640,6 +641,9 @@ artifact:
 inspect-rootfs: $(BUILD)/root.img $(BUILD)/minix-inspect
 	@"$(BUILD)/minix-inspect" "$(BUILD)/root.img"
 
+fsck-rootfs: $(BUILD)/root.img
+	@bash "$(REPO_ROOT)/scripts/fsck-rootfs.sh"
+
 watch:
 	@printf '  $(CB)watching source tree for changes (Ctrl-C to stop)$(CR)\n\n'
 	@rebuild() { \
@@ -787,6 +791,7 @@ help:
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
+	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
 	@printf '\n  $(CB)$(CP)workflow$(CR)\n'
 	@printf '    $(CWH)watch$(CR)          auto-rebuild on file change\n'
 	@printf '    $(CWH)ci$(CR)             clean build + full tests + checksums\n'
