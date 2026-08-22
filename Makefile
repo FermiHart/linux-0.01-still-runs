@@ -193,7 +193,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-sanitized static-analysis fuzz \
+        test-fs-inspect test-fs-real test-bemu-devices test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -442,6 +442,7 @@ test: all
 	$(call STAGE,9/10,running bEMU boot test suite)
 	@python3 tests/test_harness_utils.py
 	@$(MAKE) --no-print-directory test-bemu-devices
+	@$(MAKE) --no-print-directory bbp-conformance
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -558,6 +559,15 @@ bbp-golden-vectors: $(BUILD)/bbp-tool | dirs
 	@$(BUILD)/bbp-tool encode tests/bemu/golden/bbp-minimal.bin
 	$(call OK,wrote tests/bemu/golden/bbp-minimal.bin)
 
+bbp-conformance: $(BUILD)/bbp-tool $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-bbp-golden | dirs
+	$(call STAGE,9/10,running BBP conformance tests)
+	@rm -f /tmp/bbp-conformance.bin
+	@$(BUILD)/bbp-tool encode /tmp/bbp-conformance.bin
+	@$(BUILD)/bbp-tool decode /tmp/bbp-conformance.bin
+	@$(BUILD)/test-bbp-invalid
+	@$(BUILD)/test-bbp-trunc
+	@$(BUILD)/test-bbp-golden tests/bemu/golden/bbp-minimal.bin
+	$(call OK,BBP conformance tests passed)
 $(BUILD)/test-bbp-golden: tests/bemu/test_bbp_golden.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bbp_golden.c
