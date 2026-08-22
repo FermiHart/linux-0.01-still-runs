@@ -1,42 +1,47 @@
 # linux-0.01-still-runs — Containerized build environment
 #
 # Build:   docker build -t linux-0.01-still-runs .
-# Run:     docker run --rm -it linux-0.01-still-runs
+# Run:     docker run --rm linux-0.01-still-runs
 # Shell:   docker run --rm -it --entrypoint /bin/bash linux-0.01-still-runs
+# Export:  docker build --target artifacts --output type=local,dest=. .
 #
-# Produces: /build/linux-0.01.iso  and  /build/root.img
+# Produces: kernel, root image, and the bEMU KVM runner under /build in both
+# the default image and the exported artifacts stage.
 
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     nasm \
-    qemu-system-x86 \
-    xorriso \
-    git \
     ca-certificates \
-    x86_64-elf-gcc \
-    x86_64-elf-binutils \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth=1 -b v8.x https://github.com/limine-bootloader/limine.git /tmp/limine-src \
-    && make -C /tmp/limine-src
-
 WORKDIR /src
-COPY . .
+COPY Makefile ./
+COPY LICENSE ./
+COPY bbp/ bbp/
+COPY bemu/ bemu/
+COPY boot/ boot/
+COPY fs/ fs/
+COPY include/ include/
+COPY init/ init/
+COPY kernel/ kernel/
+COPY lib/ lib/
+COPY mm/ mm/
+COPY tools/mkimage.c tools/mkimage.c
+COPY userland/ userland/
 
-RUN mkdir -p /build
-RUN make all 2>&1
+RUN make all
+RUN install -d -m 0755 /build \
+    && install -m 0644 build/root.img build/kernel.elf build/kernel.bin /build/ \
+    && install -m 0644 LICENSE /build/LICENSE \
+    && install -m 0755 build/bemu-linux01 /build/bemu-linux01
 
 FROM scratch AS artifacts
-COPY --from=builder /src/build/linux-0.01.iso /build/linux-0.01.iso
-COPY --from=builder /src/build/root.img /build/root.img
-COPY --from=builder /src/build/kernel.elf /build/kernel.elf
-COPY --from=builder /src/build/kernel.bin /build/kernel.bin
-COPY --from=builder /src/build/bootstub.elf /build/bootstub.elf
+COPY --from=builder /build/ /build/
 
 FROM builder
-CMD ["make", "run"]
+CMD ["make", "all"]

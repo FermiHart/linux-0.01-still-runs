@@ -5,16 +5,18 @@
 #   Author    : F E R M I ∞ H A R T  <contact@fermihart.com>
 #   Subject   : Linus Torvalds' first kernel (1991) booting on 2026 iron
 #   Codename  : Vesica Piscis      Channel: v0.1 FOREVER
-#   License   : FHCL draft / Unlicense fallback
+#   License   : Linux 0.01 terms / BSD-3-Clause / Unlicense (see LICENSE)
 #
 #   First time?  →  make help
-#   Show off?    →  make boom        (clean + build + launch QEMU)
+#   Show off?    →  make boom        (clean + build + launch bEMU)
 #   Daily work?  →  make run         (build incrementally + run)
 #
 # ════════════════════════════════════════════════════════════════════════════
 
 SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
+.DELETE_ON_ERROR:
 
 # ──────────────────────────────────────────────── identity ──────────────────
 CODENAME   := Vesica Piscis
@@ -25,11 +27,33 @@ EMAIL      := contact@fermihart.com
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 BUILD_HOST := $(shell hostname -s 2>/dev/null || hostname)
 GIT_REV    := $(shell git rev-parse --short HEAD 2>/dev/null || echo "no-git")
-GIT_DIRTY  := $(shell git diff --quiet 2>/dev/null && printf ' ' || printf '★')
+GIT_DIRTY  := $(shell test -z "$$(git status --porcelain 2>/dev/null)" && printf ' ' || printf '★')
 UNAME_S    := $(shell uname -s)
+REPO_ROOT  := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+BUILD      ?= build
+MAKE_COMMAND := $(MAKE)
+export BUILD MAKE_COMMAND
+
+ARTIFACT_NAMES := kernel.elf kernel.bin root.img bemu-linux01 mkimage \
+                  shell.bin update.bin hello.bin
+ARTIFACTS = $(addprefix $(BUILD)/,$(ARTIFACT_NAMES))
 
 # ──────────────────────────────────────────────── toolchain ─────────────────
-PREFIX     := x86_64-elf-
+# Prefer a cross-compiler when one is installed. Linux can use its native
+# freestanding toolchain because every target is explicitly built as i386.
+# Override with `make PREFIX=/path/to/bin/x86_64-elf-` when needed.
+PREFIX ?= $(shell \
+  if [ -f "$(BUILD)/.cross_prefix" ]; then \
+    read -r p < "$(BUILD)/.cross_prefix"; \
+    if [ -x "$$p/bin/x86_64-elf-gcc" ]; then \
+      printf '%s/bin/x86_64-elf-' "$$p"; exit 0; \
+    fi; \
+  fi; \
+  if command -v x86_64-elf-gcc >/dev/null 2>&1; then printf 'x86_64-elf-'; \
+  elif [ -x "$(HOME)/.local/cross/bin/x86_64-elf-gcc" ]; then printf '%s/.local/cross/bin/x86_64-elf-' "$(HOME)"; \
+  elif [ -x /opt/cross/bin/x86_64-elf-gcc ]; then printf '/opt/cross/bin/x86_64-elf-'; \
+  elif [ "$(UNAME_S)" = Linux ]; then printf ''; \
+  else printf 'x86_64-elf-'; fi)
 CC         := $(PREFIX)gcc
 AS         := $(PREFIX)as
 LD         := $(PREFIX)ld
@@ -37,35 +61,26 @@ OBJCOPY    := $(PREFIX)objcopy
 OBJDUMP    := $(PREFIX)objdump
 NM         := $(PREFIX)nm
 NASM       := nasm
-QEMU       := qemu-system-i386
-XORRISO    := xorriso
-# Limine bootloader. Auto-detected so the build never hard-depends on a hand-
-# populated /tmp dir. Resolution order (first hit wins; override on the CLI with
-# `make LIMINE_DIR=/path`):
-#   1. legacy /tmp/limine-src build dir (if it still has the artifacts)
-#   2. Homebrew/system data dir (/usr/local or /opt/homebrew share/limine)
-# LIMINE_BIN is resolved separately because brew ships the data in share/ but the
-# `limine` executable in bin/ (PATH).
-LIMINE_DIR ?= $(shell \
-  if [ -f /tmp/limine-src/limine-bios-cd.bin ]; then echo /tmp/limine-src; \
-  elif [ -f /usr/local/share/limine/limine-bios-cd.bin ]; then echo /usr/local/share/limine; \
-  elif [ -f /opt/homebrew/share/limine/limine-bios-cd.bin ]; then echo /opt/homebrew/share/limine; \
-  else echo /tmp/limine-src; fi)
-LIMINE_BIN ?= $(shell command -v limine 2>/dev/null || echo $(LIMINE_DIR)/limine)
+HOSTCC     ?= cc
 
 # ──────────────────────────────────────────────── flags ─────────────────────
 COMMON_FLAGS = -m32 -march=i386 \
                -ffreestanding -nostdinc -fno-pie -fno-pic \
                -fno-stack-protector -fno-asynchronous-unwind-tables \
-               -fno-builtin -fleading-underscore -fno-omit-frame-pointer \
+               -fno-builtin -fno-strict-aliasing -fleading-underscore -fno-omit-frame-pointer \
                -mpreferred-stack-boundary=2 \
                -Wall -Werror -O2
 
 CFLAGS  := $(COMMON_FLAGS) -std=gnu89 -Iinclude
 ASFLAGS := --32
 LDFLAGS := -m elf_i386 -nostdlib -z noexecstack -z max-page-size=0x1000 --no-warn-rwx-segments
+DEPFLAGS = -MMD -MP -MF $(@:.o=.d) -MT $@
 
-BUILD := build
+HOSTCFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wformat-security \
+              -Werror=format-security -fstack-protector-strong \
+              -D_FORTIFY_SOURCE=2 -fPIE
+HOSTLDFLAGS ?= -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
+BEMU_LDFLAGS ?= -static-pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
 
 # ──────────────────────────────────────────────── object lists ──────────────
 KERNEL_OBJS := \
@@ -91,15 +106,18 @@ INIT_OBJS := init/main.o
 HEAD_OBJ  := boot/head.o
 
 # ── Bear Boot Protocol (BBP) — native linux-0.01 port ────────────────────────
-# Additive, non-fatal CRC-sealed boot-handoff layer. Lives entirely in bbp/.
+# Additive, non-fatal CRC-checksummed boot-handoff layer. Lives in bbp/.
 # The BBP core REQUIRES C99+ (for-initializer declarations), but the 1991
 # kernel builds -std=gnu89; so the BBP objects get their OWN -std=gnu11 while
 # keeping every OTHER kernel flag — crucially -fleading-underscore, so the glue
 # resolves _printk / _panic exactly like the rest of the kernel. See bbp/.
-BBP_OBJS := \
-    bbp/bbp_kernel.o bbp/bbp_build.o bbp/osif.o bbp/adapter.o bbp/linux01_bbp.o
+BBP_OBJS := bbp/bbp_kernel.o bbp/linux01_bbp.o
 
 ALL_OBJS := $(HEAD_OBJ) $(INIT_OBJS) $(KERNEL_OBJS) $(MM_OBJS) $(FS_OBJS) $(LIB_OBJS) $(BBP_OBJS)
+SOURCE_DEPFILES := $(filter-out boot/head.d,$(ALL_OBJS:.o=.d))
+DEPFILES := $(SOURCE_DEPFILES) $(BUILD)/hello.d $(BUILD)/shell.d $(BUILD)/mkimage.d
+
+-include $(DEPFILES)
 
 # ──────────────────────────────────────────────── ANSI palette ──────────────
 ifneq ($(NO_COLOR),)
@@ -162,27 +180,34 @@ define OK
 endef
 
 # ──────────────────────────────────────────────── phony decls ───────────────
-.PHONY: help all clean deepclean run run-uefi run-debug run-headless run-monitor \
-        iso kernel image dirs boom doctor info sizes symbols hash tree stats \
-        audit journey watch ci backup logs screenshot replay banner \
-        test test-quick test-shell test-large-rootfs bootmon gdb
+.PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
+        sizes symbols hash checksums tree stats audit journey watch ci backup \
+        banner require-artifacts test test-quick test-shell test-large-rootfs \
+        toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-all: banner $(BUILD)/linux-0.01.iso $(BUILD)/root.img
+all: banner
+	@$(MAKE) --no-print-directory $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/bemu-linux01
 	@$(call _summary)
 
 banner:
 	$(SPLASH)
 
 dirs:
-	@mkdir -p $(BUILD) $(BUILD)/iso_root
+	@repo_root="$(REPO_ROOT)"; \
+	  build_abs="$$(python3 -c 'import os; print(os.path.realpath(os.environ["BUILD"]))')"; \
+	  case "$$build_abs" in \
+	    "$$repo_root/build"|"$$repo_root/build"/*) ;; \
+	    *) printf '  $(CRD)$(G_NO)$(CR) refusing BUILD outside the canonical repository build tree: %s\n' "$$build_abs" >&2; exit 1 ;; \
+	  esac; \
+	  mkdir -p -- "$$build_abs"
 
 %.o: %.c
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s\n' "$<" "$@"
-	@$(CC) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(CFLAGS) $(DEPFLAGS) -c -o "$@" "$<"
 
 # fs/buffer.c + fs/bitmap.c: -O2 mis-compiles the buffer-cache walk and
 # new_block's getblk result handling on modern GCC (Heisenbug — masked by
@@ -190,11 +215,11 @@ dirs:
 # -O1 here only. Same class as the sys_ioctl `volatile int ret` fix.
 fs/buffer.o: fs/buffer.c
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 heisenbug]$(CR)\n' "$<" "$@"
-	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 -c -o $@ $<
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
 fs/bitmap.o: fs/bitmap.c
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 heisenbug]$(CR)\n' "$<" "$@"
-	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 -c -o $@ $<
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
 # kernel/vsprintf.c: -O2 miscompiles the `%s` case (va_arg(char*) fetch) on
 # modern GCC — a non-empty %s renders garbage (the pointer is read off by a
@@ -204,79 +229,56 @@ fs/bitmap.o: fs/bitmap.c
 # adapter printed a real status string. Drop to -O1 here only.
 kernel/vsprintf.o: kernel/vsprintf.c
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 %%s heisenbug]$(CR)\n' "$<" "$@"
-	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 -c -o $@ $<
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
 # ── BBP objects: same kernel flags (incl. -fleading-underscore so _printk /
 # _panic resolve), but -std=gnu11 (the core uses C99 for-initializer
 # declarations) plus the BBP core + compat-shim include paths.
-# -DBBP_L01_HIGH_MEMORY is pulled live from include/linux/config.h so the glue's
-# RAM model always matches the kernel ceiling. The active #define is the one not
-# guarded out; LINUS_HD selects 0x800000. tools/bbp_highmem.sh asks the C
-# preprocessor for the active value (a bare $(shell awk ...) trips make's paren
-# counting on the (0x...) literal, hence the helper script).
-BBP_HIGH_MEMORY := $(shell sh tools/bbp_highmem.sh)
 BBP_CFLAGS := $(filter-out -std=gnu89,$(COMMON_FLAGS)) -std=gnu11 \
-              -Ibbp/include -Ibbp/compat -Iinclude \
-              -DBBP_L01_HIGH_MEMORY=$(BBP_HIGH_MEMORY)
+              -Ibbp/include -Ibbp/compat -Iinclude
 
 # Each BBP object is pinned explicitly: GNU make 3.81 (macOS bundled) does not
 # reliably prefer the shorter-stem `bbp/%.o` over the generic `%.o: %.c`, so a
 # pattern rule alone could be shadowed and silently compile with the wrong
 # (gnu89, no-BBP-include) flags. Explicit targets guarantee BBP_CFLAGS.
 #
-# Header deps are listed explicitly: this Makefile predates -MMD auto-deps, so
-# without these, editing a BBP header would not rebuild the objects that include
-# it (silent stale build). BBP_HDRS is every header the BBP TUs can pull.
+# Keep explicit BBP prerequisites for first-build clarity; generated -MMD
+# dependency files maintain the complete transitive set after compilation.
 BBP_HDRS := bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h \
-            bbp/include/bbp/bbp_osif.h bbp/bbp_kernel.h bbp/bbp_build.h \
-            bbp/osif.h bbp/adapter.h bbp/linux01_bbp.h \
+            bbp/bbp_kernel.h bbp/linux01_bbp.h bbp/linux01_handoff.h \
             bbp/compat/stdint.h bbp/compat/stddef.h
 
 bbp/bbp_kernel.o:  bbp/bbp_kernel.c $(BBP_HDRS)
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[bbp gnu11]$(CR)\n' "$<" "$@"
-	@$(CC) $(BBP_CFLAGS) -c -o $@ $<
-bbp/bbp_build.o:   bbp/bbp_build.c $(BBP_HDRS)
-	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[bbp gnu11]$(CR)\n' "$<" "$@"
-	@$(CC) $(BBP_CFLAGS) -c -o $@ $<
-bbp/osif.o:        bbp/osif.c $(BBP_HDRS)
-	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[bbp gnu11]$(CR)\n' "$<" "$@"
-	@$(CC) $(BBP_CFLAGS) -c -o $@ $<
-bbp/adapter.o:     bbp/adapter.c $(BBP_HDRS)
-	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[bbp gnu11]$(CR)\n' "$<" "$@"
-	@$(CC) $(BBP_CFLAGS) -c -o $@ $<
+	@$(CC) $(BBP_CFLAGS) $(DEPFLAGS) -c -o "$@" "$<"
 bbp/linux01_bbp.o: bbp/linux01_bbp.c $(BBP_HDRS)
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[bbp gnu11]$(CR)\n' "$<" "$@"
-	@$(CC) $(BBP_CFLAGS) -c -o $@ $<
+	@$(CC) $(BBP_CFLAGS) $(DEPFLAGS) -c -o "$@" "$<"
 
 # init/main.c includes bbp/linux01_bbp.h (the call site), which pulls <bbp/bbp.h>.
 # It still compiles -std=gnu89 like the rest of the kernel (the BBP headers are
 # gnu89-clean), it just needs the BBP header search paths. Additive override.
 init/main.o: init/main.c bbp/linux01_bbp.h bbp/bbp_kernel.h bbp/include/bbp/bbp.h
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s\n' "$<" "$@"
-	@$(CC) $(CFLAGS) -Ibbp -Ibbp/include -Ibbp/compat -c -o $@ $<
+	@$(CC) $(CFLAGS) -Ibbp -Ibbp/include -Ibbp/compat $(DEPFLAGS) -c -o "$@" "$<"
 
 %.o: %.s
 	@printf '  $(CGY)as  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s\n' "$<" "$@"
-	@$(AS) $(ASFLAGS) -o $@ $<
+	@$(AS) $(ASFLAGS) -o "$@" "$<"
 
 %.o: %.S
 	@printf '  $(CGY)cpp $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s\n' "$<" "$@"
-	@$(CC) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(CFLAGS) $(DEPFLAGS) -c -o "$@" "$<"
 
 $(BUILD)/kernel.elf: $(ALL_OBJS) boot/kernel.ld | dirs
 	$(call STAGE,5/10,linking kernel.elf @ phys 0x00000000)
-	@$(LD) $(LDFLAGS) -T boot/kernel.ld -o $@ $(ALL_OBJS) 2>&1 | sed 's/^/    /'
+	@$(LD) $(LDFLAGS) -T boot/kernel.ld -o "$@" $(ALL_OBJS) 2>&1 | sed 's/^/    /'
 	$(call OK,kernel.elf ready)
 
 $(BUILD)/kernel.bin: $(BUILD)/kernel.elf
-	@$(OBJCOPY) -O binary $< $@
+	@$(OBJCOPY) -O binary "$<" "$@"
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "kernel.bin" "$$(stat -f%z $@ 2>/dev/null || stat -c%s $@)"
-
-$(BUILD)/bootstub.elf: boot/bootstub.o boot/bootstub.ld | dirs
-	$(call STAGE,6/10,linking bootstub.elf @ phys 0x00100000)
-	@$(LD) $(LDFLAGS) -T boot/bootstub.ld -o $@ boot/bootstub.o
-	$(call OK,bootstub.elf ready)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              USERLAND                                    ║
@@ -284,31 +286,34 @@ $(BUILD)/bootstub.elf: boot/bootstub.o boot/bootstub.ld | dirs
 
 $(BUILD)/sh.bin: userland/sh.asm | dirs
 	$(call STEP,assembling userland/sh.asm (mini-ash))
-	@$(NASM) -f bin $< -o $@
+	@$(NASM) -f bin "$<" -o "$@"
 
 $(BUILD)/update.bin: userland/update.asm | dirs
 	$(call STEP,assembling userland/update.asm (sync daemon))
-	@$(NASM) -f bin $< -o $@
+	@$(NASM) -f bin "$<" -o "$@"
 
 # ── Userland C programs ───────────────────────────────────────────
 
 $(BUILD)/crt0.o: userland/crt0.S | dirs
 	$(call STEP,assembling userland/crt0.S (C runtime))
-	@$(AS) $(ASFLAGS) -o $@ $<
+	@$(AS) $(ASFLAGS) -o "$@" "$<"
 
 $(BUILD)/hello.bin: userland/programs/hello.c $(BUILD)/crt0.o | dirs
 	$(call STEP,compiling userland/programs/hello.c (C userland demo))
-	@$(CC) $(CFLAGS) -Iuserland -c userland/programs/hello.c -o $(BUILD)/hello.o
-	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry $(BUILD)/crt0.o $(BUILD)/hello.o -o $(BUILD)/hello.elf
-	@$(OBJCOPY) -O binary $(BUILD)/hello.elf $(BUILD)/hello.bin
+	@$(CC) $(CFLAGS) -Iuserland -MMD -MP -MF "$(BUILD)/hello.d" -MT "$@" \
+	  -c userland/programs/hello.c -o "$(BUILD)/hello.o"
+	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry "$(BUILD)/crt0.o" "$(BUILD)/hello.o" -o "$(BUILD)/hello.elf"
+	@$(OBJCOPY) -O binary "$(BUILD)/hello.elf" "$(BUILD)/hello.bin"
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "hello.bin" "$$(stat -f%z $(BUILD)/hello.bin 2>/dev/null || stat -c%s $(BUILD)/hello.bin)"
 
 $(BUILD)/shell.bin: userland/shell.c $(BUILD)/crt0.o | dirs
 	$(call STEP,compiling userland/shell.c (interactive shell))
-	@$(CC) $(filter-out -O2,$(CFLAGS)) -Os -Iuserland -c userland/shell.c -o $(BUILD)/shell.o
-	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry $(BUILD)/crt0.o $(BUILD)/shell.o -o $(BUILD)/shell.elf
-	@$(OBJCOPY) -O binary $(BUILD)/shell.elf $(BUILD)/shell.bin
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -Os -Iuserland \
+	  -MMD -MP -MF "$(BUILD)/shell.d" -MT "$@" \
+	  -c userland/shell.c -o "$(BUILD)/shell.o"
+	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry "$(BUILD)/crt0.o" "$(BUILD)/shell.o" -o "$(BUILD)/shell.elf"
+	@$(OBJCOPY) -O binary "$(BUILD)/shell.elf" "$(BUILD)/shell.bin"
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "shell.bin" "$$(stat -f%z $(BUILD)/shell.bin 2>/dev/null || stat -c%s $(BUILD)/shell.bin)"
 
@@ -316,95 +321,43 @@ $(BUILD)/shell.bin: userland/shell.c $(BUILD)/crt0.o | dirs
 
 $(BUILD)/mkimage: tools/mkimage.c | dirs
 	$(call STEP,building tools/mkimage (Minix v1 + MBR forge))
-	@cc -O2 -Wno-format -o $@ $<
+	@$(HOSTCC) $(HOSTCFLAGS) -MMD -MP -MF "$(BUILD)/mkimage.d" -MT "$@" \
+	  -o "$@" "$<" $(HOSTLDFLAGS)
 
 # Collect all userland binaries (ASM + C)
 USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin
 
 $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	$(call STAGE,7/10,forging Minix v1 root filesystem)
-	@$(BUILD)/mkimage $@ $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin 2>&1 | sed 's/^/    /'
+	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" 2>&1 | sed 's/^/    /'
 	$(call OK,root.img forged)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║                                ISO                                       ║
+# ║                                bEMU                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-$(BUILD)/linux-0.01.iso: $(BUILD)/bootstub.elf $(BUILD)/kernel.bin boot/limine.conf
-	$(call STAGE,8/10,assembling bootable ISO (BIOS + UEFI))
-	@rm -rf $(BUILD)/iso_root
-	@mkdir -p $(BUILD)/iso_root/boot/limine $(BUILD)/iso_root/EFI/BOOT
-	@cp $(BUILD)/bootstub.elf       $(BUILD)/iso_root/boot/kernel.elf
-	@cp $(BUILD)/kernel.bin         $(BUILD)/iso_root/boot/linus.bin
-	@cp boot/limine.conf            $(BUILD)/iso_root/boot/limine/
-	@cp $(LIMINE_DIR)/limine-bios.sys    $(BUILD)/iso_root/boot/limine/
-	@cp $(LIMINE_DIR)/limine-bios-cd.bin $(BUILD)/iso_root/boot/limine/
-	@cp $(LIMINE_DIR)/limine-uefi-cd.bin $(BUILD)/iso_root/boot/limine/
-	@cp $(LIMINE_DIR)/BOOTX64.EFI        $(BUILD)/iso_root/EFI/BOOT/
-	@$(XORRISO) -as mkisofs -b boot/limine/limine-bios-cd.bin \
-	  -no-emul-boot -boot-load-size 4 -boot-info-table \
-	  --efi-boot boot/limine/limine-uefi-cd.bin \
-	  -efi-boot-part --efi-boot-image --protective-msdos-label \
-	  $(BUILD)/iso_root -o $@ 2>&1 | tail -3 | sed 's/^/    /'
-	@$(LIMINE_BIN) bios-install $@ 2>&1 | tail -2 | sed 's/^/    /'
-	$(call OK,ISO sealed (BIOS+UEFI dual-protocol))
+$(BUILD)/bemu-linux01: bemu/bemu_linux01.c bbp/bbp_build.c bbp/bbp_build.h \
+                        bbp/linux01_handoff.h bbp/include/bbp/bbp.h \
+                        bbp/include/bbp/bbp_crc64.h | dirs
+	$(call STAGE,8/10,building firmware-free bEMU KVM runner)
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" bemu/bemu_linux01.c bbp/bbp_build.c $(BEMU_LDFLAGS)
+	$(call OK,bemu-linux01 ready)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              RUN TARGETS                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-ifeq ($(UNAME_S),Darwin)
-QEMU_DISPLAY := cocoa
-else
-QEMU_DISPLAY := gtk
-endif
-
-QEMU_COMMON := \
-    -cdrom $(BUILD)/linux-0.01.iso \
-    -drive file=$(BUILD)/root.img,format=raw,if=none,id=hd0 \
-    -device ide-hd,drive=hd0,bus=ide.0,unit=0,cyls=977,heads=5,secs=17 \
-    -boot d -m 8M -no-reboot
-
 run: all
-	$(call STAGE,9/10,launching QEMU (Linus' kernel meets 2026 silicon))
+	$(call STAGE,9/10,launching bEMU (direct KVM, no firmware))
 	$(call _curtain_up)
-	@$(QEMU) $(QEMU_COMMON) -serial stdio \
-	    -d guest_errors,int -D $(BUILD)/qemu.log \
-	    -display $(QEMU_DISPLAY)
-	@printf '\n$(CGY)  ── curtain down ── log saved to $(BUILD)/qemu.log$(CR)\n'
+	@"$(BUILD)/bemu-linux01" --kernel "$(BUILD)/kernel.bin" --root "$(BUILD)/root.img"
 
-run-uefi: all
-	$(call STAGE,9/10,launching QEMU in UEFI mode)
-	@$(QEMU) $(QEMU_COMMON) -serial stdio \
-	    -bios $(shell brew --prefix qemu 2>/dev/null)/share/qemu/edk2-i386-code.fd \
-	    -display $(QEMU_DISPLAY)
+run-headless: run
 
-run-headless: all
-	$(call STAGE,9/10,running headless (no GUI))
-	@$(QEMU) $(QEMU_COMMON) -nographic \
-	    -serial file:$(BUILD)/serial.log \
-	    -d guest_errors,int -D $(BUILD)/qemu.log
-	@printf '  $(CGY)$(G_DOT)$(CR) serial log: $(CWH)$(BUILD)/serial.log$(CR)\n'
-	@printf '  $(CGY)$(G_DOT)$(CR) analyze:    $(CWH)make bootmon$(CR)\n'
-
-run-debug: all
-	$(call STAGE,9/10,launching QEMU with GDB stub on :1234)
-	@printf '  $(CY)gdb attach:$(CR)  target remote :1234\n\n'
-	@$(QEMU) $(QEMU_COMMON) -serial stdio -s -S \
-	    -d guest_errors,int,cpu_reset -D $(BUILD)/qemu.log \
-	    -display $(QEMU_DISPLAY)
-
-run-monitor: all
-	$(call STAGE,9/10,launching QEMU with monitor socket)
-	@rm -f $(BUILD)/mon.sock
-	@$(QEMU) $(QEMU_COMMON) -display none \
-	    -monitor unix:$(BUILD)/mon.sock,server,nowait \
-	    -serial file:$(BUILD)/serial.log \
-	    -daemonize -pidfile $(BUILD)/qemu.pid
-	@sleep 2
-	@printf '  $(CG)$(G_OK)$(CR) connect: socat - UNIX-CONNECT:$(BUILD)/mon.sock\n'
-
-boom: clean all run
+boom:
+	@$(MAKE) --no-print-directory clean
+	@$(MAKE) --no-print-directory run
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              CINEMATIC                                   ║
@@ -420,19 +373,19 @@ define _curtain_up
 	    printf "$(CR)  $(CWH)%s$(CR)\n" "$${msg[$$phase]}"; \
 	    sleep 0.18; \
 	  done; \
-	  printf "\n  $(CY)$(G_ARR) handing control to QEMU$(CR)\n\n"'
+	  printf "\n  $(CY)$(G_ARR) handing control to bEMU/KVM$(CR)\n\n"'
 endef
 
 define _summary
 	@printf '\n$(CC1)╔══════════════════════════════════════════════════════════════════════════╗$(CR)\n'
 	@printf '$(CC1)║$(CR)  $(CB)$(CG)BUILD COMPLETE$(CR)                                                          $(CC1)║$(CR)\n'
 	@printf '$(CC1)╠══════════════════════════════════════════════════════════════════════════╣$(CR)\n'
-	@for f in $(BUILD)/kernel.elf $(BUILD)/kernel.bin $(BUILD)/bootstub.elf \
-	          $(BUILD)/linux-0.01.iso $(BUILD)/root.img $(BUILD)/shell.bin $(BUILD)/hello.bin; do \
+	@for f in $(ARTIFACTS); do \
 	   if [ -f $$f ]; then \
 	     sz=$$(stat -f%z $$f 2>/dev/null || stat -c%s $$f); \
-	     printf "$(CC1)║$(CR)  $(CC1)$(G_INF)$(CR) %-32s $(CY)%14s$(CR) bytes  $(CGY)sha1$(CR) $(CP)%s$(CR)  $(CC1)║$(CR)\n" \
-	       $$f $$sz $$(shasum $$f | cut -c1-8); \
+	     h=$$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$$f"; else shasum -a 256 "$$f"; fi | cut -c1-8); \
+	     printf "$(CC1)║$(CR)  $(CC1)$(G_INF)$(CR) %-32s $(CY)%14s$(CR) bytes  $(CGY)sha256$(CR) $(CP)%s$(CR)  $(CC1)║$(CR)\n" \
+	       $$f $$sz $$h; \
 	   fi; \
 	 done
 	@printf '$(CC1)╠══════════════════════════════════════════════════════════════════════════╣$(CR)\n'
@@ -441,57 +394,52 @@ define _summary
 endef
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║                              BOOT MONITOR                                ║
-# ╚══════════════════════════════════════════════════════════════════════════╝
-
-bootmon:
-	@python3 tools/bootmon.py $(BUILD)/serial.log 2>/dev/null || \
-	  python3 tools/bootmon.py
-
-bootmon-live:
-	@python3 tools/bootmon.py --live $(BUILD)/serial.log 2>/dev/null || \
-	  echo '  $(CRD)no serial.log — run $(CWH)make run-monitor$(CR) first'
-
-bootmon-timeline:
-	@python3 tools/bootmon.py --timeline $(BUILD)/serial.log 2>/dev/null || \
-	  echo '  $(CRD)no serial.log — run $(CWH)make run$(CR) first'
-
-# ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              TESTING                                     ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 test: all
-	$(call STAGE,9/10,running QEMU boot test suite)
-	@python3 tests/test_boot.py --iso $(BUILD)/linux-0.01.iso \
-	  --img $(BUILD)/root.img --timeout 60
-	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --iso $(BUILD)/linux-0.01.iso \
-	  --img $(BUILD)/root.img --timeout 120
+	$(call STAGE,9/10,running bEMU boot test suite)
+	@python3 tests/test_harness_utils.py
+	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
+	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
+	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120 --interactive
+	@python3 tests/test_large_rootfs.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --mkimage $(BUILD)/mkimage \
+	  --shell $(BUILD)/shell.bin --update $(BUILD)/update.bin \
+	  --hello $(BUILD)/hello.bin --factor 3 --timeout 120
 
-test-quick:
+require-artifacts:
+	@missing=0; \
+	  for f in "$(BUILD)/bemu-linux01" "$(BUILD)/kernel.bin" "$(BUILD)/root.img"; do \
+	    if [ ! -f "$$f" ]; then \
+	      printf '  $(CRD)$(G_NO)$(CR) missing required artifact: %s\n' "$$f" >&2; \
+	      missing=1; \
+	    fi; \
+	  done; \
+	  if [ "$$missing" -ne 0 ]; then \
+	    printf '  $(CY)$(G_ARR)$(CR) run $(CWH)make all$(CR) first\n' >&2; \
+	    exit 1; \
+	  fi
+
+test-quick: require-artifacts
 	$(call STEP,boot test (existing artifacts))
-	@python3 tests/test_boot.py --iso $(BUILD)/linux-0.01.iso \
-	  --img $(BUILD)/root.img --timeout 15
+	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 
 test-shell: all
 	$(call STEP,shell smoke test)
-	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --iso $(BUILD)/linux-0.01.iso \
-	  --img $(BUILD)/root.img --timeout 120
+	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 
 test-large-rootfs: all
 	$(call STEP,large rootfs shell smoke test)
-	@python3 tests/test_large_rootfs.py --iso $(BUILD)/linux-0.01.iso \
+	@python3 tests/test_large_rootfs.py --bemu $(BUILD)/bemu-linux01 --kernel $(BUILD)/kernel.bin \
 	  --mkimage $(BUILD)/mkimage --shell $(BUILD)/shell.bin \
 	  --update $(BUILD)/update.bin --hello $(BUILD)/hello.bin \
 	  --factor 3 --timeout 120
-
-# ╔══════════════════════════════════════════════════════════════════════════╗
-# ║                              GDB                                         ║
-# ╚══════════════════════════════════════════════════════════════════════════╝
-
-gdb:
-	@printf '  $(CGY)$(G_DOT)$(CR) attach with: $(CWH)x86_64-elf-gdb $(BUILD)/kernel.elf -x .gdbinit$(CR)\n'
-	@printf '  $(CGY)$(G_DOT)$(CR) pretty-printers in $(CWH)gdb/printers.py$(CR)\n'
-	@printf '  $(CGY)$(G_DOT)$(CR) commands: $(CWH)task_list$(CR) $(CWH)page_table$(CR) $(CWH)buffer_list$(CR)\n'
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              DIAGNOSTICS                                 ║
@@ -500,25 +448,50 @@ gdb:
 doctor:
 	$(SPLASH)
 	@printf '\n  $(CB)$(CWH)toolchain health check$(CR)\n\n'
-	@for tool in $(CC) $(AS) $(LD) $(NM) $(OBJCOPY) $(NASM) $(QEMU) $(XORRISO) socat shasum; do \
-	  if command -v $$tool >/dev/null 2>&1; then \
-	    v=$$($$tool --version 2>/dev/null | head -1 | cut -c1-50); \
-	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)%s$(CR)\n" "$$tool" "$$v"; \
+	@status=0; \
+	  for tool in $(CC) $(AS) $(LD) $(NM) $(OBJCOPY) $(OBJDUMP) $(NASM) \
+	              $(HOSTCC) python3 make awk sed find sort git mktemp stat cut \
+	              diff tr xargs wc seq clear; do \
+	    if command -v "$$tool" >/dev/null 2>&1; then \
+	      printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)%s$(CR)\n" "$$tool" "$$(command -v "$$tool")"; \
+	    else \
+	      printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)MISSING$(CR)\n" "$$tool"; \
+	      status=1; \
+	    fi; \
+	  done; \
+	  if command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1; then \
+	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)available$(CR)\n" "SHA-256 tool"; \
 	  else \
-	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)MISSING$(CR)\n" "$$tool"; \
+	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)MISSING$(CR)\n" "SHA-256 tool"; \
+	    status=1; \
 	  fi; \
-	done
-	@printf '\n  $(CB)$(CWH)limine bootloader$(CR)\n\n'
-	@if [ -d $(LIMINE_DIR) ] && [ -f $(LIMINE_BIN) ]; then \
-	  printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)%s$(CR)\n" "limine" "$$($(LIMINE_BIN) version | head -1)"; \
-	else \
-	  printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)not built — $(CR)cd $(LIMINE_DIR) && make\n" "limine"; \
-	fi
-	@printf '\n  $(CB)$(CWH)platform$(CR)\n\n'
-	@printf "  $(CGY)$(G_DOT)$(CR) os               $(CWH)%s$(CR)\n" "$(UNAME_S)"
-	@printf "  $(CGY)$(G_DOT)$(CR) qemu display     $(CWH)%s$(CR)\n" "$(QEMU_DISPLAY)"
-	@printf "  $(CGY)$(G_DOT)$(CR) build host       $(CWH)%s$(CR)\n" "$(BUILD_HOST)"
-	@printf '\n'
+	  tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/linux001-doctor.XXXXXXXX"); \
+	  trap 'rm -rf -- "$$tmp"' EXIT; \
+	  if printf 'void f(void) {}\n' | $(CC) $(COMMON_FLAGS) -x c -c -o "$$tmp/kernel.o" - >/dev/null 2>&1; then \
+	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)i386 freestanding$(CR)\n" "compiler probe"; \
+	  else \
+	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)i386 flags rejected$(CR)\n" "compiler probe"; \
+	    status=1; \
+	  fi; \
+	  if printf 'int main(void) { return 0; }\n' | $(HOSTCC) $(HOSTCFLAGS) -x c -o "$$tmp/host" - $(BEMU_LDFLAGS) >/dev/null 2>&1; then \
+	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)static PIE$(CR)\n" "host linker probe"; \
+	  else \
+	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)static PIE unavailable$(CR)\n" "host linker probe"; \
+	    status=1; \
+	  fi; \
+	  printf '\n  $(CB)$(CWH)virtualization$(CR)\n\n'; \
+	  if [ "$(UNAME_S)" = Linux ] && [ -r /usr/include/linux/kvm.h ] && \
+	     [ -r /dev/kvm ] && [ -w /dev/kvm ]; then \
+	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)headers + read/write$(CR)\n" "/dev/kvm"; \
+	  else \
+	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)KVM unavailable$(CR)\n" "/dev/kvm"; \
+	    status=1; \
+	  fi; \
+	  printf '\n  $(CB)$(CWH)platform$(CR)\n\n'; \
+	  printf "  $(CGY)$(G_DOT)$(CR) os               $(CWH)%s$(CR)\n" "$(UNAME_S)"; \
+	  printf "  $(CGY)$(G_DOT)$(CR) boot backend     $(CWH)bEMU/KVM$(CR)\n"; \
+	  printf "  $(CGY)$(G_DOT)$(CR) build host       $(CWH)%s$(CR)\n\n" "$(BUILD_HOST)"; \
+	  exit "$$status"
 
 info:
 	$(SPLASH)
@@ -529,7 +502,7 @@ info:
 	@printf '\n'
 	@if [ -d $(BUILD) ]; then \
 	  printf '  $(CB)artifacts$(CR)\n'; \
-	  for f in $(BUILD)/*.iso $(BUILD)/*.img $(BUILD)/*.bin $(BUILD)/*.elf; do \
+	  for f in $(BUILD)/*.img $(BUILD)/*.bin $(BUILD)/*.elf $(BUILD)/bemu-linux01; do \
 	    [ -f $$f ] && printf "    $(CC1)$(G_INF)$(CR) %-32s $(CY)%s$(CR) bytes\n" \
 	      "$$f" "$$(stat -f%z $$f 2>/dev/null || stat -c%s $$f)"; \
 	  done; \
@@ -537,32 +510,50 @@ info:
 
 sizes: $(BUILD)/kernel.elf
 	@printf '\n  $(CB)$(CWH)kernel.elf sections$(CR)\n\n'
-	@$(OBJDUMP) -h $< | awk '/^ *[0-9]/ { \
-	    "printf '"'"'%d'"'"' 0x"$$3 | getline sz; close("printf '"'"'%d'"'"' 0x"$$3); \
-	    printf "  $(CGY)$(G_DOT)$(CR) %-12s $(CY)%6s$(CR) bytes  $(CGY)vma$(CR) $(CP)%s$(CR)\n", $$2, sz, $$4 }'
+	@$(OBJDUMP) -h "$<" | while read -r index name hex_size vma rest; do \
+	  case "$$index" in *[!0-9]*|'') continue ;; esac; \
+	  size=$$((16#$$hex_size)); \
+	  printf '  $(CGY)$(G_DOT)$(CR) %-12s $(CY)%6d$(CR) bytes  $(CGY)vma$(CR) $(CP)%s$(CR)\n' \
+	    "$$name" "$$size" "$$vma"; \
+	done
 	@printf '\n  $(CB)$(CWH)visual$(CR)\n\n'
-	@$(OBJDUMP) -h $< | awk '/^ *[0-9] *\.(text|rodata|data|bss)/ { \
-	    "printf '"'"'%d'"'"' 0x"$$3 | getline sz; close("printf '"'"'%d'"'"' 0x"$$3); \
-	    n=int(sz/512)+1; bar=""; \
-	    for(i=0;i<n;i++) bar=bar "█"; \
-	    printf "  $(CWH)%-8s$(CR) $(CG)%s$(CR) $(CGY)%d$(CR)\n", $$2, bar, sz; \
-	  }'
+	@$(OBJDUMP) -h "$<" | while read -r index name hex_size rest; do \
+	  case "$$name" in .text|.rodata|.data|.bss) ;; *) continue ;; esac; \
+	  size=$$((16#$$hex_size)); n=$$(((size + 511) / 512)); \
+	  [ "$$n" -gt 0 ] || n=1; \
+	  printf -v bar '%*s' "$$n" ''; bar=$${bar// /█}; \
+	  printf '  $(CWH)%-8s$(CR) $(CG)%s$(CR) $(CGY)%d$(CR)\n' "$$name" "$$bar" "$$size"; \
+	done
 	@printf '\n'
 
 symbols: $(BUILD)/kernel.elf
 	@printf '\n  $(CB)$(CWH)top kernel symbols (by address)$(CR)\n\n'
-	@$(NM) -n $< | grep ' [TtDdBb] _' | head -30 | \
-	  awk '{ printf "  $(CP)%s$(CR) $(CGY)%s$(CR) $(CWH)%s$(CR)\n", $$1, $$2, $$3 }'
+	@$(NM) -n $< | awk '$$2 ~ /^[TtDdBb]$$/ && $$3 ~ /^_/ && shown < 30 { \
+	  printf "  $(CP)%s$(CR) $(CGY)%s$(CR) $(CWH)%s$(CR)\n", $$1, $$2, $$3; shown++ }'
 
-hash:
+hash: $(ARTIFACTS)
 	@printf '\n  $(CB)$(CWH)artifact integrity (sha256)$(CR)\n\n'
-	@for f in $(BUILD)/kernel.bin $(BUILD)/kernel.elf $(BUILD)/bootstub.elf \
-	          $(BUILD)/linux-0.01.iso $(BUILD)/root.img $(BUILD)/shell.bin $(BUILD)/hello.bin; do \
-	  if [ -f $$f ]; then \
-	    h=$$(shasum -a 256 $$f | cut -c1-64); \
-	    printf "  $(CC1)$(G_INF)$(CR) $(CWH)%-28s$(CR) $(CP)%s$(CR)\n" "$$f" "$$h"; \
-	  fi; \
+	@for f in $(ARTIFACTS); do \
+	  h=$$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$$f"; else shasum -a 256 "$$f"; fi | cut -c1-64); \
+	  printf "  $(CC1)$(G_INF)$(CR) $(CWH)%-28s$(CR) $(CP)%s$(CR)\n" "$$f" "$$h"; \
 	done
+
+checksums: $(ARTIFACTS)
+	@tmp="$(BUILD)/.SHA256SUMS.tmp"; \
+	  trap 'rm -f -- "$$tmp"' EXIT; \
+	  : > "$$tmp"; \
+	  for f in $(ARTIFACTS); do \
+	    h=$$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$$f"; else shasum -a 256 "$$f"; fi | cut -c1-64); \
+	    printf '%s  %s\n' "$$h" "$${f#$(BUILD)/}" >> "$$tmp"; \
+	  done; \
+	  if command -v sha256sum >/dev/null 2>&1; then \
+	    (cd "$(BUILD)" && sha256sum --check .SHA256SUMS.tmp >/dev/null); \
+	  else \
+	    (cd "$(BUILD)" && shasum -a 256 --check .SHA256SUMS.tmp >/dev/null); \
+	  fi; \
+	  mv -- "$$tmp" "$(BUILD)/SHA256SUMS"; \
+	  trap - EXIT; \
+	  printf '  $(CG)$(G_OK)$(CR) wrote and verified $(CWH)%s$(CR)\n' "$(BUILD)/SHA256SUMS"
 
 tree:
 	@printf '\n  $(CB)$(CWH)source layout$(CR)  $(CGY)(*.c, *.h, *.s, *.S)$(CR)\n\n'
@@ -576,85 +567,104 @@ tree:
 
 stats:
 	@printf '\n  $(CB)$(CWH)1991 → 2026 delta$(CR)\n\n'
-	@orig=$$(find ../linux-0.01 -type f \( -name '*.c' -o -name '*.h' -o -name '*.s' \) \
-	         -not -path '*/.git/*' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	@orig=""; \
+	  if [ -d ../linux-0.01 ]; then \
+	    orig=$$(find ../linux-0.01 -type f \( -name '*.c' -o -name '*.h' -o -name '*.s' \) \
+	           -not -path '*/.git/*' -print0 | xargs -0r wc -l | tail -1 | awk '{print $$1}'); \
+	  fi; \
 	  mod=$$(find . -type f \( -name '*.c' -o -name '*.h' -o -name '*.s' -o -name '*.S' \) \
-	         -not -path './build/*' -not -path './.git/*' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $$1}'); \
-	  printf "  $(CGY)$(G_DOT)$(CR) lines of code  upstream Linus 1991:  $(CY)%s$(CR)\n" "$$orig"; \
+	         -not -path './build/*' -not -path './.git/*' -print0 | xargs -0r wc -l | tail -1 | awk '{print $$1}'); \
+	  if [ -n "$$orig" ]; then \
+	    printf "  $(CGY)$(G_DOT)$(CR) lines of code  upstream Linus 1991:  $(CY)%s$(CR)\n" "$$orig"; \
+	  else \
+	    printf "  $(CGY)$(G_DOT)$(CR) lines of code  upstream Linus 1991:  $(CY)%s$(CR)\n" \
+	      "not available (expected at ../linux-0.01)"; \
+	  fi; \
 	  printf "  $(CGY)$(G_DOT)$(CR) lines of code  modern port 2026:     $(CY)%s$(CR)\n" "$$mod"; \
 	  if [ -n "$$orig" ] && [ -n "$$mod" ]; then \
 	    delta=$$((mod - orig)); \
 	    printf "  $(CGY)$(G_DOT)$(CR) delta:                                $(CM)%+d$(CR) lines\n" "$$delta"; \
 	  fi
 	@printf '\n  $(CB)$(CWH)git activity$(CR)\n\n'
-	@git log --pretty=format:'  $(CP)%h$(CR) $(CGY)%ad$(CR) $(CWH)%s$(CR)' --date=short 2>/dev/null | head -8
+	@git log --max-count=8 --pretty=format:'  $(CP)%h$(CR) $(CGY)%ad$(CR) $(CWH)%s$(CR)' --date=short 2>/dev/null
 	@printf '\n\n'
 
 audit:
 	@printf '\n  $(CB)$(CWH)diff vs upstream Linus 1991$(CR)\n\n'
 	@if [ -d ../linux-0.01 ]; then \
-	  diff -rq ../linux-0.01 . 2>/dev/null | grep -v '.git\|build\|userland\|tools' | head -30 | \
-	    awk '{ \
+	  { diff -rq ../linux-0.01 . 2>/dev/null || [ $$? -eq 1 ]; } | \
+	    awk '!/\.git|build|userland|tools/ && shown < 30 { \
 	      if ($$1=="Only") { printf "  $(CG)+$(CR) $(CWH)%s$(CR)\n", $$NF } \
-	      else { printf "  $(CY)*$(CR) $(CWH)%s$(CR)\n", $$2 } \
+	      else { printf "  $(CY)*$(CR) $(CWH)%s$(CR)\n", $$2 } shown++ \
 	    }'; \
 	else \
 	  printf "  $(CRD)upstream ../linux-0.01 not found$(CR)\n"; \
 	fi
 	@printf '\n'
 
-logs:
-	@if [ -f $(BUILD)/qemu.log ]; then \
-	  printf '\n  $(CB)$(CWH)last 40 lines of qemu.log$(CR)\n\n'; \
-	  tail -40 $(BUILD)/qemu.log | sed 's/^/  /'; \
-	else \
-	  printf '  $(CRD)no qemu.log yet — run `make run` first$(CR)\n'; \
-	fi
-
-screenshot:
-	@if [ ! -S $(BUILD)/mon.sock ]; then \
-	  printf '  $(CRD)QEMU monitor not running — try: $(CWH)make run-monitor$(CR)\n'; exit 1; \
-	fi
-	@echo "screendump $(PWD)/$(BUILD)/screen.ppm" | socat - UNIX-CONNECT:$(BUILD)/mon.sock >/dev/null
-	@sips -s format png $(BUILD)/screen.ppm --out $(BUILD)/screen.png >/dev/null 2>&1 || true
-	@printf '  $(CG)$(G_OK)$(CR) screenshot saved: $(CWH)$(BUILD)/screen.png$(CR)\n'
-
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              CI / WATCH                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-ci: clean all
-	@printf '\n  $(CB)$(CWH)CI smoke test$(CR)\n\n'
-	@timeout 10 $(QEMU) $(QEMU_COMMON) -display none -nographic \
-	    -serial file:$(BUILD)/ci-serial.log \
-	    -d guest_errors -D $(BUILD)/ci.log >/dev/null 2>&1 || true
-	@if grep -q "Triple Fault\|Reset" $(BUILD)/ci.log; then \
-	  printf "  $(CRD)$(G_NO)$(CR) boot failed — see $(BUILD)/ci.log\n"; exit 1; \
-	elif grep -q "Ok." $(BUILD)/ci-serial.log 2>/dev/null; then \
-	  printf "  $(CG)$(G_OK)$(CR) smoke test passed (root fs mounted)\n"; \
-	else \
-	  printf "  $(CY)$(G_ARR)$(CR) partial boot — serial: "; \
-	  tail -5 $(BUILD)/ci-serial.log 2>/dev/null | tr '\n' ' '; \
-	  echo; \
-	fi
+ci:
+	@$(MAKE) --no-print-directory clean
+	@$(MAKE) --no-print-directory test
+	@$(MAKE) --no-print-directory checksums
 
 watch:
 	@printf '  $(CB)watching source tree for changes (Ctrl-C to stop)$(CR)\n\n'
-	@if command -v fswatch >/dev/null 2>&1; then \
-	  fswatch -or boot/ init/ kernel/ mm/ fs/ lib/ include/ userland/ tools/ Makefile | \
-	    while read; do clear; $(MAKE) --no-print-directory all; done; \
+	@rebuild() { \
+	    clear 2>/dev/null || true; \
+	    if ! "$${MAKE_COMMAND}" -j1 --no-print-directory all; then \
+	      printf '  $(CRD)$(G_NO)$(CR) build failed; waiting for the next source change\n' >&2; \
+	    fi; \
+	  }; \
+	  if command -v fswatch >/dev/null 2>&1; then \
+	  fswatch -r bbp/ bemu/ boot/ init/ kernel/ mm/ fs/ lib/ include/ userland/ tools/ Makefile | \
+	    while IFS= read -r changed; do \
+	      case "$$changed" in *.c|*.h|*.s|*.S|*.asm|*.ld|*/Makefile|Makefile) \
+	        rebuild ;; esac; \
+	    done; \
 	elif command -v inotifywait >/dev/null 2>&1; then \
-	  while inotifywait -qre modify boot/ init/ kernel/ mm/ fs/ lib/ include/ userland/ tools/ Makefile; do \
-	    clear; $(MAKE) --no-print-directory all; \
-	  done; \
+	  inotifywait -qmr -e close_write,create,delete,move --format '%w%f' \
+	    bbp/ bemu/ boot/ init/ kernel/ mm/ fs/ lib/ include/ userland/ tools/ Makefile | \
+	    while IFS= read -r changed; do \
+	      case "$$changed" in *.c|*.h|*.s|*.S|*.asm|*.ld|*/Makefile|Makefile) \
+	        rebuild ;; esac; \
+	    done; \
 	else \
-	  printf '  $(CRD)install fswatch (macOS) or inotify-tools (linux)$(CR)\n'; \
+	  printf '  $(CY)$(G_ARR)$(CR) fswatch/inotifywait unavailable; using 1s polling\n'; \
+	  snapshot() { \
+	    { find bbp bemu boot init kernel mm fs lib include userland tools -type f \
+	        \( -name '*.c' -o -name '*.h' -o -name '*.s' -o -name '*.S' \
+	           -o -name '*.asm' -o -name '*.ld' -o -name Makefile \) \
+	        -printf '%T@ %s %p\n'; \
+	      stat -c '%Y %s Makefile' Makefile; } | \
+	      if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; \
+	      else shasum -a 256 | cut -c1-64; fi; \
+	  }; \
+	  before=$$(snapshot); \
+	  while sleep 1; do \
+	    after=$$(snapshot); \
+	    if [ "$$after" != "$$before" ]; then \
+	      before="$$after"; rebuild; before=$$(snapshot); \
+	    fi; \
+	  done; \
 	fi
 
 backup:
 	@tag="release/$(shell echo $(CODENAME) | tr A-Z a-z | tr ' ' '-')-$(VERSION)"; \
+	  if ! worktree=$$(git status --porcelain --untracked-files=all); then \
+	    printf '  $(CRD)$(G_NO)$(CR) could not inspect the git worktree\n' >&2; exit 1; \
+	  fi; \
+	  if [ -n "$$worktree" ]; then \
+	    printf '  $(CRD)$(G_NO)$(CR) refusing to tag a dirty worktree\n' >&2; exit 1; \
+	  fi; \
+	  if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
+	    printf '  $(CRD)$(G_NO)$(CR) tag already exists: %s\n' "$$tag" >&2; exit 1; \
+	  fi; \
 	  printf '  $(CB)tagging:$(CR) $(CY)%s$(CR)\n' "$$tag"; \
-	  git tag -a "$$tag" -m "$(CODENAME) $(VERSION) — sealed $(BUILD_DATE) by $(AUTHOR)" 2>&1 | sed 's/^/  /' || true; \
+	  git tag -a "$$tag" -m "$(CODENAME) $(VERSION) — sealed $(BUILD_DATE) by $(AUTHOR)" 2>&1 | sed 's/^/  /'; \
 	  printf '  $(CG)$(G_OK)$(CR) done. push with: $(CWH)git push origin "$$tag"$(CR)\n'
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -676,8 +686,8 @@ journey:
 	    "$(CGY)2026-05-23, modern silicon$(CR)" \
 	    "  $(CC1)10,243 lines of 1991 source$(CR)" \
 	    "  $(CC1)compiled by GCC 13 with $(CB)$(CY)-fleading-underscore$(CR)" \
-	    "  $(CC1)loaded by $(CB)$(CM)Limine 8.7$(CR)$(CC1) multiboot2$(CR)" \
-	    "  $(CC1)booted on $(CB)$(CG)QEMU i386$(CR)" \
+	    "  $(CC1)loaded directly by $(CB)$(CM)bEMU-NANO$(CR)$(CC1) through BBP$(CR)" \
+	    "  $(CC1)booted on $(CB)$(CG)KVM i386$(CR)" \
 	    "" \
 	    "$(CM)the kernel that became the world is breathing again$(CR)" \
 	  ); \
@@ -701,19 +711,17 @@ journey:
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 clean:
-	@printf '\n  $(CGY)$(G_DOT)$(CR) clearing object files……\n'
-	@rm -f $(ALL_OBJS) boot/bootstub.o $(BUILD)/crt0.o $(BUILD)/hello.o $(BUILD)/shell.o
-	@printf '  $(CGY)$(G_DOT)$(CR) clearing build/……\n'
-	@rm -rf $(BUILD)
+	@repo_root="$(REPO_ROOT)"; \
+	  build_abs="$$(python3 -c 'import os; print(os.path.realpath(os.environ["BUILD"]))')"; \
+	  case "$$build_abs" in \
+	    "$$repo_root/build"|"$$repo_root/build"/*) ;; \
+	    *) printf '  $(CRD)$(G_NO)$(CR) refusing to remove BUILD outside the canonical repository build tree: %s\n' "$$build_abs" >&2; exit 1 ;; \
+	  esac; \
+	  printf '\n  $(CGY)$(G_DOT)$(CR) clearing object files……\n'; \
+	  rm -f -- $(ALL_OBJS) $(SOURCE_DEPFILES) bbp/*.o; \
+	  printf '  $(CGY)$(G_DOT)$(CR) clearing %s……\n' "$$build_abs"; \
+	  rm -rf -- "$$build_abs"
 	@printf '  $(CG)$(G_OK)$(CR) workspace pristine\n'
-
-deepclean: clean
-	@printf '  $(CGY)$(G_DOT)$(CR) clearing /tmp/limine-src……\n'
-	@# Only ever remove a /tmp scratch dir — NEVER a system/brew share path that
-	@# LIMINE_DIR may now auto-resolve to. Deleting /usr/local/share/limine here
-	@# would nuke the Homebrew install.
-	@case "$(LIMINE_DIR)" in /tmp/*) rm -rf "$(LIMINE_DIR)";; *) printf '  $(CGY)$(G_DOT)$(CR) skipping non-/tmp LIMINE_DIR ($(LIMINE_DIR))\n';; esac
-	@printf '  $(CG)$(G_OK)$(CR) deep clean done\n'
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              HELP                                        ║
@@ -723,54 +731,50 @@ help:
 	$(SPLASH)
 	@printf '\n  $(CB)$(CWH)usage$(CR)  $(CGY)make <target>$(CR)\n\n'
 	@printf '  $(CB)$(CG)build$(CR)\n'
-	@printf '    $(CWH)all$(CR)            build kernel + image + ISO (default)\n'
+	@printf '    $(CWH)all$(CR)            build kernel + image + bEMU\n'
 	@printf '    $(CWH)kernel$(CR)         build only the kernel binary\n'
-	@printf '    $(CWH)iso$(CR)            build only the ISO\n'
 	@printf '    $(CWH)image$(CR)          build only the Minix v1 root image\n'
+	@printf '    $(CWH)bemu$(CR)           build only the KVM runner\n'
 	@printf '\n  $(CB)$(CC1)launch$(CR)\n'
-	@printf '    $(CWH)run$(CR)            $(CY)★$(CR) build + boot in QEMU (the main act)\n'
+	@printf '    $(CWH)run$(CR)            $(CY)★$(CR) build + boot directly with bEMU\n'
 	@printf '    $(CWH)boom$(CR)           $(CY)★$(CR) clean + build + run (one shot)\n'
-	@printf '    $(CWH)run-uefi$(CR)       boot via UEFI firmware\n'
-	@printf '    $(CWH)run-debug$(CR)      boot with gdb stub on :1234\n'
-	@printf '    $(CWH)run-headless$(CR)   no GUI, all output to stdio\n'
-	@printf '    $(CWH)run-monitor$(CR)    daemonize + monitor socket (for $(CWH)screenshot$(CR))\n'
+	@printf '    $(CWH)run-headless$(CR)   alias for the terminal-native bEMU run\n'
 	@printf '\n  $(CB)$(CM)diagnose$(CR)\n'
 	@printf '    $(CWH)doctor$(CR)         check toolchain health\n'
 	@printf '    $(CWH)info$(CR)           show release / build metadata\n'
 	@printf '    $(CWH)sizes$(CR)          kernel section sizes (with bars)\n'
 	@printf '    $(CWH)symbols$(CR)        top kernel symbols by address\n'
 	@printf '    $(CWH)hash$(CR)           sha256 of all artifacts\n'
-	@printf '    $(CWH)logs$(CR)           tail last QEMU run log\n'
-	@printf '    $(CWH)screenshot$(CR)     capture current QEMU framebuffer\n'
+	@printf '    $(CWH)checksums$(CR)      write + verify build/SHA256SUMS\n'
 	@printf '\n  $(CB)$(CY)inspect$(CR)\n'
 	@printf '    $(CWH)tree$(CR)           source layout\n'
 	@printf '    $(CWH)stats$(CR)          LOC vs upstream Linus 1991\n'
 	@printf '    $(CWH)audit$(CR)          diff against upstream\n'
 	@printf '\n  $(CB)$(CM)test$(CR)\n'
-	@printf '    $(CWH)test$(CR)           build + full boot test in QEMU\n'
+	@printf '    $(CWH)test$(CR)           build + full boot test in bEMU\n'
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
-	@printf '    $(CWH)test-shell$(CR)     shell smoke test in QEMU\n'
+	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'
-	@printf '    $(CWH)bootmon$(CR)        decode VGA boot markers from serial.log\n'
-	@printf '    $(CWH)bootmon-live$(CR)   live monitor boot progress\n'
-	@printf '    $(CWH)bootmon-timeline$(CR) annotated boot timeline\n'
-	@printf '\n  $(CB)$(CP)debug$(CR)\n'
-	@printf '    $(CWH)run-debug$(CR)      boot with gdb stub on :1234\n'
-	@printf '    $(CWH)gdb$(CR)            show GDB pretty-printer info\n'
-	@printf '    $(CWH)screenshot$(CR)     capture current QEMU framebuffer\n'
 	@printf '\n  $(CB)$(CP)workflow$(CR)\n'
 	@printf '    $(CWH)watch$(CR)          auto-rebuild on file change\n'
-	@printf '    $(CWH)ci$(CR)             headless smoke test\n'
+	@printf '    $(CWH)ci$(CR)             clean build + full tests + checksums\n'
+	@printf '    $(CWH)toolchain$(CR)      auto-install all tools (detects OS)\n'
 	@printf '    $(CWH)backup$(CR)         git tag with codename\n'
 	@printf '    $(CWH)journey$(CR)        cinematic 1991→2026 story\n'
 	@printf '\n  $(CB)$(CRD)clean$(CR)\n'
 	@printf '    $(CWH)clean$(CR)          remove build artifacts\n'
-	@printf '    $(CWH)deepclean$(CR)      also remove vendored Limine\n'
 	@printf '\n'
 	@printf '  $(CGY)·······································································$(CR)\n'
 	@printf '  $(CGY)"as above, so below — the kernel that booted the world,$(CR)\n'
 	@printf '  $(CGY)  boots again in the geometry of vesica piscis."$(CR)   $(CM)$(G_INF8)$(CR)\n\n'
 
 kernel: $(BUILD)/kernel.bin
-iso:    $(BUILD)/linux-0.01.iso
 image:  $(BUILD)/root.img
+bemu:   $(BUILD)/bemu-linux01
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║                            TOOLCHAIN SETUP                                 ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+toolchain:
+	@printf '\n  $(CB)$(CWH)setting up toolchain$(CR)\n\n'
+	@bash tools/setup-toolchain.sh
