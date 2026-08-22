@@ -188,8 +188,8 @@ endef
 # ──────────────────────────────────────────────── phony decls ───────────────
 .PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
-        reproducible verify-reproducible release-check artifact banner require-artifacts \
-        test test-quick test-shell test-large-rootfs toolchain
+        reproducible verify-reproducible release-check artifact inspect-rootfs banner \
+        require-artifacts test test-quick test-shell test-large-rootfs toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -328,6 +328,11 @@ $(BUILD)/shell.bin: userland/shell.c $(BUILD)/crt0.o | dirs
 $(BUILD)/mkimage: tools/mkimage.c | dirs
 	$(call STEP,building tools/mkimage (Minix v1 + MBR forge))
 	@$(HOSTCC) $(HOSTCFLAGS) -MMD -MP -MF "$(BUILD)/mkimage.d" -MT "$@" \
+	  -o "$@" "$<" $(HOSTLDFLAGS)
+
+$(BUILD)/minix-inspect: tools/minix-inspect.c | dirs
+	$(call STEP,building tools/minix-inspect)
+	@$(HOSTCC) $(HOSTCFLAGS) -MMD -MP -MF "$(BUILD)/minix-inspect.d" -MT "$@" \
 	  -o "$@" "$<" $(HOSTLDFLAGS)
 
 # Collect all userland binaries (ASM + C)
@@ -632,6 +637,9 @@ release-check:
 artifact:
 	@bash "$(REPO_ROOT)/scripts/make-artifact.sh"
 
+inspect-rootfs: $(BUILD)/root.img $(BUILD)/minix-inspect
+	@"$(BUILD)/minix-inspect" "$(BUILD)/root.img"
+
 watch:
 	@printf '  $(CB)watching source tree for changes (Ctrl-C to stop)$(CR)\n\n'
 	@rebuild() { \
@@ -777,6 +785,8 @@ help:
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'
+	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
+	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '\n  $(CB)$(CP)workflow$(CR)\n'
 	@printf '    $(CWH)watch$(CR)          auto-rebuild on file change\n'
 	@printf '    $(CWH)ci$(CR)             clean build + full tests + checksums\n'
