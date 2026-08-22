@@ -43,12 +43,7 @@ static inline int setup(void)
     __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_setup));
     return __res;
 }
-inline int sync(void)
-{
-    int __res;
-    __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_sync));
-    return __res;
-}
+extern int sync(void);
 
 #include <linux/tty.h>
 #include <linux/sched.h>

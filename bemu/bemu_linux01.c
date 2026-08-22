@@ -384,7 +384,7 @@ static void build_bbp_handoff(struct machine *m, size_t kernel_size)
 static void map_disk(struct ide_state *ide, const char *path)
 {
     struct stat st;
-    int fd = open(path, O_RDONLY);
+    int fd = open(path, O_RDWR);
     size_t expected = (size_t)IDE_CYLINDERS * IDE_HEADS * IDE_SECTORS * IDE_SECTOR_LEN;
     if (fd < 0)
         die(path);
@@ -392,7 +392,7 @@ static void map_disk(struct ide_state *ide, const char *path)
         die("fstat root image");
     if ((size_t)st.st_size != expected)
         fail("root image does not match 977/5/17 CHS geometry");
-    ide->disk = mmap(NULL, expected, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    ide->disk = mmap(NULL, expected, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ide->disk == MAP_FAILED) {
         int error = errno;
         (void)close(fd);

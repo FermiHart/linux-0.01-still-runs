@@ -1293,6 +1293,7 @@ static void builtin_help(void) {
         "  help         show this help\n"
         "  clear        clear the screen\n"
         "  exit         leave shell session safely\n"
+        "  sync         flush filesystem buffers\n"
         "  halt         sync and halt\n"
         "  reboot       sync and reboot\n"
 		"  echo <text>  echo arguments; supports > and >>\n"
@@ -1340,6 +1341,11 @@ static void builtin_halt(void) {
     sync();
     _power(0);
     for (;;) pause();
+}
+
+static void builtin_sync(void) {
+    sync();
+    puts(CG "synced" C0 "\n");
 }
 
 static void builtin_reboot(void) {
@@ -2375,6 +2381,7 @@ static void builtin_clear_cmd(int argc, char **argv) { (void)argc; (void)argv; b
 static void builtin_exit_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_exit(); }
 static void builtin_reboot_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_reboot(); }
 static void builtin_halt_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_halt(); }
+static void builtin_sync_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_sync(); }
 static void builtin_pwd_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_pwd(); }
 static void builtin_help_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_help(); }
 static void builtin_hello_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_hello(); }
@@ -2396,6 +2403,7 @@ static int run_builtin(int argc, char **argv) {
     if (eq4(s,'h','e','l','p')) { builtin_help_cmd(argc, argv); return 1; }
     if (eq5(s,'c','l','e','a','r')) { builtin_clear_cmd(argc, argv); return 1; }
     if (eq4(s,'e','x','i','t')) { builtin_exit_cmd(argc, argv); return 1; }
+    if (eq4(s,'s','y','n','c')) { builtin_sync_cmd(argc, argv); return 1; }
     if (eq4(s,'h','a','l','t')) { builtin_halt_cmd(argc, argv); return 1; }
     if (eq6(s,'r','e','b','o','o','t')) { builtin_reboot_cmd(argc, argv); return 1; }
     if (eq4(s,'e','c','h','o')) { builtin_echo(argc, argv); return 1; }

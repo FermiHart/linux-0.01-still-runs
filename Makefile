@@ -106,7 +106,8 @@ FS_OBJS := \
 
 LIB_OBJS := \
     lib/ctype.o lib/_exit.o lib/open.o lib/close.o lib/errno.o \
-    lib/write.o lib/dup.o lib/setsid.o lib/execve.o lib/wait.o lib/string.o
+    lib/write.o lib/dup.o lib/setsid.o lib/execve.o lib/wait.o lib/string.o \
+    lib/sync.o
 
 INIT_OBJS := init/main.o
 HEAD_OBJ  := boot/head.o
