@@ -24,7 +24,13 @@ VERSION    := 0.01
 RELEASE    := $(CODENAME)-$(VERSION)
 AUTHOR     := F E R M I ∞ H A R T
 EMAIL      := contact@fermihart.com
-BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+BUILD_DATE := $(shell \
+  epoch="$${SOURCE_DATE_EPOCH:-}"; \
+  if [ -n "$$epoch" ]; then \
+    date -u -d "@$$epoch" +%Y-%m-%dT%H:%M:%SZ; \
+  else \
+    date -u +%Y-%m-%dT%H:%M:%SZ; \
+  fi)
 BUILD_HOST := $(shell hostname -s 2>/dev/null || hostname)
 GIT_REV    := $(shell git rev-parse --short HEAD 2>/dev/null || echo "no-git")
 GIT_DIRTY  := $(shell test -z "$$(git status --porcelain 2>/dev/null)" && printf ' ' || printf '★')
@@ -182,7 +188,7 @@ endef
 # ──────────────────────────────────────────────── phony decls ───────────────
 .PHONY: help all clean run run-headless kernel image bemu dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
-        banner require-artifacts test test-quick test-shell test-large-rootfs \
+        reproducible banner require-artifacts test test-quick test-shell test-large-rootfs \
         toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -604,6 +610,15 @@ ci:
 	@$(MAKE) --no-print-directory test
 	@$(MAKE) --no-print-directory checksums
 
+reproducible:
+	@export SOURCE_DATE_EPOCH="$${SOURCE_DATE_EPOCH-1700000000}"; \
+	  printf '\n  $(CB)$(CWH)reproducible build$(CR)  $(CGY)SOURCE_DATE_EPOCH=$(CP)%s$(CR)\n\n' "$$SOURCE_DATE_EPOCH"; \
+	  $(MAKE) --no-print-directory clean; \
+	  $(MAKE) --no-print-directory all; \
+	  $(MAKE) --no-print-directory checksums; \
+	  cp "$(BUILD)/SHA256SUMS" "$(BUILD)/REPRODUCIBLE.sha256"; \
+	  printf '\n  $(CG)$(G_OK)$(CR) wrote $(CWH)$(BUILD)/REPRODUCIBLE.sha256$(CR)\n'
+
 watch:
 	@printf '  $(CB)watching source tree for changes (Ctrl-C to stop)$(CR)\n\n'
 	@rebuild() { \
@@ -752,6 +767,7 @@ help:
 	@printf '\n  $(CB)$(CP)workflow$(CR)\n'
 	@printf '    $(CWH)watch$(CR)          auto-rebuild on file change\n'
 	@printf '    $(CWH)ci$(CR)             clean build + full tests + checksums\n'
+	@printf '    $(CWH)reproducible$(CR)   clean build with SOURCE_DATE_EPOCH\n'
 	@printf '    $(CWH)toolchain$(CR)      auto-install all tools (detects OS)\n'
 	@printf '    $(CWH)backup$(CR)         git tag with codename\n'
 	@printf '    $(CWH)journey$(CR)        cinematic 1991→2026 story\n'
