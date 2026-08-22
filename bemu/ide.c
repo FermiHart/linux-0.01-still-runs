@@ -13,6 +13,23 @@
 extern void die(const char *what);
 extern void fail(const char *what);
 
+void ide_reset(struct ide_state *ide)
+{
+    ide->error = 1;
+    ide->count = 0;
+    ide->sector = 1;
+    ide->lcyl = 0;
+    ide->hcyl = 0;
+    ide->current = 0xa0;
+    ide->status = IDE_READY | IDE_SEEK;
+    ide->control = 0;
+    ide->lba = 0;
+    ide->remaining = 0;
+    ide->data_pos = 0;
+    ide->writing = 0;
+    ide->irq_pending = 0;
+}
+
 void map_disk(struct ide_state *ide, const char *path)
 {
     struct stat st;
@@ -34,10 +51,7 @@ void map_disk(struct ide_state *ide, const char *path)
     if (close(fd) < 0)
         die("close root image");
     ide->disk_size = expected;
-    ide->error = 1;
-    ide->status = IDE_READY | IDE_SEEK;
-    ide->sector = 1;
-    ide->current = 0xa0;
+    ide_reset(ide);
 }
 
 static void ide_set_irq(struct machine *m)

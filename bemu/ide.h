@@ -36,6 +36,7 @@ struct ide_state {
     int writing, irq_pending;
 };
 
+void ide_reset(struct ide_state *ide);
 void map_disk(struct ide_state *ide, const char *path);
 void ide_command(struct machine *m, uint8_t command);
 uint32_t ide_data_read(struct machine *m, unsigned size);
