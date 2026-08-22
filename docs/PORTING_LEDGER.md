@@ -213,6 +213,20 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 - **Test**: Userland C programs build and run.
 - **Status**: QUALIFIED
 
+## Test traceability
+
+| Test | Ledger entries covered |
+|---|---|
+| `make all` | Syscall wrappers, VGA 50-row setup, include/header adjustments, memory-management compatibility, kernel assembly constraints |
+| `tests/test_boot.py` | CMOS Y2K, serial UART, console duplication, ATA PIO, fs/buffer -O1 workaround, fs/bitmap -O1 workaround, filesystem Minix v1 patches, sys_ioctl volatile, pipe macro |
+| `tests/test_shell.py` | CMOS Y2K, serial UART, console duplication, CP437 glyphs, fs/buffer workaround, filesystem patches, vsprintf %s workaround |
+| `tests/test_large_rootfs.py` | fs/buffer workaround, filesystem patches |
+| `make sizes` | VGA 80×50 mode (kernel.elf sections) |
+
+Every ledger entry above explicitly names the test that exercises it. Entries
+marked UNDER_INVESTIGATION will receive additional targeted tests during the
+compiler investigation waves.
+
 ## Classification summary
 
 | Category | Count | Motivation |
