@@ -193,7 +193,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-sanitized golden-trace toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-sanitized static-analysis golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -522,8 +522,12 @@ test-bemu-devices: $(BUILD)/test-bemu-devices
 
 test-sanitized: bemu-sanitized require-artifacts
 	$(call STAGE,9/10,running boot test under ASan/UBSan)
-	@ASAN_OPTIONS=detect_leaks=0 python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01-sanitized \
+	@UBSAN_OPTIONS=print_stacktrace=1 python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01-sanitized \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
+
+static-analysis:
+	$(call STAGE,9/10,running static analysis)
+	@bash "$(REPO_ROOT)/scripts/static-analysis.sh"
 
 $(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/pic.h bemu/pit.h bemu/uart.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
