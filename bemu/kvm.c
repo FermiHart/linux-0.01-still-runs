@@ -107,7 +107,8 @@ void setup_kvm(struct machine *m, const char *kernel)
     mmap_size = ioctl(kvm, KVM_GET_VCPU_MMAP_SIZE, 0);
     close(kvm);
     if (mmap_size <= 0) die("KVM_GET_VCPU_MMAP_SIZE");
-    m->run = mmap(NULL, (size_t)mmap_size, PROT_READ | PROT_WRITE,
+    m->run_size = (size_t)mmap_size;
+    m->run = mmap(NULL, m->run_size, PROT_READ | PROT_WRITE,
                   MAP_SHARED, m->vcpu, 0);
     if (m->run == MAP_FAILED) die("mmap kvm_run");
 

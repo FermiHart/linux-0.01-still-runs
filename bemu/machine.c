@@ -56,9 +56,10 @@ int machine_create(struct machine *m)
 
 void machine_destroy(struct machine *m)
 {
-    if (m->run && m->run != MAP_FAILED) {
-        /* m->run mapping size is not stored; skip explicit unmap */
+    if (m->run && m->run != MAP_FAILED && m->run_size) {
+        munmap(m->run, m->run_size);
         m->run = NULL;
+        m->run_size = 0;
     }
     if (m->ram && m->ram != MAP_FAILED) {
         munmap(m->ram, RAM_SIZE);
