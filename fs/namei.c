@@ -492,6 +492,7 @@ static int empty_dir(struct m_inode * inode)
 	if (de[0].inode != inode->i_num || !de[1].inode || 
 	    strcmp(".",de[0].name) || strcmp("..",de[1].name)) {
 	    	printk("warning - bad directory on dev %04x\n",inode->i_dev);
+		brelse(bh);
 		return 0;
 	}
 	nr = 2;

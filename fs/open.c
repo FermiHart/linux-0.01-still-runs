@@ -13,15 +13,35 @@
 int sys_utime(char * filename, struct utimbuf * times)
 {
 	struct m_inode * inode;
+	int mode;
 	long actime,modtime;
 
 	if (!(inode=namei(filename)))
 		return -ENOENT;
 	if (times) {
+		if (current->euid && current->euid != inode->i_uid) {
+			iput(inode);
+			return -EPERM;
+		}
+		if (verify_area(times,sizeof *times)) {
+			iput(inode);
+			return -EFAULT;
+		}
 		actime = get_fs_long((unsigned long *) &times->actime);
 		modtime = get_fs_long((unsigned long *) &times->modtime);
-	} else
+	} else {
+		mode = inode->i_mode;
+		if (current->euid == inode->i_uid)
+			mode >>= 6;
+		else if (current->egid == inode->i_gid)
+			mode >>= 3;
+		if (current->euid && current->euid != inode->i_uid &&
+		    !(mode & 2)) {
+			iput(inode);
+			return -EACCES;
+		}
 		actime = modtime = CURRENT_TIME;
+	}
 	inode->i_atime = actime;
 	inode->i_mtime = modtime;
 	inode->i_dirt = 1;
@@ -151,6 +171,12 @@ int sys_open(const char * filename,int flag,int mode)
 /* ttys are somewhat special (ttyxx major==4, tty major==5) */
 	if (S_ISCHR(inode->i_mode)) {
 		if (MAJOR(inode->i_zone[0])==4) {
+			if (MINOR(inode->i_zone[0]) >= NR_TTYS) {
+				iput(inode);
+				current->filp[fd]=NULL;
+				f->f_count=0;
+				return -ENXIO;
+			}
 			if (current->leader && current->tty<0) {
 				current->tty = MINOR(inode->i_zone[0]);
 				tty_table[current->tty].pgrp = current->pgrp;

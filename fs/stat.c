@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include <linux/fs.h>
@@ -11,7 +12,9 @@ static int cp_stat(struct m_inode * inode, struct stat * statbuf)
 	struct stat tmp;
 	int i;
 
-	verify_area(statbuf,sizeof (* statbuf));
+	if (verify_area(statbuf,sizeof (* statbuf)))
+		return -EFAULT;
+	memset(&tmp,0,sizeof tmp);
 	tmp.st_dev = inode->i_dev;
 	tmp.st_ino = inode->i_num;
 	tmp.st_mode = inode->i_mode;

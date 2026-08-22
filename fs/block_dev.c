@@ -19,7 +19,9 @@ int block_write(int dev, long * pos, char * buf, int count)
 		bh = bread(dev,block);
 		if (!bh)
 			return written?written:-EIO;
-		chars = (count<BLOCK_SIZE) ? count : BLOCK_SIZE;
+		chars = BLOCK_SIZE-offset;
+		if (chars > count)
+			chars = count;
 		p = offset + bh->b_data;
 		offset = 0;
 		block++;
@@ -47,7 +49,9 @@ int block_read(int dev, unsigned long * pos, char * buf, int count)
 		bh = bread(dev,block);
 		if (!bh)
 			return read?read:-EIO;
-		chars = (count<BLOCK_SIZE) ? count : BLOCK_SIZE;
+		chars = BLOCK_SIZE-offset;
+		if (chars > count)
+			chars = count;
 		p = offset + bh->b_data;
 		offset = 0;
 		block++;

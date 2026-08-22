@@ -104,10 +104,15 @@ int read_area(struct m_inode * inode,long size)
 	if (!(dind = bread(inode->i_dev,i)))
 		return -1;
 	table = (unsigned short *) dind->b_data;
-	for(count=0 ; count<512 ; count++)
-		if ((i=read_ind(inode->i_dev,*(table++),size,
-		    BLOCK_SIZE*(518+count))) || (size -= BLOCK_SIZE*512)<=0)
+	for(count=0 ; count<512 ; count++) {
+		i=read_ind(inode->i_dev,*(table++),size,
+			BLOCK_SIZE*(518+count*512));
+		if (i || (size -= BLOCK_SIZE*512)<=0) {
+			brelse(dind);
 			return i;
+		}
+	}
+	brelse(dind);
 	panic("Impossibly long executable");
 }
 
@@ -175,7 +180,7 @@ static unsigned long copy_strings(int argc,char ** argv,unsigned long *page,
 		do {
 			len++;
 		} while (get_fs_byte(tmp++));
-		if (p-len < 0)		/* this shouldn't happen - 128kB */
+		if ((unsigned long)len > p)
 			return 0;
 		i = ((unsigned) (p-len)) >> 12;
 		while (i<MAX_ARG_PAGES && !page[i]) {

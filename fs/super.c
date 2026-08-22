@@ -24,27 +24,52 @@ struct super_block super_block[NR_SUPER];
 struct super_block * do_mount(int dev)
 {
 	struct super_block * p;
+	struct super_block * disk;
 	struct buffer_head * bh;
-	int i,block;
+	unsigned long inode_blocks, zone_bits;
+	int i,block,bad;
 
 	for(p = &super_block[0] ; p < &super_block[NR_SUPER] ; p++ )
 		if (!(p->s_dev))
 			break;
-	p->s_dev = -1;		/* mark it in use */
 	if (p >= &super_block[NR_SUPER])
 		return NULL;
-	if (!(bh = bread(dev,1)))
-		return NULL;
-	*p = *((struct super_block *) bh->b_data);
-	brelse(bh);
-	if (p->s_magic != SUPER_MAGIC) {
+	p->s_dev = -1;		/* mark it in use */
+	if (!(bh = bread(dev,1))) {
 		p->s_dev = 0;
 		return NULL;
 	}
+	disk = (struct super_block *) bh->b_data;
+	p->s_ninodes = disk->s_ninodes;
+	p->s_nzones = disk->s_nzones;
+	p->s_imap_blocks = disk->s_imap_blocks;
+	p->s_zmap_blocks = disk->s_zmap_blocks;
+	p->s_firstdatazone = disk->s_firstdatazone;
+	p->s_log_zone_size = disk->s_log_zone_size;
+	p->s_max_size = disk->s_max_size;
+	p->s_magic = disk->s_magic;
+	brelse(bh);
 	for (i=0;i<I_MAP_SLOTS;i++)
 		p->s_imap[i] = NULL;
 	for (i=0;i<Z_MAP_SLOTS;i++)
 		p->s_zmap[i] = NULL;
+	inode_blocks = (p->s_ninodes + INODES_PER_BLOCK - 1) /
+		INODES_PER_BLOCK;
+	bad = p->s_magic != SUPER_MAGIC || !p->s_ninodes ||
+		!p->s_imap_blocks || p->s_imap_blocks > I_MAP_SLOTS ||
+		!p->s_zmap_blocks || p->s_zmap_blocks > Z_MAP_SLOTS ||
+		p->s_log_zone_size ||
+		(unsigned long)p->s_ninodes + 1 >
+			(unsigned long)p->s_imap_blocks * BLOCK_SIZE * 8 ||
+		p->s_firstdatazone < 2 + p->s_imap_blocks +
+			p->s_zmap_blocks + inode_blocks ||
+		p->s_firstdatazone >= p->s_nzones;
+	zone_bits = (unsigned long)p->s_nzones - p->s_firstdatazone + 1;
+	if (bad || zone_bits >
+	    (unsigned long)p->s_zmap_blocks * BLOCK_SIZE * 8) {
+		p->s_dev = 0;
+		return NULL;
+	}
 	block=2;
 	for (i=0 ; i < p->s_imap_blocks ; i++)
 		if ((p->s_imap[i]=bread(dev,block)))
@@ -96,10 +121,12 @@ void mount_root(void)
 	current->pwd = mi;
 	current->root = mi;
 	free=0;
-	i=p->s_nzones;
-	while (-- i >= 0)
+	i=p->s_nzones-p->s_firstdatazone;
+	while (i > 0) {
 		if (!test_bit(i&8191,p->s_zmap[i>>13]->b_data))
 			free++;
+		i--;
+	}
 	printk("\033[32m%d\033[0m/\033[37m%d\033[0m free blocks\n\r",free,p->s_nzones);
 	free=0;
 	i=p->s_ninodes+1;
