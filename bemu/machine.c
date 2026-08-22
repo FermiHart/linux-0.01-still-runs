@@ -46,6 +46,7 @@ int machine_create(struct machine *m)
     memset(m, 0, sizeof *m);
     m->vm = -1;
     m->vcpu = -1;
+    trace_clock_reset(&m->clock);
     pic_reset(&m->pic);
     pit_reset(&m->pit);
     uart_reset(&m->uart);

@@ -193,7 +193,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -361,26 +361,26 @@ $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h 
                         bemu/machine.c bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
                         bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                         bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
-                        bemu/keyboard.c bemu/keyboard.h \
+                        bemu/keyboard.c bemu/keyboard.h bemu/trace_clock.c bemu/trace_clock.h \
                         bbp/bbp_build.c bbp/bbp_build.h \
                         bbp/linux01_handoff.h bbp/include/bbp/bbp.h \
                         bbp/include/bbp/bbp_crc64.h | dirs
 	$(call STAGE,8/10,building firmware-free bEMU KVM runner)
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
-	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bbp/bbp_build.c $(BEMU_LDFLAGS)
+	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bbp/bbp_build.c $(BEMU_LDFLAGS)
 	$(call OK,bemu-linux01 ready)
 
 $(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h \
                         bemu/machine.c bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
                         bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                         bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
-                        bemu/keyboard.c bemu/keyboard.h \
+                        bemu/keyboard.c bemu/keyboard.h bemu/trace_clock.c bemu/trace_clock.h \
                         bbp/bbp_build.c bbp/bbp_build.h \
                         bbp/linux01_handoff.h bbp/include/bbp/bbp.h \
                         bbp/include/bbp/bbp_crc64.h | dirs
 	$(call STAGE,8/10,building bEMU with ASan/UBSan)
 	@$(HOSTCC) $(HOSTCFLAGS) $(BEMU_SANFLAGS) -Werror -std=gnu11 -Ibbp/include \
-	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bbp/bbp_build.c $(BEMU_LDFLAGS) $(BEMU_SANFLAGS) -lm
+	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bbp/bbp_build.c $(BEMU_LDFLAGS) $(BEMU_SANFLAGS) -lm
 	$(call OK,bemu-linux01-sanitized ready)
 
 bemu-sanitized: $(BUILD)/bemu-linux01-sanitized
@@ -523,12 +523,16 @@ golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
 
-test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc
+test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-trace-clock
 	$(call STAGE,9/10,running bEMU device unit tests)
 	@$(BUILD)/test-bemu-devices
 	@$(BUILD)/test-bbp-invalid
 	@$(BUILD)/test-bbp-trunc
+	@$(BUILD)/test-trace-clock
 
+$(BUILD)/test-trace-clock: tests/bemu/test_trace_clock.c bemu/trace_clock.c bemu/trace_clock.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 \
+	  -o "$@" tests/bemu/test_trace_clock.c bemu/trace_clock.c
 test-sanitized: bemu-sanitized require-artifacts
 	$(call STAGE,9/10,running boot test under ASan/UBSan)
 	@UBSAN_OPTIONS=print_stacktrace=1 python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01-sanitized \

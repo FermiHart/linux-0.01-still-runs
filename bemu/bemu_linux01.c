@@ -41,6 +41,7 @@
 #include "pit.h"
 #include "uart.h"
 #include "console.h"
+#include "trace_clock.h"
 #include "keyboard.h"
 #include "error.h"
 
@@ -441,6 +442,7 @@ int main(int argc, char **argv)
         if (stop_requested)
             break;
         exits++;
+        trace_clock_tick(&m.clock);
         if (poll_due) {
             poll_due = 0;
             m.run->immediate_exit = 0;

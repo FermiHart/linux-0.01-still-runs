@@ -143,6 +143,24 @@ A trace file is a UTF-8 text file containing one JSON object per line (newline
 delimited JSON, also known as JSON Lines). Lines may be compressed with `gzip`
 if the file extension is `.trace.gz`.
 
+## Logical clock
+
+The `ts` field is produced by a deterministic logical clock (`bemu/trace_clock.h`).
+The clock is reset at machine creation and advances by one fixed quantum for every
+observable event (currently one nanosecond per KVM exit).  It does **not** read the
+host wall clock, so the same guest path yields identical `ts` values across runs.
+
+When `SOURCE_DATE_EPOCH` is present in the environment, the clock uses it as the
+boot epoch; otherwise the epoch is zero.  This makes the trace stable across
+reproducible builds without depending on the host `time(NULL)`.
+
+| Function | Meaning |
+|---|---|
+| `trace_clock_reset()` | Reset epoch and counters |
+| `trace_clock_tick()` | Advance one quantum |
+| `trace_clock_now()` | Current logical timestamp |
+| `trace_clock_seq()` | Monotonic event sequence number |
+
 ## Stability guarantees
 
 - New event types may be added without bumping the trace version.
