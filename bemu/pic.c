@@ -47,11 +47,19 @@ void pic_write(struct pic_state *pic, uint16_t port, uint8_t value)
             case 1:
                 pic->icw[1] = value;
                 pic->vector_base = value;
-                pic->icw_step = (pic->icw[0] & 2) ? 3 : 2;
+                if (pic->icw[0] & 2) { /* single mode, no ICW3 */
+                    pic->icw_step = (pic->icw[0] & 1) ? 4 : 0;
+                    if (!pic->icw_step)
+                        pic->init = 0;
+                } else {
+                    pic->icw_step = 2;
+                }
                 break;
             case 2:
                 pic->icw[2] = value;
-                pic->icw_step = (pic->icw[0] & 1) ? 3 : 4;
+                pic->icw_step = (pic->icw[0] & 1) ? 4 : 0;
+                if (!pic->icw_step)
+                    pic->init = 0;
                 break;
             case 3:
                 pic->icw[3] = value;

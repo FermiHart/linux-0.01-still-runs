@@ -192,7 +192,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real golden-trace toolchain
+        test-fs-inspect test-fs-real test-bemu-devices golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -498,6 +498,15 @@ test-fs-real: all
 golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
+
+test-bemu-devices: $(BUILD)/test-bemu-devices
+	$(call STAGE,9/10,running bEMU device unit tests)
+	@$(BUILD)/test-bemu-devices
+
+$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/pic.h bemu/pit.h bemu/uart.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" tests/bemu/test_bemu_devices.c \
+	  bemu/pic.c bemu/pit.c bemu/uart.c
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              DIAGNOSTICS                                 ║
