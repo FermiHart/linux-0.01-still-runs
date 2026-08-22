@@ -339,6 +339,11 @@ $(BUILD)/minix-inspect: tools/minix-inspect.c | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -MMD -MP -MF "$(BUILD)/minix-inspect.d" -MT "$@" \
 	  -o "$@" "$<" $(HOSTLDFLAGS)
 
+$(BUILD)/bbp-tool: tools/bbp-tool.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
+	$(call STEP,building tools/bbp-tool)
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" "$<" $(HOSTLDFLAGS)
+
 # Collect all userland binaries (ASM + C)
 USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin
 
