@@ -191,7 +191,8 @@ endef
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
-        test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property toolchain
+        test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
+        test-fs-inspect toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -478,6 +479,11 @@ test-fs-property: all
 	$(call STEP,fs property-style test)
 	@PYTHONUNBUFFERED=1 python3 tests/test_fs_property.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
+
+test-fs-inspect: $(BUILD)/root.img $(BUILD)/minix-inspect
+	$(call STEP,independent fs inspector consistency test)
+	@python3 tests/test_fs_inspect.py --minix-inspect $(BUILD)/minix-inspect \
+	  --img $(BUILD)/root.img
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              DIAGNOSTICS                                 ║
@@ -820,6 +826,7 @@ help:
 	@printf '    $(CWH)test-fs-link$(CR)   link/unlink/rename smoke test\n'
 	@printf '    $(CWH)test-fs-large$(CR)  multi-line file smoke test\n'
 	@printf '    $(CWH)test-fs-property$(CR) property-style fs test\n'
+	@printf '    $(CWH)test-fs-inspect$(CR) independent fs inspector check\n'
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
