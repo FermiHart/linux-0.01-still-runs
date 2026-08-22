@@ -42,6 +42,7 @@
 #include "uart.h"
 #include "console.h"
 #include "keyboard.h"
+#include "error.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -417,7 +418,7 @@ int main(int argc, char **argv)
     machine_create(&m);
     if (cli_parse_args(argc, argv, &opts) < 0) {
         cli_usage(argv[0]);
-        return 2;
+        return BEMU_EXIT_CLI;
     }
     m.trace = opts.trace;
     m.no_timer = opts.no_timer;
@@ -431,7 +432,8 @@ int main(int argc, char **argv)
     signal_run = m.run;
     if (setup_host_input() < 0) {
         (void)restore_host_input();
-        return 1;
+        status = BEMU_EXIT_RUNTIME;
+        goto out;
     }
     fprintf(stderr, "[bemu-linux01] direct KVM entry: %s @ PA 0, 8 MiB, no firmware, no bootloader\n",
             opts.kernel);
@@ -476,17 +478,18 @@ int main(int argc, char **argv)
         }
     }
     if (stop_requested) {
-        status = 128 + stop_requested;
+        status = BEMU_EXIT_SIGNAL_BASE + stop_requested;
         fprintf(stderr, "\n[bemu-linux01] interrupted by signal %d\n", (int)stop_requested);
     } else if (!m.done) {
         fprintf(stderr, "[bemu-linux01] gave up after %ld KVM exits\n", exits);
+        status = BEMU_EXIT_RUNTIME;
     } else {
         fprintf(stderr, "\n[bemu-linux01] RESULT: PASS after %ld KVM exits\n", exits);
-        status = 0;
+        status = BEMU_EXIT_OK;
     }
 out:
-    if (restore_host_input() < 0 && status == 0)
-        status = 1;
+    if (restore_host_input() < 0 && status == BEMU_EXIT_OK)
+        status = BEMU_EXIT_RUNTIME;
     machine_destroy(&m);
     return status;
 }
