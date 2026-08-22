@@ -19,7 +19,9 @@ Thumbs.db
 .idea/
 *.sublime-*
 
-# Logs & local runs
+# Upstream extraction output
+upstream/extracted/
+
 *.log
 serial.log
 
