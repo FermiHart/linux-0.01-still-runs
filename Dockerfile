@@ -1,47 +1,35 @@
-# linux-0.01-still-runs — Containerized build environment
+# syntax=docker/dockerfile:1
+# Reproducible build environment for linux-0.01-still-runs.
+# This container provides the reference toolchain documented in docs/TOOLCHAIN.md.
 #
-# Build:   docker build -t linux-0.01-still-runs .
-# Run:     docker run --rm linux-0.01-still-runs
-# Shell:   docker run --rm -it --entrypoint /bin/bash linux-0.01-still-runs
-# Export:  docker build --target artifacts --output type=local,dest=. .
+# Build:
+#   docker build -t linux001-still-runs:latest .
 #
-# Produces: kernel, root image, and the bEMU KVM runner under /build in both
-# the default image and the exported artifacts stage.
+# Run (KVM access requires --device /dev/kvm):
+#   docker run --rm -it --device /dev/kvm \
+#     -v "$(pwd):/work" -w /work \
+#     linux001-still-runs:latest make ci
 
-FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517 AS builder
+FROM ubuntu:24.04@sha256:e0a1f2ca717d2dd2d5a5bee1110f32a7f14378c49e675f302b10fddc2eba7aa6
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    nasm \
-    ca-certificates \
-    python3 \
+    build-essential=12.10ubuntu1 \
+    gcc-13=13.3.0-6ubuntu2~24.04.1 \
+    g++-13=13.3.0-6ubuntu2~24.04.1 \
+    binutils=2.42-4ubuntu2.5 \
+    nasm=2.16.01-1build1 \
+    python3=3.12.3-0ubuntu2 \
+    python3-venv=3.12.3-0ubuntu2 \
+    make=4.3-4.1build2 \
+    git=1:2.43.0-1ubuntu1.2 \
+    ca-certificates=20240203 \
+    libc6-dev=2.39-0ubuntu8.5 \
+    linux-headers-generic=6.8.0-51.52 \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /src
-COPY Makefile ./
-COPY LICENSE ./
-COPY bbp/ bbp/
-COPY bemu/ bemu/
-COPY boot/ boot/
-COPY fs/ fs/
-COPY include/ include/
-COPY init/ init/
-COPY kernel/ kernel/
-COPY lib/ lib/
-COPY mm/ mm/
-COPY tools/mkimage.c tools/mkimage.c
-COPY userland/ userland/
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-13
 
-RUN make all
-RUN install -d -m 0755 /build \
-    && install -m 0644 build/root.img build/kernel.elf build/kernel.bin /build/ \
-    && install -m 0644 LICENSE /build/LICENSE \
-    && install -m 0755 build/bemu-linux01 /build/bemu-linux01
-
-FROM scratch AS artifacts
-COPY --from=builder /build/ /build/
-
-FROM builder
-CMD ["make", "all"]
+WORKDIR /work
