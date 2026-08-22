@@ -6,6 +6,7 @@
 #include <stddef.h>
 
 #include "ide.h"
+#include "pic.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -33,6 +34,7 @@ struct machine {
     uint8_t *ram;
     struct kvm_run *run;
     struct ide_state ide;
+    struct pic_state pic;
     struct uart_state uart;
     uint8_t cmos_index, port61;
     uint8_t pit_latch[2];

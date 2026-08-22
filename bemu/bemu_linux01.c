@@ -37,6 +37,7 @@
 #include "loader.h"
 #include "cli.h"
 #include "kvm.h"
+#include "pic.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -524,6 +525,9 @@ static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
     case 0x64: value=m->key_ready ? 1 : 0; break;
     case 0x71: value=cmos_read(m->cmos_index); break;
     case 0x40: value=0; break;
+    case 0x20: value=pic_read(&m->pic, 0); break;
+    case 0x21: value=pic_read(&m->pic, 1); break;
+    case 0xa0: case 0xa1: value=0; break;
     case 0x3c5: value=m->seq[m->seq_index]; break;
     case 0x3cf: value=m->gc[m->gc_index]; break;
     case 0x3d5: value=m->crtc[m->crtc_index]; break;
@@ -578,6 +582,9 @@ static void io_write(struct machine *m, uint16_t port, uint32_t value, unsigned 
         m->pit_bytes = 0;
         m->pit_enabled = 0;
         break;
+    case 0x20: pic_write(&m->pic, 0, byte); break;
+    case 0x21: pic_write(&m->pic, 1, byte); break;
+    case 0xa0: case 0xa1: break;
     case 0x3c4: m->seq_index=byte; break;
     case 0x3c5: m->seq[m->seq_index]=byte; break;
     case 0x3ce: m->gc_index=byte; break;

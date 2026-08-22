@@ -352,13 +352,13 @@ $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 
 $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h \
                         bemu/machine.c bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
-                        bemu/kvm.c bemu/kvm.h \
+                        bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h \
                         bbp/bbp_build.c bbp/bbp_build.h \
                         bbp/linux01_handoff.h bbp/include/bbp/bbp.h \
                         bbp/include/bbp/bbp_crc64.h | dirs
 	$(call STAGE,8/10,building firmware-free bEMU KVM runner)
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
-	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bbp/bbp_build.c $(BEMU_LDFLAGS)
+	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bbp/bbp_build.c $(BEMU_LDFLAGS)
 	$(call OK,bemu-linux01 ready)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
