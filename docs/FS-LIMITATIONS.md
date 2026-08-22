@@ -36,6 +36,23 @@ this.
 `/bin/update` is built but not started by `init`. Even if it were started, it
 would block on the same `sync()` issue.
 
+### Full disk / full inode
+
+Not exercised by the smoke-test suite. The current root image has 961 free
+blocks and 241 free inodes, which is enough for the tests above.
+
+### Corruption, IDE errors and power loss
+
+Not modeled. bEMU writes directly into the mmap'd root image; there is no
+injection framework for disk errors or simulated power loss. These scenarios
+will be addressed after the IDE write IRQ path is deterministic.
+
+### Multi-boot persistence
+
+See the cross-boot persistence note above. Files created in one bEMU run are
+not yet visible in a second run because dirty buffers are not flushed to the
+backing image.
+
 ## Workarounds
 
 For testing, all filesystem operations are verified within a single boot using
