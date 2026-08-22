@@ -127,7 +127,7 @@ static inline int _fork(void) {
 static inline int _execve(const char *p, char **a, char **e) {
     int r;
     __asm__ volatile("int $0x80" : "=a"(r)
-        : "0"(SYS_execve), "b"(p), "c"(a), "d"(e));
+        : "0"(SYS_execve), "b"(p), "c"(a), "d"(e) : "memory");
     return r;
 }
 
@@ -140,54 +140,57 @@ static inline int _ioctl(int fd, int cmd, void *arg) {
 
 static inline int _chdir(const char *p) {
     int r;
-    __asm__ volatile("int $0x80" : "=a"(r) : "0"(SYS_chdir), "b"(p));
+    __asm__ volatile("int $0x80" : "=a"(r)
+        : "0"(SYS_chdir), "b"(p) : "memory");
     return r;
 }
 
 static inline int _stat(const char *p, struct stat *s) {
     int r;
     __asm__ volatile("int $0x80" : "=a"(r)
-        : "0"(SYS_stat), "b"(p), "c"(s));
+        : "0"(SYS_stat), "b"(p), "c"(s) : "memory");
     return r;
 }
 
 static inline int _creat(const char *p, int mode) {
     int r;
     __asm__ volatile("int $0x80" : "=a"(r)
-        : "0"(SYS_creat), "b"(p), "c"(mode));
+        : "0"(SYS_creat), "b"(p), "c"(mode) : "memory");
     return r;
 }
 
 static inline int _unlink(const char *p) {
     int r;
-    __asm__ volatile("int $0x80" : "=a"(r) : "0"(SYS_unlink), "b"(p));
+    __asm__ volatile("int $0x80" : "=a"(r)
+        : "0"(SYS_unlink), "b"(p) : "memory");
     return r;
 }
 
 static inline int _link(const char *oldp, const char *newp) {
     int r;
     __asm__ volatile("int $0x80" : "=a"(r)
-        : "0"(SYS_link), "b"(oldp), "c"(newp));
+        : "0"(SYS_link), "b"(oldp), "c"(newp) : "memory");
     return r;
 }
 
 static inline int _mkdir(const char *p, int mode) {
     int r;
     __asm__ volatile("int $0x80" : "=a"(r)
-        : "0"(SYS_mkdir), "b"(p), "c"(mode));
+        : "0"(SYS_mkdir), "b"(p), "c"(mode) : "memory");
     return r;
 }
 
 static inline int _rmdir(const char *p) {
     int r;
-    __asm__ volatile("int $0x80" : "=a"(r) : "0"(SYS_rmdir), "b"(p));
+    __asm__ volatile("int $0x80" : "=a"(r)
+        : "0"(SYS_rmdir), "b"(p) : "memory");
     return r;
 }
 
 static inline int _open3(const char *p, int flags, int mode) {
     int r;
     __asm__ volatile("int $0x80" : "=a"(r)
-        : "0"(5), "b"(p), "c"(flags), "d"(mode));
+        : "0"(5), "b"(p), "c"(flags), "d"(mode) : "memory");
     return r;
 }
 
@@ -257,6 +260,7 @@ static inline char *strcat(char *d, const char *s) {
 #define MAX_HISTORY  100
 #define MAX_ARGS      32
 #define MAX_MATCHES    64   /* keep complete() stack frame <= 16KB */
+#define NAME_LEN       14
 #define PROMPT_STR   "fermihart@linux01"
 
 #define C0 "\033[0m"
@@ -292,6 +296,16 @@ static int raw_active;
 static char scratch[2048];
 
 /* ── Terminal helpers ──────────────────────────────────────── */
+static int write_all(int fd, const char *buf, int len) {
+	int total = 0, n;
+	while (total < len) {
+		n = write(fd, buf + total, len - total);
+		if (n <= 0) break;
+		total += n;
+	}
+	return total;
+}
+
 static void __attribute__((unused)) save_termios(void) {
 	_ioctl(0, TCGETA, &saved_termio);
 }
@@ -320,28 +334,32 @@ static void restore_termios(void) {
 }
 
 static void wr(const char *s, int len) {
-    write(1, s, len);
+    write_all(1, s, len);
+}
+
+static void write_stdout(const char *buf, int len) {
+    int i, start = 0;
+    for (i = 0; i < len; i++) {
+        if (buf[i] == '\n') {
+            if (i > start)
+                write_all(1, buf + start, i - start);
+            write_all(1, "\r\n", 2);
+            start = i + 1;
+        }
+    }
+    if (start < len)
+        write_all(1, buf + start, len - start);
 }
 
 static void puts(const char *s) {
-    while (*s) {
-        if (*s == '\n')
-            write(1, "\r", 1);
-        write(1, s, 1);
-        s++;
-    }
+    write_stdout(s, strlen(s));
 }
 
 static void putc(char c) {
     if (c == '\n')
-        write(1, "\r", 1);
-    write(1, &c, 1);
-}
-
-static void write_stdout(const char *buf, int len) {
-    int i;
-    for (i = 0; i < len; i++)
-        putc(buf[i]);
+        write_all(1, "\r\n", 2);
+    else
+        write_all(1, &c, 1);
 }
 
 static void puts_width(const char *s, int width) {
@@ -379,14 +397,33 @@ static const char *shell_path(const char *p) {
     return p;
 }
 
+static int path_valid(const char *p) {
+    int component = 0;
+    int total = 0;
+    while (*p) {
+        if (++total >= MAX_LINE)
+            return 0;
+        if (*p == '/')
+            component = 0;
+        else if (++component > NAME_LEN)
+            return 0;
+        p++;
+    }
+    return 1;
+}
+
 static int shell_open_read(const char *p) {
-    return open(shell_path(p), O_RDONLY);
+    p = shell_path(p);
+    if (!path_valid(p)) return -1;
+    return open(p, O_RDONLY);
 }
 
 static int shell_open_write(const char *p, int append) {
+    p = shell_path(p);
+    if (!path_valid(p)) return -1;
     if (append)
-        return _open3(shell_path(p), O_WRONLY | O_CREAT | O_APPEND, 0644);
-    return _creat(shell_path(p), 0644);
+        return _open3(p, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    return _creat(p, 0644);
 }
 
 static void path_parent(char *p) {
@@ -405,42 +442,57 @@ static void path_parent(char *p) {
         p[n - 1] = 0;
 }
 
-static void path_append(char *p, const char *name) {
-    int n, room, k;
+static int path_append(char *p, int cap, const char *name) {
+    int n, k;
     if (!name[0] || (name[0] == '.' && name[1] == 0))
-        return;
+        return 0;
     if (name[0] == '.' && name[1] == '.' && name[2] == 0) {
         path_parent(p);
-        return;
+        return 0;
     }
+    for (k = 0; name[k]; k++)
+        if (k >= NAME_LEN)
+            return -1;
     n = strlen(p);
     if (n > 1) {
-        if (n >= MAX_LINE - 2) return;
+        if (n >= cap - 1) return -1;
         p[n++] = '/';
     }
-    room = MAX_LINE - 1 - n;
-    for (k = 0; k < room && name[k]; k++)
+    if (n + k >= cap)
+        return -1;
+    for (k = 0; name[k]; k++)
         p[n + k] = name[k];
     p[n + k] = 0;
+    return 0;
 }
 
-static void normalize_path(char *out, const char *base, const char *input) {
-    char part[MAX_LINE];
+static int normalize_path(char *out, int cap, const char *base, const char *input) {
+    char part[NAME_LEN + 1];
     int i = 0, j;
 
-    if (input[0] == '/')
-        strcpy(out, "/");
-    else
-        strcpy(out, base);
+    if (input[0] == '/') {
+        if (cap < 2) return -1;
+        out[0] = '/';
+        out[1] = 0;
+    } else {
+        for (j = 0; base[j]; j++)
+            if (j >= cap - 1) return -1;
+        for (j = 0; base[j]; j++) out[j] = base[j];
+        out[j] = 0;
+    }
 
     while (input[i]) {
         while (input[i] == '/') i++;
+        if (!input[i]) break;
         j = 0;
-        while (input[i] && input[i] != '/' && j < MAX_LINE - 1)
+        while (input[i] && input[i] != '/') {
+            if (j >= NAME_LEN) return -1;
             part[j++] = input[i++];
+        }
         part[j] = 0;
-        path_append(out, part);
+        if (path_append(out, cap, part) < 0) return -1;
     }
+    return 0;
 }
 
 #define VFS_MAX 32
@@ -454,8 +506,8 @@ struct vfile {
 };
 static struct vfile vfs[VFS_MAX];
 
-static void vpath(char *out, const char *p) {
-    normalize_path(out, cwd, shell_path(p));
+static int vpath(char *out, const char *p) {
+    return normalize_path(out, MAX_LINE, cwd, shell_path(p));
 }
 
 static int vfind_path(const char *path) {
@@ -468,7 +520,7 @@ static int vfind_path(const char *path) {
 
 static int vfind(const char *p) {
     char path[MAX_LINE];
-    vpath(path, p);
+    if (vpath(path, p) < 0) return -1;
     return vfind_path(path);
 }
 
@@ -477,6 +529,9 @@ static int valloc(const char *path, int is_dir) {
     int k;
     if (i >= 0)
         return i;
+    for (k = 0; k < MAX_LINE - 1 && path[k]; k++)
+        ;
+    if (path[k]) return -1;
     for (i = 0; i < VFS_MAX; i++)
         if (!vfs[i].used) {
             vfs[i].used = 1;
@@ -491,7 +546,7 @@ static int valloc(const char *path, int is_dir) {
     return -1;
 }
 
-static int vparent_is(const char *path, const char *dir, char *name) {
+static int vparent_is(const char *path, const char *dir, char *name, int cap) {
     int n = strlen(dir), i, j = 0;
     if (strcmp(dir, "/") == 0)
         n = 1;
@@ -505,8 +560,11 @@ static int vparent_is(const char *path, const char *dir, char *name) {
     i = n == 1 ? 1 : n + 1;
     if (!path[i])
         return 0;
-    while (path[i] && path[i] != '/')
+    while (path[i] && path[i] != '/') {
+        if (j >= cap - 1)
+            return 0;
         name[j++] = path[i++];
+    }
     name[j] = 0;
     return path[i] == 0;
 }
@@ -514,7 +572,7 @@ static int vparent_is(const char *path, const char *dir, char *name) {
 static int vwrite_file(const char *p, const char *data, int append) {
     char path[MAX_LINE];
     int i, n;
-    vpath(path, p);
+    if (vpath(path, p) < 0) return -1;
     i = valloc(path, 0);
     if (i < 0 || vfs[i].is_dir)
         return -1;
@@ -687,33 +745,21 @@ static void history_add(void) {
 static void load_history(void) {
 	int fd = open(HIST_FILE, O_RDONLY);
 	char buf[512];
-	int n, i = 0, j = 0;
+	int n, i, j = 0;
 	if (fd < 0) return;
-	n = read(fd, buf, sizeof(buf) - 1);
-	close(fd);
-	if (n <= 0) return;
-	buf[n] = 0;
-	while (buf[i] && hist_count < MAX_HISTORY) {
-		if (buf[i] == '\n') {
-			hist[hist_count][j] = 0;
-			if (j > 0) hist_count++;
-			j = 0;
-		} else if (j < MAX_LINE - 1) {
-			hist[hist_count][j++] = buf[i];
+	while (hist_count < MAX_HISTORY && (n = read(fd, buf, sizeof(buf))) > 0) {
+		for (i = 0; i < n && hist_count < MAX_HISTORY; i++) {
+			if (buf[i] == '\n') {
+				hist[hist_count][j] = 0;
+				if (j > 0) hist_count++;
+				j = 0;
+			} else if (j < MAX_LINE - 1) {
+				hist[hist_count][j++] = buf[i];
+			}
 		}
-		i++;
 	}
+	close(fd);
 	hist_pos = hist_count;
-}
-
-static int write_all(int fd, const char *buf, int len) {
-	int total = 0, n;
-	while (total < len) {
-		n = write(fd, buf + total, len - total);
-		if (n <= 0) break;
-		total += n;
-	}
-	return total;
 }
 
 static void save_history(void) {
@@ -810,13 +856,25 @@ static int is_dot(const char *name) {
 	return (name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0)));
 }
 
-static void add_match(char matches[MAX_MATCHES][MAX_LINE], int *match_count, const char *name) {
+static int name_from_dirent(char *dst, int cap, const char src[NAME_LEN]) {
     int i;
+    if (cap < NAME_LEN + 1) return -1;
+    for (i = 0; i < NAME_LEN && src[i]; i++) dst[i] = src[i];
+    dst[i] = 0;
+    return 0;
+}
+
+static void add_match(char matches[MAX_MATCHES][MAX_LINE], int *match_count, const char *name) {
+    int i, n;
     for (i = 0; i < *match_count; i++)
         if (strcmp(matches[i], name) == 0)
             return;
-    if (*match_count < MAX_MATCHES)
-        strcpy(matches[(*match_count)++], name);
+    if (*match_count >= MAX_MATCHES) return;
+    for (n = 0; name[n]; n++)
+        if (n >= MAX_LINE - 1) return;
+    for (i = 0; i <= n; i++)
+        matches[*match_count][i] = name[i];
+    (*match_count)++;
 }
 
 static void maybe_builtin_match(char matches[MAX_MATCHES][MAX_LINE], int *match_count,
@@ -825,20 +883,23 @@ static void maybe_builtin_match(char matches[MAX_MATCHES][MAX_LINE], int *match_
         add_match(matches, match_count, name);
 }
 
-static void make_path(char *out, const char *dir, const char *name) {
-	int n;
-	strcpy(out, dir);
-	n = strlen(out);
-	if (n == 0) {
-		strcpy(out, name);
-		return;
+static int make_path(char *out, int cap, const char *dir, const char *name) {
+	int i, n = 0;
+	while (dir[n]) {
+		if (n >= cap - 1) return -1;
+		out[n] = dir[n];
+		n++;
 	}
-	if (n == 1 && out[0] == '/')
-		strcpy(out + 1, name);
-	else {
+	if (n && !(n == 1 && out[0] == '/')) {
+		if (n >= cap - 1) return -1;
 		out[n++] = '/';
-		strcpy(out + n, name);
 	}
+	for (i = 0; name[i]; i++) {
+		if (n >= cap - 1) return -1;
+		out[n++] = name[i];
+	}
+	out[n] = 0;
+	return 0;
 }
 
 static void __attribute__((unused)) complete(void) {
@@ -851,6 +912,7 @@ static void __attribute__((unused)) complete(void) {
     static char dir[MAX_LINE];
     static char prefix[MAX_LINE];
     static char candidate[MAX_LINE];
+    static char entry_name[NAME_LEN + 1];
     static char matches[MAX_MATCHES][MAX_LINE];
     int  match_count = 0;
     int  word_start, word_len, first_word, has_path, slash, i, fd, n;
@@ -940,28 +1002,31 @@ static void __attribute__((unused)) complete(void) {
 				n = read(fd, &de, sizeof(de));
 				if (n != sizeof(de)) break;
 				if (de.inode == 0) continue;
-				if (is_dot(de.name)) continue;
-				if (is_prefix_ci(prefix, de.name))
-					add_match(matches, &match_count, de.name);
+				name_from_dirent(entry_name, sizeof(entry_name), de.name);
+				if (is_dot(entry_name)) continue;
+				if (is_prefix_ci(prefix, entry_name))
+					add_match(matches, &match_count, entry_name);
 			}
 			close(fd);
 		}
 	}
 
 	/* Search cwd or an explicit path. */
+	if (!path_valid(dir)) return;
 	fd = open(dir, O_RDONLY);
 	if (fd >= 0) {
 		while (1) {
 			n = read(fd, &de, sizeof(de));
 			if (n != sizeof(de)) break;
 			if (de.inode == 0) continue;
-			if (is_dot(de.name)) continue;
-			if (is_prefix_ci(prefix, de.name)) {
+			name_from_dirent(entry_name, sizeof(entry_name), de.name);
+			if (is_dot(entry_name)) continue;
+			if (is_prefix_ci(prefix, entry_name)) {
 				if (has_path) {
-					make_path(candidate, dir, de.name);
-					add_match(matches, &match_count, candidate);
+					if (make_path(candidate, sizeof(candidate), dir, entry_name) == 0)
+						add_match(matches, &match_count, candidate);
 				} else
-					add_match(matches, &match_count, de.name);
+					add_match(matches, &match_count, entry_name);
 			}
 		}
 		close(fd);
@@ -1345,6 +1410,7 @@ static void builtin_hello(void) {
 
 static void builtin_uname(int argc, char **argv) {
 	struct utsname u = {0};
+	(void)argv;
 	if (_uname(&u) < 0) {
 		puts(CR "uname: syscall failed" C0 "\n");
 		return;
@@ -1369,7 +1435,11 @@ const char *dir;
 char next[MAX_LINE];
 int vi;
 dir = (argc < 2) ? "/home/fermihart" : shell_path(argv[1]);
-normalize_path(next, cwd, dir);
+if (normalize_path(next, sizeof(next), cwd, dir) < 0) {
+puts_c(CY, dir);
+puts(CR ": name or path too long" C0 "\n");
+return;
+}
 if (argc >= 2 && strcmp(argv[1], "..") == 0 && vfind_path(cwd) >= 0) {
 strcpy(cwd, next);
 return;
@@ -1397,28 +1467,27 @@ static void builtin_pwd(void) {
     putc('\n');
 }
 
-static void name_from_dirent(char *dst, const char *src) {
-    int i;
-    for (i = 0; i < 14 && src[i]; i++) dst[i] = src[i];
-    dst[i] = 0;
-}
-
-static void join_path(char *out, const char *dir, const char *name) {
-    int n;
+static int join_path(char *out, int cap, const char *dir, const char *name) {
+    int i, n;
     if (strcmp(dir, ".") == 0) dir = cwd;
-    strcpy(out, dir);
-    n = strlen(out);
-    if (n == 0) {
-        strcpy(out, name);
-        return;
+    for (n = 0; dir[n]; n++) {
+        if (n >= cap - 1) return -1;
+        out[n] = dir[n];
     }
-    if (n > 1 && out[n - 1] != '/') {
+    if (n == 0) {
+        ;
+    } else if (n > 1 && out[n - 1] != '/') {
+        if (n >= cap - 1) return -1;
         out[n++] = '/';
-        out[n] = 0;
     } else if (n == 1 && out[0] == '/') {
         n = 1;
     }
-    strcpy(out + n, name);
+    for (i = 0; name[i]; i++) {
+        if (n >= cap - 1) return -1;
+        out[n++] = name[i];
+    }
+    out[n] = 0;
+    return 0;
 }
 
 static void mode_string(unsigned short mode, char *out) {
@@ -1524,7 +1593,7 @@ print_known_entry("update", longfmt);
 print_known_entry("hello", longfmt);
 }
 for (fi = 0; fi < VFS_MAX; fi++) {
-if (vfs[fi].used && vparent_is(vfs[fi].path, dir, vname)) {
+if (vfs[fi].used && vparent_is(vfs[fi].path, dir, vname, sizeof(vname))) {
 if (!all && vname[0] == '.') continue;
 if (longfmt) {
 puts(vfs[fi].is_dir ? "drwxr-xr-x 1 0 0 0 " : "-rw-r--r-- 1 0 0 0 ");
@@ -1564,6 +1633,11 @@ static void builtin_ls(int argc, char **argv) {
         }
     }
     open_dir = (strcmp(dir, ".") == 0) ? cwd : dir;
+	if (!path_valid(shell_path(open_dir))) {
+		puts_c(CY, dir);
+		puts(CR ": name or path too long" C0 "\n");
+		return;
+	}
     if (strcmp(open_dir, "/") == 0 || strcmp(open_dir, "/dev") == 0 ||
         strcmp(open_dir, "/etc") == 0 || strcmp(open_dir, "/bin") == 0 ||
         strcmp(open_dir, "/home") == 0 ||
@@ -1584,10 +1658,10 @@ static void builtin_ls(int argc, char **argv) {
             int n = read(fd, &de, sizeof(de));
             if (n != sizeof(de)) break;
             if (de.inode == 0) continue;
-            name_from_dirent(name, de.name);
+            name_from_dirent(name, sizeof(name), de.name);
             if (!all && name[0] == '.') continue;
             entries++;
-            join_path(path, open_dir, name);
+            if (join_path(path, sizeof(path), open_dir, name) < 0) continue;
             if (longfmt)
                 print_ls_entry(path, name, longfmt);
             else {
@@ -1602,7 +1676,7 @@ static void builtin_ls(int argc, char **argv) {
         close(fd);
     }
 for (fd = 0; fd < VFS_MAX; fd++) {
-if (vfs[fd].used && vparent_is(vfs[fd].path, open_dir, name)) {
+if (vfs[fd].used && vparent_is(vfs[fd].path, open_dir, name, sizeof(name))) {
 if (!all && name[0] == '.') continue;
 entries++;
 if (longfmt) {
@@ -1646,24 +1720,47 @@ static void builtin_cat(int argc, char **argv) {
     }
 }
 
+static int same_real_file(const char *src, const char *dst) {
+    struct stat src_st, dst_st;
+    const char *src_path = shell_path(src);
+    const char *dst_path = shell_path(dst);
+
+    if (!path_valid(src_path) || !path_valid(dst_path))
+        return 0;
+    if (_stat(src_path, &src_st) == 0 && _stat(dst_path, &dst_st) == 0 &&
+        src_st.st_dev == dst_st.st_dev && src_st.st_ino == dst_st.st_ino)
+        return 1;
+    return 0;
+}
+
 static int copy_file(const char *src, const char *dst) {
     char buf[512];
     int in, out, n;
 
+    if (!path_valid(shell_path(src)) || !path_valid(shell_path(dst)))
+        return -1;
+    if (same_real_file(src, dst))
+        return -4;
+
     in = shell_open_read(src);
     if (in < 0)
         return -1;
-    out = _creat(shell_path(dst), 0644);
+    out = shell_open_write(dst, 0);
     if (out < 0) {
         close(in);
         return -2;
     }
     while ((n = read(in, buf, sizeof(buf))) > 0)
-        if (write(out, buf, n) != n) {
+        if (write_all(out, buf, n) != n) {
             close(in);
             close(out);
             return -3;
         }
+    if (n < 0) {
+        close(in);
+        close(out);
+        return -3;
+    }
     close(in);
     close(out);
     return 0;
@@ -1678,8 +1775,9 @@ return;
 for (i = 1; i < argc; i++)
 {
 char path[MAX_LINE];
-vpath(path, argv[i]);
-valloc(path, 1);
+if (vpath(path, argv[i]) < 0 || valloc(path, 1) < 0) {
+puts(CR "mkdir: invalid or full path " C0); puts_c(CY, argv[i]); putc('\n');
+}
 }
 }
 
@@ -1696,7 +1794,7 @@ static void builtin_rmdir(int argc, char **argv) {
             vfs[vi].used = 0;
             continue;
         }
-        if (_rmdir(shell_path(argv[i])) < 0) {
+        if (!path_valid(shell_path(argv[i])) || _rmdir(shell_path(argv[i])) < 0) {
             puts(CR "rmdir: cannot remove " C0); puts_c(CY, shell_path(argv[i])); putc('\n');
         }
         }
@@ -1740,11 +1838,11 @@ vfs[vi].used = 0;
 continue;
 }
 if (recursive) {
-if (_rmdir(shell_path(files[i])) == 0)
+if (path_valid(shell_path(files[i])) && _rmdir(shell_path(files[i])) == 0)
 continue;
 }
-if (_unlink(shell_path(files[i])) < 0) {
-if (_rmdir(shell_path(files[i])) < 0) {
+if (!path_valid(shell_path(files[i])) || _unlink(shell_path(files[i])) < 0) {
+if (!path_valid(shell_path(files[i])) || _rmdir(shell_path(files[i])) < 0) {
 puts(CR "rm: cannot remove " C0);
 puts_c(CY, shell_path(files[i])); putc('\n');
 }
@@ -1765,14 +1863,17 @@ vwrite_file(argv[i], "", 0);
 
 static void builtin_cp(int argc, char **argv) {
     int r;
-    int vi;
+    int vi, dst_vi;
     if (argc != 3) {
         puts(CR "cp: usage: cp SRC DST" C0 "\n");
         return;
     }
     vi = vfind(argv[1]);
     if (vi >= 0 && !vfs[vi].is_dir) {
-        vwrite_file(argv[2], vfs[vi].data, 0);
+        dst_vi = vfind(argv[2]);
+        if (dst_vi == vi || vwrite_file(argv[2], vfs[vi].data, 0) < 0) {
+            puts(CR "cp: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+        }
         return;
     }
     r = copy_file(argv[1], argv[2]);
@@ -1782,17 +1883,27 @@ static void builtin_cp(int argc, char **argv) {
 }
 
 static void builtin_mv(int argc, char **argv) {
-    int vi;
+    int vi, dst_vi;
     if (argc != 3) {
         puts(CR "mv: usage: mv SRC DST" C0 "\n");
         return;
     }
     vi = vfind(argv[1]);
     if (vi >= 0 && !vfs[vi].is_dir) {
-        vwrite_file(argv[2], vfs[vi].data, 0);
+        dst_vi = vfind(argv[2]);
+        if (dst_vi == vi) return;
+        if (vwrite_file(argv[2], vfs[vi].data, 0) < 0) {
+            puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+            return;
+        }
         vfs[vi].used = 0;
         return;
     }
+    if (!path_valid(shell_path(argv[1])) || !path_valid(shell_path(argv[2]))) {
+        puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+        return;
+    }
+    if (same_real_file(argv[1], argv[2])) return;
     if ((_link(shell_path(argv[1]), shell_path(argv[2])) < 0 && copy_file(argv[1], argv[2]) < 0) ||
         _unlink(shell_path(argv[1])) < 0) {
         puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
@@ -1810,7 +1921,8 @@ static void builtin_ln(int argc, char **argv) {
         vwrite_file(argv[2], vfs[vi].data, 0);
         return;
     }
-    if (_link(shell_path(argv[1]), shell_path(argv[2])) < 0) {
+    if (!path_valid(shell_path(argv[1])) || !path_valid(shell_path(argv[2])) ||
+        _link(shell_path(argv[1]), shell_path(argv[2])) < 0) {
         puts(CR "ln: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
     }
 }
@@ -1833,11 +1945,13 @@ static void builtin_head(int argc, char **argv) {
         return;
     }
     while (lines < 10 && (n = read(fd, buf, sizeof(buf))) > 0) {
-        for (i = 0; i < n && lines < 10; i++) {
-            putc(buf[i]);
-            if (buf[i] == '\n')
-                lines++;
+        for (i = 0; i < n; i++) {
+            if (buf[i] == '\n' && ++lines == 10) {
+                i++;
+                break;
+            }
         }
+        write_stdout(buf, i);
     }
     close(fd);
 }
@@ -1896,8 +2010,8 @@ static int contains(const char *linebuf, const char *needle) {
 }
 
 static void builtin_grep(int argc, char **argv) {
-    char c, linebuf[MAX_LINE];
-    int fd, n, len = 0;
+    char buf[256], linebuf[MAX_LINE];
+    int fd, n, i, len = 0;
     if (argc != 3) {
         puts(CR "grep: usage: grep TEXT FILE" C0 "\n");
         return;
@@ -1913,16 +2027,18 @@ static void builtin_grep(int argc, char **argv) {
         puts(CR "grep: cannot open " C0); puts_c(CY, shell_path(argv[2])); putc('\n');
         return;
     }
-    while ((n = read(fd, &c, 1)) > 0) {
-        if (c == '\n' || len >= MAX_LINE - 1) {
-            linebuf[len] = 0;
-            if (contains(linebuf, argv[1])) {
-                puts(linebuf);
-                putc('\n');
+    while ((n = read(fd, buf, sizeof(buf))) > 0) {
+        for (i = 0; i < n; i++) {
+            if (buf[i] == '\n' || len >= MAX_LINE - 1) {
+                linebuf[len] = 0;
+                if (contains(linebuf, argv[1])) {
+                    puts(linebuf);
+                    putc('\n');
+                }
+                len = 0;
+            } else {
+                linebuf[len++] = buf[i];
             }
-            len = 0;
-        } else {
-            linebuf[len++] = c;
         }
     }
     if (len) {
@@ -2316,7 +2432,7 @@ static int run_builtin(int argc, char **argv) {
 
 /* ── Main loop ────────────────────────────────────────────────
  * Keep the production shell in canonical mode until raw TTY input
- * is reliable across QEMU/HMP and the real console path.          */
+ * is reliable across scripted bEMU input and the real console path. */
 static void shell_loop(void) {
 	int n;
 
@@ -2351,6 +2467,8 @@ int main(int argc, char **argv) {
 	int motd_fd, motd_n, r;
 	char motd_buf[1800];
 
+	(void)argc;
+	(void)argv;
 	cwd[0] = '/';
 	cwd[1] = 0;
 	boot_time = time((long *)0);

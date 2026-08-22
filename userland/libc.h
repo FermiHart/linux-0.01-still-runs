@@ -72,7 +72,8 @@ static inline int open(const char *path, int flags)
     int __res;
     __asm__ volatile("int $0x80"
         : "=a" (__res)
-        : "0" (__NR_open), "b" (path), "c" (flags));
+        : "0" (__NR_open), "b" (path), "c" (flags)
+        : "memory");
     return __res;
 }
 
@@ -88,7 +89,8 @@ static inline long time(long *tloc)
 {
     long __res;
     __asm__ volatile("int $0x80"
-        : "=a" (__res) : "0" (__NR_time), "b" (tloc));
+        : "=a" (__res) : "0" (__NR_time), "b" (tloc)
+        : "memory");
     return __res;
 }
 
@@ -104,7 +106,8 @@ static inline int uname(void *buf)
 {
     int __res;
     __asm__ volatile("int $0x80"
-        : "=a" (__res) : "0" (__NR_uname), "b" (buf));
+        : "=a" (__res) : "0" (__NR_uname), "b" (buf)
+        : "memory");
     return __res;
 }
 
@@ -121,7 +124,8 @@ static inline pid_t wait(int *status)
     pid_t __res;
     __asm__ volatile("int $0x80"
         : "=a" (__res)
-        : "0" (__NR_waitpid), "b" (-1), "c" (status), "d" (0));
+        : "0" (__NR_waitpid), "b" (-1), "c" (status), "d" (0)
+        : "memory");
     return __res;
 }
 
@@ -151,10 +155,11 @@ static inline char *itoa(long n)
 {
     static char buf[24];
     char *p = buf + sizeof(buf) - 1;
+    unsigned long magnitude;
     int neg = (n < 0);
-    if (neg) n = -n;
+    magnitude = neg ? 0UL - (unsigned long)n : (unsigned long)n;
     *p = '\0';
-    do { *--p = '0' + (n % 10); } while (n /= 10);
+    do { *--p = '0' + (magnitude % 10); } while (magnitude /= 10);
     if (neg) *--p = '-';
     return p;
 }
