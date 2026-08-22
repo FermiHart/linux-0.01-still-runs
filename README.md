@@ -6,10 +6,10 @@
 
 Not emulated. Not behind glass. Running.
 
-<img src="docs/screenshots/01-boot-motd.png" alt="linux-0.01-still-runs booting in QEMU — kernel boot, full MOTD, IBM PC 8x8 font, the year 2026" width="720"/>
+<img src="docs/screenshots/01-boot-motd.png" alt="linux-0.01-still-runs booting through bEMU — kernel boot, full MOTD, PC-compatible 8x8 font, the year 2026" width="720"/>
 
 [![CI](https://github.com/fermihart/linux-0.01-still-runs/actions/workflows/build.yml/badge.svg)](https://github.com/fermihart/linux-0.01-still-runs/actions/workflows/build.yml)
-[![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
+[![License: mixed](https://img.shields.io/badge/license-mixed-blue.svg)](LICENSE)
 [![codename](https://img.shields.io/badge/codename-Vesica%20Piscis-purple)](#)
 [![channel](https://img.shields.io/badge/channel-v0.1%20FOREVER-success)](#)
 
@@ -27,7 +27,7 @@ Not works in the sense of a museum exhibit under rope and velvet. Works in the s
 
 He was wrong about the scale. But he was right about the spirit.
 
-This project exists to keep that spirit running. **Not frozen. Not emulated behind a glass pane. Running.** The original linux-0.01 source — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a modern bootloader so the kernel can reach hardware, a toolchain that speaks 2026 C while respecting 1991 conventions, and just enough runtime patches to make the thing boot without panicking on its own assumptions.
+This project exists to keep that spirit running. **Not frozen. Not emulated behind a glass pane. Running.** The original linux-0.01 source — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a firmware-free KVM runner, a toolchain that speaks 2026 C while respecting 1991 conventions, and just enough runtime patches to make the thing boot without panicking on its own assumptions.
 
 **Welcome to 1991. It still runs in 2026.**
 
@@ -35,26 +35,15 @@ This project exists to keep that spirit running. **Not frozen. Not emulated behi
 
 ## Quick start
 
-**Don't want to compile?** Grab the bootable ISO from the
-[**latest release**](https://github.com/FermiHart/linux-0.01-still-runs/releases/latest)
-— download, `gunzip root.img.gz`, and boot:
+The runtime requires Linux with `/dev/kvm`. Build and boot directly:
 
 ```bash
-qemu-system-i386 -cdrom linux-0.01-still-runs.iso \
-  -drive file=root.img,format=raw,if=none,id=hd0 \
-  -device ide-hd,drive=hd0,bus=ide.0,unit=0,cyls=977,heads=5,secs=17 \
-  -boot d -m 8M -no-reboot
-```
-
-Or build it yourself:
-
-```bash
-brew install x86_64-elf-gcc nasm qemu xorriso     # macOS
-# (apt: x86_64-elf-gcc nasm qemu-system-x86 xorriso on linux)
+sudo apt install build-essential nasm python3
 
 git clone https://github.com/fermihart/linux-0.01-still-runs
 cd linux-0.01-still-runs
-make boom        # clean + build + boot in QEMU — one-shot demo
+make toolchain   # verify/install missing build tools and KVM access
+make boom        # clean + build + direct bEMU/KVM boot
 ```
 
 Inside the booted system:
@@ -78,8 +67,8 @@ fermihart@linux01:/$ cat /etc/motd     # the letter above, on the VGA console
 | | |
 |:---:|:---:|
 | <img src="docs/screenshots/04-shell-commands.png" width="400"/><br/>**Interactive shell** — a 1991 Unix command suite | <img src="docs/screenshots/05-shell-hello-c.png" width="400"/><br/>**C userland** — `/bin/hello` built with the cross toolchain |
-| <img src="docs/screenshots/02-build-splash.png" width="400"/><br/>**Cinematic build** — `make` with a Unicode splash | <img src="docs/screenshots/07-build-complete.png" width="400"/><br/>**Reproducible artifacts** — sha-stamped on every build |
-| <img src="docs/screenshots/08-build-stages.png" width="400"/><br/>**Ten-stage pipeline** — kernel → ISO → Minix v1 rootfs forge | <img src="docs/screenshots/06-make-help.png" width="400"/><br/>**`make help`** — every target, self-documenting |
+| <img src="docs/screenshots/02-build-splash.png" width="400"/><br/>**Cinematic build** — `make` with a Unicode splash | <img src="docs/screenshots/07-build-complete.png" width="400"/><br/>**Checksummed artifacts** — SHA-256-stamped on every build |
+| <img src="docs/screenshots/08-build-stages.png" width="400"/><br/>**Build pipeline** — kernel → BBP-aware bEMU → Minix v1 rootfs forge | <img src="docs/screenshots/06-make-help.png" width="400"/><br/>**`make help`** — every target, self-documenting |
 
 </div>
 
@@ -90,7 +79,7 @@ fermihart@linux01:/$ cat /etc/motd     # the letter above, on the VGA console
 | Layer | Purpose | Status |
 |-------|---------|--------|
 | **Historical core** — `init/`, `kernel/`, `mm/`, `fs/`, `lib/`, `include/` | Original Linux 0.01 source from October 1991, patched only where modern hardware or modern GCC demand it | Recognizable line-for-line against the [kernel.org tarball](https://www.kernel.org/pub/linux/kernel/Historic/linux-0.01.tar.gz) |
-| **Modern port** — `boot/`, `tools/`, `userland/`, `tests/`, `Makefile` | Limine bootloader, ISO/root-image generation, interactive shell, VGA 80×50 mode-set, QEMU smoke tests, GitHub CI | New, minimal, written to feel period-correct where it touches the kernel |
+| **Modern port** — `bemu/`, `bbp/`, `boot/`, `tools/`, `userland/`, `tests/`, `Makefile` | Direct KVM entry, BBP handoff, root-image generation, interactive shell, VGA 80×50 mode-set, bEMU smoke tests | New, minimal, written to feel period-correct where it touches the kernel |
 
 This is therefore best described as **Linux 0.01 that runs today**, not a byte-for-byte preservation tree. For archaeology, compare against the official tarball. For experimentation, boot this repo.
 
@@ -98,13 +87,14 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 
 ## What you get
 
-- **VGA 80×50 text mode** using the original IBM PC ROM 8×8 character set extracted from SeaBIOS — same font Linus saw on his 386, just denser
+- **VGA 80×50 text mode** using an 8×8 PC-compatible character set derived from SeaBIOS VGA font data
 - **Colored interactive shell** (`userland/shell.c`) with emacs line editing, tab completion, history, and ANSI colors on `ls`
 - **1991 Unix command suite**: `date`, `cal`, `uptime`, `fortune`, `yes`, `true`, `false`, plus an Easter-egg `linus` that prints the original comp.os.minix announcement
 - **Minix v1 filesystem** built by hand at image time (`tools/mkimage.c`), with `/etc/motd`, `/etc/passwd`, `/bin/{shell,hello,update}`, `/dev/tty0`
-- **Limine v12 multiboot2 boot** — BIOS *and* UEFI from a single ISO
+- **Firmware-free bEMU boot** — KVM enters `kernel.bin` at physical zero with no BIOS, UEFI, ISO, or bootloader
+- **Real BBP handoff** — bEMU publishes CRC64-checksummed RAM, kernel, root-disk, and machine identity tags at physical `0xC0000`; CRC64 detects corruption but does not authenticate the producer
 - **Real CMOS time** (Y2K rollover patched in `init/main.c` so `date` returns 2026 not 1970)
-- **CI on every push**: build → boot in headless QEMU → run 26-command shell smoke test on Ubuntu 24.04
+- **Automated validation**: build → direct KVM boot → run the full shell smoke suite
 
 ---
 
@@ -112,9 +102,9 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 
 | Stage | Component | What it does |
 |-------|-----------|--------------|
-| 1 | Limine BIOS/UEFI | Loads `bootstub.elf` + `kernel.bin` as multiboot2 modules |
-| 2 | `boot/bootstub.S` | Serial init, copies kernel to phys 0, reprograms PIC, far-jumps |
-| 3 | `boot/head.s` | IDT/GDT, paging, BSS zeroing, calls `main()` |
+| 1 | `bemu/bemu_linux01.c` | Loads `kernel.bin` at phys 0, creates the BBP handoff, and provides the legacy devices through KVM |
+| 2 | `boot/head.s` | Reprograms the PIC, initializes IDT/GDT and paging, zeros BSS, calls `main()` |
+| 3 | `bbp/linux01_bbp.c` | Validates bEMU identity, memory, kernel, and root-disk tags |
 | 4 | `init/main.c` | VGA 80×50 mode set → time → tty → traps → sched → buffer → fork-init |
 | 5 | Linus' 1991 kernel | scheduler, fork, exec, Minix VFS, block/char devices, signals, pipes |
 | 6 | Userland | `crt0.S` + interactive shell + `/bin/hello` demo |
@@ -127,11 +117,11 @@ Deep dive: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 make help            # show every target with a one-line description
-make all             # full build (kernel + root.img + ISO), -Werror clean
-make run             # build + boot in QEMU (GUI)
-make run-headless    # build + boot in QEMU, serial → build/serial.log
+make all             # full build (kernel + root.img + bEMU), -Werror clean
+make run             # build + direct KVM boot in the terminal
+make run-headless    # alias for make run; bEMU is terminal-native
 make boom            # clean + build + run — cinematic one-shot demo
-make test            # full build + 26-command shell smoke test
+make test            # boot + 53 shell commands + editor + large-rootfs tests
 make doctor          # toolchain health check
 make sizes           # kernel section sizes
 make hash            # SHA-256 of all artifacts
@@ -144,7 +134,7 @@ python3 tests/qquick.py "date" --expect "2026"
 python3 tests/qquick.py "ls"   --expect "bin"  --setup "cd etc"
 ```
 
-Toolchain: `x86_64-elf-gcc -Wall -Werror -O2 -std=gnu89 -m32 -march=i386 -ffreestanding`, NASM, `xorriso`, Limine v12.3.1, QEMU `qemu-system-i386`.
+Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m32 -march=i386 -ffreestanding`; plus NASM, a host C compiler, Python 3, Linux KVM headers, and writable `/dev/kvm` for execution.
 
 ---
 
@@ -184,7 +174,7 @@ Tab completion: press `Tab` once to complete, twice to list matches in columns. 
 - **GCC -O2 mis-compiled `fs/buffer.c`'s free-list walk.** The original `while (tmp != free_list || (tmp=NULL))` trick discarded its side-effect on modern toolchains, causing the second `_open3(O_CREAT)` after any FS write to panic. Fixed by rewriting the loop AND dropping `fs/buffer.o`+`fs/bitmap.o` to `-O1`. Same class of Heisenbug as the existing `sys_ioctl` `volatile int ret` patch.
 - **CMOS Y2K rollover.** `kernel_mktime` reads `tm_year` as years-since-1900; CMOS gives 2-digit year, so `26` meant 1926 → epoch went negative → `date` showed Jan 1 1970. Treat `< 70` as `20yy`.
 - **Serial throughput.** UART was at 2400 baud with polled busy-wait; `printk` also routed every byte twice (`serial_puts` *and* `tty_write` → `con_write` → `serial_console_write`). At 26 commands the write_q saturated and the shell blocked. Bumped to 115200, dropped the duplicate path.
-- **CP437 on VGA.** Original `con_write` filtered to bytes 32–126. Since we ship the full IBM PC ROM 8×8 font in plane 2, loosened the filter to let extended slots through — `∞` at `0xEC`, box-drawing chars, math symbols.
+- **CP437 on VGA.** Original `con_write` filtered to bytes 32–126. Since we ship the full PC-compatible 8×8 font in plane 2, loosened the filter to let extended slots through — `∞` at `0xEC`, box-drawing chars, math symbols.
 
 ---
 
@@ -192,7 +182,7 @@ Tab completion: press `Tab` once to complete, twice to list matches in columns. 
 
 | | |
 |---|---|
-| QEMU `sendkey` burst can race the shell's raw-mode TTY processing under certain timing windows (`cd tmp` may need a retry after long sessions) | tracked — needs a GDB session, not a guess |
+| The supported build/test host is Linux KVM | bEMU requires Linux headers and writable `/dev/kvm`; no fallback backend is claimed |
 | Runtime file creation in the shell is session-local (VFS-only); a kernel-side Minix allocator audit remains pending for true on-disk `mkdir`/`creat` | shell `mkdir/touch/rm` work; they just don't survive a reboot |
 | External binary execution is explicit-by-path (`/bin/hello`). No `$PATH` resolution yet | by design — keeps the surface small |
 
@@ -200,10 +190,11 @@ Tab completion: press `Tab` once to complete, twice to list matches in columns. 
 
 ## License
 
-The original Linux 0.01 source is © 1991 Linus Torvalds.
-Everything modern in this repo (bootstub, Makefile, shell, tools, tests, docs) is dedicated to the public domain under [Unlicense](LICENSE).
-
-The embedded IBM PC 8×8 character ROM bitmap (`kernel/vga_font8x8.h`) is the original 1981 IBM hardware ROM, public domain since release.
+The historical kernel remains © 1991 Linus Torvalds under the original Linux
+0.01 distribution terms. Modern files are under the Unlicense unless they
+carry another identifier; bEMU and BBP are BSD-3-Clause. See [LICENSE](LICENSE)
+for the complete notices and the pinned provenance of the public-domain VGA
+font data.
 
 ---
 

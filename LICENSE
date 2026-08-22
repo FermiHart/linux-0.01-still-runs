@@ -25,10 +25,73 @@ For more information, please refer to <https://unlicense.org/>
 
 ---
 
-Note: The original Linux 0.01 source code (files under boot/, fs/, init/,
-kernel/, lib/, mm/, include/ that are unchanged from the 1991 release) is
-copyright © 1991 Linus Torvalds and was originally distributed under a
-permissive license allowing free distribution. The modern additions
-(entire bootstub.S, head.s, Makefile, linker scripts, GDB scripts, test
-harness, tools, CI configuration, documentation) are placed in the public
-domain under the terms above.
+Historical Linux 0.01 code
+
+The code derived from the original Linux 0.01 release is Copyright (C) 1991
+Linus Torvalds and remains subject to the terms published in RELNOTES-0.01:
+
+    This kernel is (C) 1991 Linus Torvalds, but all or part of it may be
+    redistributed provided you do the following:
+
+    - Full source must be available (and free), if not with the
+      distribution then at least on asking for it.
+
+    - Copyright notices must be intact. (In fact, if you distribute
+      only parts of it you may have to add copyrights, as there aren't
+      (C)'s in all files.) Small partial excerpts may be copied
+      without bothering with copyrights.
+
+    - You may not distribute this for a fee, not even "handling" costs.
+
+Source: https://www.kernel.org/pub/linux/kernel/Historic/old-versions/RELNOTES-0.01
+
+The Unlicense dedication above applies only to modern project material whose
+authors had the right to make that dedication. It does not replace the Linux
+0.01 terms or a file's own license identifier.
+
+---
+
+BSD 3-Clause License
+
+Copyright (c) 2026, F E R M I INFINITY H A R T <contact@fermihart.com>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from this
+   software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+This BSD license applies to files carrying
+`SPDX-License-Identifier: BSD-3-Clause`, including the BBP implementation and
+the bEMU Linux 0.01 runner.
+
+---
+
+Font data
+
+`kernel/vga_font8x8.h` is derived from the `vgafont8` table in SeaBIOS. The
+SeaBIOS source attributes the font package to Joseph Gil and states that the
+individual fonts are public domain. The reference source used for provenance
+is:
+
+https://github.com/coreboot/seabios/blob/81ec9ec0bcf45df11fb7f98339ec9036b546fca0/vgasrc/vgafonts.c

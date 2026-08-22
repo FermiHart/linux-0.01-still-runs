@@ -14,6 +14,3 @@ define hook-stop
         # Try to show current task
     end
 end
-
-# Connect to QEMU GDB stub
-target remote :1234

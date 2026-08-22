@@ -1,6 +1,7 @@
 # Build artifacts
 build/
 *.o
+*.d
 *.a
 *.bin
 *.elf
@@ -21,8 +22,6 @@ Thumbs.db
 # Logs & local runs
 *.log
 serial.log
-qemu.log
-ci-serial.log
 
 # Secrets
 .env
