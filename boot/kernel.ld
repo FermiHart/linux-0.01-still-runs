@@ -11,7 +11,7 @@
  *   0x4000  after_page_tables (rest of kernel)
  *
  * Linked as ELF for symbol/debug ease; later objcopy -O binary → kernel.bin.
- * The bootstub memcpy's that flat blob to physical 0.
+ * bEMU maps that flat blob directly at physical 0 before KVM entry.
  *
  * NOTE: code is built with -fleading-underscore so C symbol `main` lands as
  * `_main`, which is exactly what head.s references.
