@@ -140,4 +140,4 @@ Welcome to 1991. It still runs in 2026.
 GOLDEN_BOOT_MARKER
 
 [32mfermihart@linux01[0m:[34m/[0m[33m$
-[bemu-linux01] RESULT: PASS after 6080 KVM exits
+[bemu-linux01] RESULT: PASS after 6079 KVM exits

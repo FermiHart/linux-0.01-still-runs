@@ -7,6 +7,7 @@
 
 #include "ide.h"
 #include "pic.h"
+#include "pit.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -37,8 +38,7 @@ struct machine {
     struct pic_state pic;
     struct uart_state uart;
     uint8_t cmos_index, port61;
-    uint8_t pit_latch[2];
-    int pit_bytes, pit_enabled;
+    struct pit_state pit;
     uint8_t seq_index, gc_index, crtc_index;
     uint8_t seq[256], gc[256], crtc[256];
     uint8_t keys[KEY_QUEUE_MAX];

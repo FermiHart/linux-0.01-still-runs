@@ -43,6 +43,7 @@ int machine_create(struct machine *m)
     m->vm = -1;
     m->vcpu = -1;
     pic_reset(&m->pic);
+    pit_reset(&m->pit);
     return 0;
 }
 

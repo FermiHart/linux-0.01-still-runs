@@ -38,6 +38,7 @@
 #include "cli.h"
 #include "kvm.h"
 #include "pic.h"
+#include "pit.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -463,7 +464,7 @@ static void queue_text(struct machine *m, const char *text)
 
 static void pump_input(struct machine *m)
 {
-    if (m->pit_enabled && !m->no_timer)
+    if (pit_is_enabled(&m->pit) && !m->no_timer)
         irq_pulse(m, 0);
     if (m->script && !m->script_queued && m->prompt_count) {
         const char *p;
@@ -524,7 +525,7 @@ static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
     case 0x61: value=m->port61; break;
     case 0x64: value=m->key_ready ? 1 : 0; break;
     case 0x71: value=cmos_read(m->cmos_index); break;
-    case 0x40: value=0; break;
+    case 0x40: value=pit_read(&m->pit, port); break;
     case 0x20: value=pic_read(&m->pic, 0); break;
     case 0x21: value=pic_read(&m->pic, 1); break;
     case 0xa0: case 0xa1: value=0; break;
@@ -573,14 +574,8 @@ static void io_write(struct machine *m, uint16_t port, uint32_t value, unsigned 
     case 0x64: break;
     case 0x70: m->cmos_index=byte; break;
     case 0x40:
-        if (m->pit_bytes < 2)
-            m->pit_latch[m->pit_bytes++] = byte;
-        if (m->pit_bytes == 2)
-            m->pit_enabled = 1;
-        break;
     case 0x43:
-        m->pit_bytes = 0;
-        m->pit_enabled = 0;
+        pit_write(&m->pit, port, byte);
         break;
     case 0x20: pic_write(&m->pic, 0, byte); break;
     case 0x21: pic_write(&m->pic, 1, byte); break;
