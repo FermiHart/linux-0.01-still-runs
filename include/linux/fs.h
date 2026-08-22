@@ -106,8 +106,7 @@ struct m_inode {
 #define PIPE_SIZE(inode) ((PIPE_HEAD(inode)-PIPE_TAIL(inode))&(PAGE_SIZE-1))
 #define PIPE_EMPTY(inode) (PIPE_HEAD(inode)==PIPE_TAIL(inode))
 #define PIPE_FULL(inode) (PIPE_SIZE(inode)==(PAGE_SIZE-1))
-#define INC_PIPE(head) \
-__asm__("incl %0\n\tandl $4095,%0"::"m" (head))
+#define INC_PIPE(head) ((head) = ((head)+1) & (PAGE_SIZE-1))
 
 struct file {
 	unsigned short f_mode;

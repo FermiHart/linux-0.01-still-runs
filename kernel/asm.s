@@ -13,6 +13,7 @@
 _divide_error:
 	pushl $_do_divide_error
 no_error_code:
+	cld				# interrupted code may have set DF
 	xchgl %eax,(%esp)
 	pushl %ebx
 	pushl %ecx
@@ -73,6 +74,7 @@ math_emulate:
 	pushl $_do_device_not_available
 	jmp no_error_code
 _device_not_available:
+	cld				# interrupted code may have set DF
 	pushl %eax
 	movl %cr0,%eax
 	bt $2,%eax			# EM (math emulation bit)
@@ -108,6 +110,7 @@ _coprocessor_error:
 _double_fault:
 	pushl $_do_double_fault
 error_code:
+	cld				# interrupted code may have set DF
 	xchgl %eax,4(%esp)		# error code <-> %eax
 	xchgl %ebx,(%esp)		# &function <-> %ebx
 	pushl %ecx
@@ -154,4 +157,3 @@ _stack_segment:
 _general_protection:
 	pushl $_do_general_protection
 	jmp error_code
-

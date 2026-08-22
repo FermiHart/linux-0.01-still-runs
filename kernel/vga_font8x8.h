@@ -1,10 +1,9 @@
 /*
- * vga_font8x8.h — IBM PC 8x8 character ROM bitmap, 256 glyphs * 8 rows.
+ * vga_font8x8.h — PC-compatible 8x8 font bitmap, 256 glyphs * 8 rows.
  *
- * Generated from the public-domain IBM PC ROM character set (the one
- * Linus saw on his 386 in 1991). Extracted from the standard SeaBIOS
- * VGA BIOS shipped with QEMU; the bitmap data itself is the original
- * IBM PC hardware ROM and has been freely redistributed for decades.
+ * Derived from SeaBIOS vgasrc/vgafonts.c. Its source notice attributes the
+ * font package to Joseph Gil and states that individual fonts are public
+ * domain. See LICENSE for the pinned provenance URL.
  *
  * Each entry is one row, MSB = leftmost pixel.
  */

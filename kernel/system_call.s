@@ -59,6 +59,7 @@ reschedule:
 	jmp _schedule
 .align 2
 _system_call:
+	cld				# the i386 C ABI requires DF clear
 	cmpl $nr_system_calls-1,%eax
 	ja bad_sys_call
 	push %ds
@@ -107,6 +108,8 @@ ret_from_sys_call:
 	pushl $28
 	pushl %edx
 	call _verify_area
+	testl %eax,%eax
+	jne bad_signal_stack
 	popl %edx
 	addl $4,%esp
 	popl %ecx
@@ -123,7 +126,7 @@ ret_from_sys_call:
 	movl EFLAGS(%esp),%eax
 	movl %eax,%fs:20(%edx)		# old eflags
 	movl %ebx,%fs:24(%edx)		# old return addr
-3:	popl %eax
+	3:	popl %eax
 	popl %ebx
 	popl %ecx
 	popl %edx
@@ -131,6 +134,16 @@ ret_from_sys_call:
 	pop %es
 	pop %ds
 	iret
+
+bad_signal_stack:
+	popl %edx
+	addl $4,%esp
+	popl %ecx
+	popl %eax
+	pushl $11			# SIGSEGV: no writable signal frame
+	call _do_exit
+	addl $4,%esp
+	jmp 3b
 
 default_signal:
 	incl %ecx
@@ -143,6 +156,7 @@ default_signal:
 
 .align 2
 _timer_interrupt:
+	cld				# interrupted user code may have set DF
 	push %ds		# save ds,es and put kernel data space
 	push %es		# into them. %fs is used by _system_call
 	push %fs
@@ -188,6 +202,7 @@ _sys_fork:
 1:	ret
 
 _hd_interrupt:
+	cld				# interrupted user code may have set DF
 	pushl %eax
 	pushl %ecx
 	pushl %edx
@@ -200,10 +215,10 @@ _hd_interrupt:
 	movl $0x17,%eax
 	mov %ax,%fs
 	movb $0x20,%al
-	outb %al,$0x20		# EOI to interrupt controller #1
+	outb %al,$0xA0		# EOI to slave interrupt controller
 	jmp 1f			# give port chance to breathe
 1:	jmp 1f
-1:	outb %al,$0xA0		# same to controller #2
+1:	outb %al,$0x20		# then acknowledge the master controller
 	movl _do_hd,%eax
 	testl %eax,%eax
 	jne 1f

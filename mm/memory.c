@@ -25,8 +25,15 @@ __asm__("movl %%eax,%%cr3"::"a" (0))
 #error "Won't work"
 #endif
 
-#define copy_page(from,to) \
-__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024):)
+#define copy_page(from,to) do { \
+	unsigned long __cp_from = (unsigned long)(from); \
+	unsigned long __cp_to = (unsigned long)(to); \
+	unsigned long __cp_count = 1024; \
+	__asm__ volatile("cld ; rep ; movsl" \
+		: "+S" (__cp_from), "+D" (__cp_to), "+c" (__cp_count) \
+		: \
+		: "memory"); \
+} while (0)
 
 static unsigned short mem_map [ PAGING_PAGES ] = {0,};
 
@@ -41,7 +48,7 @@ static unsigned short free_page_hint = 0;
 unsigned long get_free_page(void)
 {
 	unsigned short i, start = free_page_hint;
-	unsigned long addr;
+	unsigned long addr, count;
 
 	for (i = start; i < PAGING_PAGES; i++)
 		if (!mem_map[i])
@@ -57,10 +64,12 @@ found:
 	if (free_page_hint >= PAGING_PAGES)
 		free_page_hint = 0;
 	addr = LOW_MEM + ((unsigned long)i << 12);
-	__asm__("cld ; rep ; stosl"
-		: : "a" (0), "c" (1024), "D" (addr)
+	count = 1024;
+	__asm__ volatile ("cld ; rep ; stosl"
+		: "+c" (count), "+D" (addr)
+		: "a" (0)
 		: "memory");
-	return addr;
+	return addr - 4096;
 }
 
 /*

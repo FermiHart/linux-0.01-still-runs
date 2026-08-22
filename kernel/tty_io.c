@@ -202,7 +202,7 @@ int tty_read(unsigned channel, char * buf, int nr)
 	int minimum,time,flag=0;
 	long oldalarm;
 
-	if (channel>2 || nr<0) return -1;
+	if (channel>=NR_TTYS || nr<0) return -ENXIO;
 	tty = &tty_table[channel];
 	oldalarm = current->alarm;
 	time = (unsigned) 10*tty->termios.c_cc[VTIME];
@@ -262,7 +262,7 @@ int tty_write(unsigned channel, char * buf, int nr)
 	struct tty_struct * tty;
 	char c, *b=buf;
 
-	if (channel>2 || nr<0) return -1;
+	if (channel>=NR_TTYS || nr<0) return -ENXIO;
 	tty = channel + tty_table;
 	while (nr>0) {
 		sleep_if_full(&tty->write_q);
@@ -306,5 +306,7 @@ int tty_write(unsigned channel, char * buf, int nr)
  */
 void do_tty_interrupt(int tty)
 {
+	if (tty < 0 || tty >= NR_TTYS)
+		return;
 	copy_to_cooked(tty_table+tty);
 }

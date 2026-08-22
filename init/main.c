@@ -130,9 +130,7 @@ void main(void)		/* This really IS void, no error here. */
 	sched_init();
 	buffer_init();
 	hd_init();
-	bbp_linux01_init();	/* BBP: synthesize + CRC-validate the boot handoff
-				 * tag list from the kernel's RAM model. Additive,
-				 * non-fatal — logs "[bbp] linux-0.01 adapter: ok". */
+	bbp_linux01_init();	/* Validate bEMU's CRC-checksummed BBP handoff. */
 	sti();
 	move_to_user_mode();
 	if (!fork()) {
@@ -170,8 +168,7 @@ void init(void)
 /*	if (!fork())
 		_exit(execve("/bin/update",NULL,NULL));  */
 	for (i=0;i<NR_OPEN;i++)
-		if (current->filp[i])
-			close(i);
+		close(i);
 	(void) open("/dev/tty0",O_RDWR,0);
 	(void) dup(0);
 	(void) dup(0);

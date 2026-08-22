@@ -52,7 +52,8 @@ int sys_ustat(int dev,struct ustat * ubuf)
 
 	if (!ubuf)
 		return -1;
-	verify_area(ubuf,sizeof *ubuf);
+	if (verify_area(ubuf,sizeof *ubuf))
+		return -EFAULT;
 	if (!dev && current->root)
 		dev = current->root->i_dev;
 	for (s = super_block ; s < super_block + NR_SUPER ; s++)
@@ -61,7 +62,7 @@ int sys_ustat(int dev,struct ustat * ubuf)
 	if (s >= super_block + NR_SUPER || !s->s_dev)
 		return -1;
 	free_blocks = 0;
-	for (i = 0 ; i < s->s_nzones ; i++)
+	for (i = 1 ; i <= s->s_nzones-s->s_firstdatazone ; i++)
 		if (!(s->s_zmap[i>>13]->b_data[(i&8191)>>3] & (1 << (i&7))))
 			free_blocks++;
 	free_inodes = 0;
@@ -104,7 +105,8 @@ int sys_prof(struct ps_snapshot * ubuf)
 
 	if (!ubuf)
 		return -1;
-	verify_area(ubuf,sizeof *ubuf);
+	if (verify_area(ubuf,sizeof *ubuf))
+		return -EFAULT;
 	for (i = 0 ; i < NR_TASKS && n < 16 ; i++) {
 		if (!(p = task[i]))
 			continue;
@@ -176,7 +178,8 @@ int sys_time(long * tloc)
 
 	i = CURRENT_TIME;
 	if (tloc) {
-		verify_area(tloc,4);
+		if (verify_area(tloc,4))
+			return -EFAULT;
 		put_fs_long(i,(unsigned long *)tloc);
 	}
 	return i;
@@ -206,7 +209,8 @@ int sys_times(struct tms * tbuf)
 {
 	if (!tbuf)
 		return jiffies;
-	verify_area(tbuf,sizeof *tbuf);
+	if (verify_area(tbuf,sizeof *tbuf))
+		return -EFAULT;
 	put_fs_long(current->utime,(unsigned long *)&tbuf->tms_utime);
 	put_fs_long(current->stime,(unsigned long *)&tbuf->tms_stime);
 	put_fs_long(current->cutime,(unsigned long *)&tbuf->tms_cutime);
@@ -272,7 +276,8 @@ int sys_uname(struct utsname * name)
 	int i;
 
 	if (!name) return -1;
-	verify_area(name,sizeof *name);
+	if (verify_area(name,sizeof *name))
+		return -EFAULT;
 	for(i=0;i<sizeof *name;i++)
 		put_fs_byte(((char *) &thisname)[i],i+(char *) name);
 	return (0);

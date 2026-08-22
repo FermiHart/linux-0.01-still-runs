@@ -12,6 +12,7 @@
 #include <termios.h>
 
 #define TTY_BUF_SIZE 1024
+#define NR_TTYS 3
 
 struct tty_queue {
 	unsigned long data;
