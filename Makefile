@@ -590,17 +590,7 @@ stats:
 	@printf '\n\n'
 
 audit:
-	@printf '\n  $(CB)$(CWH)diff vs upstream Linus 1991$(CR)\n\n'
-	@if [ -d ../linux-0.01 ]; then \
-	  { diff -rq ../linux-0.01 . 2>/dev/null || [ $$? -eq 1 ]; } | \
-	    awk '!/\.git|build|userland|tools/ && shown < 30 { \
-	      if ($$1=="Only") { printf "  $(CG)+$(CR) $(CWH)%s$(CR)\n", $$NF } \
-	      else { printf "  $(CY)*$(CR) $(CWH)%s$(CR)\n", $$2 } shown++ \
-	    }'; \
-	else \
-	  printf "  $(CRD)upstream ../linux-0.01 not found$(CR)\n"; \
-	fi
-	@printf '\n'
+	@bash "$(REPO_ROOT)/scripts/audit.sh" | tail -n 1 | xargs -I{} printf '\n  $(CG)$(G_OK)$(CR) wrote $(CWH){}$(CR)\n'
 
 provenance:
 	@bash "$(REPO_ROOT)/scripts/provenance.sh" | tail -n 1 | xargs -I{} printf '\n  $(CG)$(G_OK)$(CR) wrote $(CWH){}$(CR)\n'
@@ -752,7 +742,7 @@ help:
 	@printf '\n  $(CB)$(CY)inspect$(CR)\n'
 	@printf '    $(CWH)tree$(CR)           source layout\n'
 	@printf '    $(CWH)stats$(CR)          LOC vs upstream Linus 1991\n'
-	@printf '    $(CWH)audit$(CR)          diff against upstream\n'
+	@printf '    $(CWH)audit$(CR)          line diff vs upstream (build/AUDIT.txt)\n'
 	@printf '    $(CWH)provenance$(CR)     write build/PROVENANCE.txt\n'
 	@printf '\n  $(CB)$(CM)test$(CR)\n'
 	@printf '    $(CWH)test$(CR)           build + full boot test in bEMU\n'
