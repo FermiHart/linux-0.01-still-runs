@@ -192,7 +192,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect toolchain
+        test-fs-inspect test-fs-real toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -484,6 +484,11 @@ test-fs-inspect: $(BUILD)/root.img $(BUILD)/minix-inspect
 	$(call STEP,independent fs inspector consistency test)
 	@python3 tests/test_fs_inspect.py --minix-inspect $(BUILD)/minix-inspect \
 	  --img $(BUILD)/root.img
+
+test-fs-real: all
+	$(call STEP,real filesystem verification)
+	@PYTHONUNBUFFERED=1 python3 tests/test_fs_real.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              DIAGNOSTICS                                 ║
@@ -827,6 +832,7 @@ help:
 	@printf '    $(CWH)test-fs-large$(CR)  multi-line file smoke test\n'
 	@printf '    $(CWH)test-fs-property$(CR) property-style fs test\n'
 	@printf '    $(CWH)test-fs-inspect$(CR) independent fs inspector check\n'
+	@printf '    $(CWH)test-fs-real$(CR)   real filesystem verification\n'
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
