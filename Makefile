@@ -193,7 +193,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-sanitized static-analysis golden-trace toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-sanitized static-analysis fuzz golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -528,6 +528,10 @@ test-sanitized: bemu-sanitized require-artifacts
 static-analysis:
 	$(call STAGE,9/10,running static analysis)
 	@bash "$(REPO_ROOT)/scripts/static-analysis.sh"
+
+fuzz: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
+	$(call STAGE,9/10,running bEMU fault injection fuzz)
+	@bash "$(REPO_ROOT)/scripts/fuzz-bemu.sh"
 
 $(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/pic.h bemu/pit.h bemu/uart.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
