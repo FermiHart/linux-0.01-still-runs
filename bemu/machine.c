@@ -1,6 +1,7 @@
 #include "machine.h"
 
 #include "console.h"
+#include "keyboard.h"
 #include "uart.h"
 
 #include <linux/kvm.h>
@@ -49,6 +50,7 @@ int machine_create(struct machine *m)
     pit_reset(&m->pit);
     uart_reset(&m->uart);
     console_reset(m);
+    keyboard_reset(m);
     return 0;
 }
 
