@@ -177,8 +177,30 @@ Memory types:
 
 ## Authentication limits
 
-CRC64 detects accidental bit flips and some classes of benign corruption. It is
-*not* a cryptographic authenticator. A malicious producer can craft a payload
-with a valid CRC. BBP assumes the producer is part of the trusted computing
-base; the CRC is a data-integrity guard, not a security boundary. See Wave 062
-for the full security note.
+CRC-64/XZ is used throughout BBP for data integrity:
+
+- `bbp_header.checksum` covers the header with the checksum field zeroed.
+- `bbp_info.checksum` covers the info structure with the checksum field zeroed.
+- `bbp_tag_header.checksum` covers the tag body (after the header) with the
+  checksum field zeroed.
+- Out-of-line data pointed to by tags carries its own per-reference CRC when
+  possible (v1.1).
+
+CRC64 detects accidental bit flips, torn writes, and some classes of benign
+corruption. It is **not** a cryptographic authenticator. The checksum length is
+64 bits, so a motivated attacker can forge a valid CRC for an arbitrary payload
+with approximately 2^64 operations; on modern hardware this is within practical
+reach for a well-funded adversary. More importantly, CRC has no keying material:
+anyone who can write the handoff region can also compute the matching checksum.
+
+BBP therefore assumes the producer is part of the trusted computing base. The
+CRC is a data-integrity guard, not a security boundary. If authentication is
+required, the handoff must be covered by a trusted execution environment, a
+measured boot chain, or a cryptographic signature verified before BBP parsing
+begins.
+
+In practice, for `linux-0.01-still-runs` running under bEMU/KVM, the producer
+is the host runner and the consumer is the guest kernel inside the same
+process address space. CRC64 here protects against host memory corruption and
+file-system bit rot, not against a malicious host.
+
