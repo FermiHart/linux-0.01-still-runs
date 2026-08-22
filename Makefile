@@ -616,6 +616,10 @@ reproducible:
 	  $(MAKE) --no-print-directory clean; \
 	  $(MAKE) --no-print-directory all; \
 	  $(MAKE) --no-print-directory checksums; \
+	  if [ ! -f "$(BUILD)/SHA256SUMS" ]; then \
+	    printf '  $(CRD)$(G_NO)$(CR) $(BUILD)/SHA256SUMS missing\n' >&2; \
+	    exit 1; \
+	  fi; \
 	  cp "$(BUILD)/SHA256SUMS" "$(BUILD)/REPRODUCIBLE.sha256"; \
 	  printf '\n  $(CG)$(G_OK)$(CR) wrote $(CWH)$(BUILD)/REPRODUCIBLE.sha256$(CR)\n'
 
