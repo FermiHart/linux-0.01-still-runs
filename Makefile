@@ -191,7 +191,7 @@ endef
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
-        test-fs-write toolchain
+        test-fs-write test-fs-mkdir toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -457,6 +457,11 @@ test-large-rootfs: all
 test-fs-write: all
 	$(call STEP,fs write/append/truncate test)
 	@PYTHONUNBUFFERED=1 python3 tests/test_fs_write.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
+
+test-fs-mkdir: all
+	$(call STEP,fs mkdir/rmdir test)
+	@PYTHONUNBUFFERED=1 python3 tests/test_fs_mkdir.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -796,6 +801,7 @@ help:
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'
 	@printf '    $(CWH)test-fs-write$(CR)   write/append/truncate smoke test\n'
+	@printf '    $(CWH)test-fs-mkdir$(CR)  mkdir/rmdir smoke test\n'
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
