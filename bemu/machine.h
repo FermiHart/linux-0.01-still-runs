@@ -8,6 +8,7 @@
 #include "ide.h"
 #include "pic.h"
 #include "pit.h"
+#include "uart.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -15,10 +16,6 @@
 #define KERNEL_MAX     (512U << 10)
 #define SERIAL_LOG_MAX (1U << 20)
 #define KEY_QUEUE_MAX  8192
-
-struct uart_state {
-    uint8_t ier, lcr, mcr, dll, dlm, scratch;
-};
 
 enum console_state {
     CONSOLE_TEXT,

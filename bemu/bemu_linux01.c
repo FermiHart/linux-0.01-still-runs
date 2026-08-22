@@ -39,6 +39,8 @@
 #include "kvm.h"
 #include "pic.h"
 #include "pit.h"
+#include "uart.h"
+#include "console.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -198,144 +200,7 @@ static uint8_t cmos_read(uint8_t index)
     }
 }
 
-static int console_csi_final_allowed(uint8_t value)
-{
-    static const char allowed[] = "@ABCDEFGHJKLMPSTXZadefgmrsu";
-    return strchr(allowed, value) != NULL;
-}
-
-static void console_byte(struct machine *m, uint8_t value)
-{
-    if (!m->sanitize_console) {
-        fputc(value, stdout);
-        fflush(stdout);
-        return;
-    }
-
-    switch (m->console_state) {
-    case CONSOLE_TEXT:
-        if (value == 0x1b) {
-            m->console_state = CONSOLE_ESC;
-        } else if (value == 0x9b) {
-            m->console_state = CONSOLE_CSI;
-            m->console_seq_len = 0;
-            m->console_csi_valid = 0;
-        } else if (value == 0x9d) {
-            m->console_state = CONSOLE_OSC;
-        } else if (value == 0x90 || value == 0x98 || value == 0x9e || value == 0x9f) {
-            m->console_state = CONSOLE_STRING;
-        } else if (value == '\b' || value == '\t' || value == '\n' || value == '\r' ||
-                   value >= 0xa0 || (value >= 0x20 && value < 0x7f)) {
-            fputc(value, stdout);
-            fflush(stdout);
-        }
-        break;
-    case CONSOLE_ESC:
-        if (value == '[') {
-            m->console_seq[0] = 0x1b;
-            m->console_seq[1] = '[';
-            m->console_seq_len = 2;
-            m->console_csi_valid = 1;
-            m->console_state = CONSOLE_CSI;
-        } else if (value == ']') {
-            m->console_state = CONSOLE_OSC;
-        } else if (value == 'P' || value == 'X' || value == '^' || value == '_') {
-            m->console_state = CONSOLE_STRING;
-        } else if (value != 0x1b) {
-            m->console_state = CONSOLE_TEXT;
-        }
-        break;
-    case CONSOLE_CSI:
-        if (value == 0x1b) {
-            m->console_state = CONSOLE_ESC;
-        } else if (value >= 0x40 && value <= 0x7e) {
-            if (m->console_csi_valid && console_csi_final_allowed(value) &&
-                m->console_seq_len < sizeof m->console_seq) {
-                m->console_seq[m->console_seq_len++] = value;
-                fwrite(m->console_seq, 1, m->console_seq_len, stdout);
-                fflush(stdout);
-            }
-            m->console_state = CONSOLE_TEXT;
-        } else if (value >= 0x20) {
-            if (!((value >= '0' && value <= '9') || value == ';' || value == ':'))
-                m->console_csi_valid = 0;
-            if (m->console_seq_len < sizeof m->console_seq)
-                m->console_seq[m->console_seq_len++] = value;
-            else
-                m->console_csi_valid = 0;
-        }
-        break;
-    case CONSOLE_OSC:
-        if (value == 0x07 || value == 0x9c)
-            m->console_state = CONSOLE_TEXT;
-        else if (value == 0x1b)
-            m->console_state = CONSOLE_OSC_ESC;
-        break;
-    case CONSOLE_OSC_ESC:
-        if (value == '\\' || value == 0x9c)
-            m->console_state = CONSOLE_TEXT;
-        else if (value != 0x1b)
-            m->console_state = CONSOLE_OSC;
-        break;
-    case CONSOLE_STRING:
-        if (value == 0x9c)
-            m->console_state = CONSOLE_TEXT;
-        else if (value == 0x1b)
-            m->console_state = CONSOLE_STRING_ESC;
-        break;
-    case CONSOLE_STRING_ESC:
-        if (value == '\\' || value == 0x9c)
-            m->console_state = CONSOLE_TEXT;
-        else if (value != 0x1b)
-            m->console_state = CONSOLE_STRING;
-        break;
-    }
-}
-
-static void serial_byte(struct machine *m, uint8_t value)
-{
-    static const char prompt_prefix[] = "fermihart@linux01:";
-    size_t line_start;
-    int plain_appended = 0;
-    if (m->serial_len + 1 < SERIAL_LOG_MAX) {
-        m->serial_log[m->serial_len++] = (char)value;
-        m->serial_log[m->serial_len] = 0;
-    }
-    console_byte(m, value);
-    if (!m->ansi_state && value == 0x1b)
-        m->ansi_state = 1;
-    else if (m->ansi_state == 1)
-        m->ansi_state = value == '[' ? 2 : 0;
-    else if (m->ansi_state == 2) {
-        if (value >= 0x40 && value <= 0x7e)
-            m->ansi_state = 0;
-    } else if (m->plain_len + 1 < SERIAL_LOG_MAX) {
-        m->plain_log[m->plain_len++] = (char)value;
-        m->plain_log[m->plain_len] = 0;
-        plain_appended = 1;
-    }
-    if (m->expect && !m->expect_seen && strstr(m->serial_log, m->expect))
-        m->expect_seen = 1;
-    line_start = m->plain_len;
-    while (line_start && m->plain_log[line_start - 1] != '\r' &&
-           m->plain_log[line_start - 1] != '\n')
-        line_start--;
-    if (plain_appended && value == '$' &&
-        m->plain_len - line_start >= sizeof(prompt_prefix) - 1 &&
-        !memcmp(m->plain_log + line_start, prompt_prefix,
-                sizeof(prompt_prefix) - 1)) {
-        m->prompt_count++;
-        if (m->script_queued && m->script_prompts_pending)
-            m->script_prompts_pending--;
-        if (!m->script || !*m->script) {
-            if (m->expect && m->expect_seen)
-                m->done = 1;
-        } else if (m->script_queued && !m->script_prompts_pending &&
-                   (!m->expect || m->expect_seen)) {
-            m->done = 1;
-        }
-    }
-}
+/* console/UART output handling moved to bemu/console.c and bemu/uart.c */
 
 static void key_push(struct machine *m, uint8_t code)
 {
@@ -497,7 +362,6 @@ static void pump_input(struct machine *m)
 static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
 {
     struct ide_state *d = &m->ide;
-    struct uart_state *u = &m->uart;
     uint32_t value = 0;
     if (port == IDE_DATA)
         return ide_data_read(m, size);
@@ -510,17 +374,12 @@ static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
     case IDE_CURRENT: value=d->current; break;
     case IDE_STATUS: value=d->status; ide_clear_irq(m); break;
     case IDE_CONTROL: value=d->status; break;
-    case 0x3f8: value=(u->lcr & 0x80) ? u->dll : 0; break;
-    case 0x3f9: value=(u->lcr & 0x80) ? u->dlm : u->ier; break;
-    case 0x3fa: value=1; break;
-    case 0x3fb: value=u->lcr; break;
-    case 0x3fc: value=u->mcr; break;
-    case 0x3fd: value=0x60; break;
-    case 0x3fe: value=0xb0; break;
-    case 0x3ff: value=u->scratch; break;
+    case 0x3f8: case 0x3f9: case 0x3fa: case 0x3fb:
+    case 0x3fc: case 0x3fd: case 0x3fe: case 0x3ff:
     case 0x2f8: case 0x2f9: case 0x2fa: case 0x2fb:
-    case 0x2fc: case 0x2fe: case 0x2ff: value=0; break;
-    case 0x2fd: value=0x60; break;
+    case 0x2fc: case 0x2fd: case 0x2fe: case 0x2ff:
+        value = uart_read(&m->uart, port);
+        break;
     case 0x60: value=m->key_ready ? m->key_data : 0; m->key_ready=0; break;
     case 0x61: value=m->port61; break;
     case 0x64: value=m->key_ready ? 1 : 0; break;
@@ -541,7 +400,6 @@ static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
 static void io_write(struct machine *m, uint16_t port, uint32_t value, unsigned size)
 {
     struct ide_state *d = &m->ide;
-    struct uart_state *u = &m->uart;
     uint8_t byte = (uint8_t)value;
     if (port == IDE_DATA) {
         ide_data_write(m, value, size);
@@ -557,18 +415,17 @@ static void io_write(struct machine *m, uint16_t port, uint32_t value, unsigned 
     case IDE_STATUS: ide_command(m, byte); break;
     case IDE_CONTROL: ide_control(m, byte); break;
     case 0x3f8:
-        if (u->lcr & 0x80) u->dll=byte;
-        else serial_byte(m, byte);
+        if (m->uart.lcr & 0x80)
+            uart_write(&m->uart, port, byte);
+        else
+            console_output(m, byte);
         break;
-    case 0x3f9:
-        if (u->lcr & 0x80) u->dlm=byte;
-        else u->ier=byte;
-        break;
-    case 0x3fb: u->lcr=byte; break;
-    case 0x3fc: u->mcr=byte; break;
-    case 0x3ff: u->scratch=byte; break;
+    case 0x3f9: case 0x3fa: case 0x3fb:
+    case 0x3fc: case 0x3fd: case 0x3fe: case 0x3ff:
     case 0x2f8: case 0x2f9: case 0x2fa: case 0x2fb:
-    case 0x2fc: case 0x2fd: case 0x2fe: case 0x2ff: break;
+    case 0x2fc: case 0x2fd: case 0x2fe: case 0x2ff:
+        uart_write(&m->uart, port, byte);
+        break;
     case 0x60: break;
     case 0x61: m->port61=byte; break;
     case 0x64: break;

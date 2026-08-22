@@ -1,5 +1,8 @@
 #include "machine.h"
 
+#include "console.h"
+#include "uart.h"
+
 #include <linux/kvm.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,6 +47,8 @@ int machine_create(struct machine *m)
     m->vcpu = -1;
     pic_reset(&m->pic);
     pit_reset(&m->pit);
+    uart_reset(&m->uart);
+    console_reset(m);
     return 0;
 }
 
