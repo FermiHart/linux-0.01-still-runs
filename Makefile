@@ -193,8 +193,8 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-sanitized bbp-conformance static-analysis fuzz \
-        bbp-golden-vectors golden-trace toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-sanitized bbp-conformance static-analysis fuzz \
+        bbp-golden-vectors golden-trace golden-trace-jsonl toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -449,6 +449,8 @@ test: all
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
+	@python3 tests/test_trace_format.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -538,6 +540,15 @@ test-fs-real: all
 golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
+
+golden-trace-jsonl: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
+	@python3 tests/golden_trace_jsonl.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
+
+test-trace-format: require-artifacts
+	$(call STEP,trace format validation)
+	@python3 tests/test_trace_format.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 
 test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)

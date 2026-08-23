@@ -100,7 +100,7 @@ static void test_basic_events(void)
 
     trace_clock_reset(&tc);
     check(trace_open(&t, &tc, temp_path) == 0, "trace_open succeeded");
-    trace_event_boot(&t, "build/kernel.bin", "build/root.img", 8);
+    trace_event_boot(&t, "build/kernel.bin", "build/root.img", 8, 1);
     trace_clock_tick(&tc);
     trace_event_kvm_exit(&t, 2, "KVM_EXIT_IO");
     trace_event_io_access(&t, "out", 0x3f8, 1, 65);
@@ -165,7 +165,7 @@ static void test_disabled(void)
 {
     struct trace t;
     trace_open(&t, NULL, NULL);
-    trace_event_boot(&t, "k", "r", 8);
+    trace_event_boot(&t, "k", "r", 8, 1);
     check(t.file == stderr, "disabled trace writes to stderr");
     trace_close(&t);
 }

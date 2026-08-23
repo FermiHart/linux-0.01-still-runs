@@ -30,7 +30,8 @@ void trace_close(struct trace *t);
 void trace_event_boot(struct trace *t,
                       const char *kernel,
                       const char *root,
-                      unsigned ram_mib);
+                      unsigned ram_mib,
+                      unsigned trace_version);
 
 void trace_event_kvm_exit(struct trace *t,
                           unsigned exit_reason,

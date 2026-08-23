@@ -453,7 +453,7 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "[bemu-linux01] direct KVM entry: %s @ PA 0, 8 MiB, no firmware, no bootloader\n",
             opts.kernel);
-    trace_event_boot(&m.trace, opts.kernel, opts.root, 8);
+    trace_event_boot(&m.trace, opts.kernel, opts.root, 8, 1);
     while (exits < opts.max_exits && !m.done) {
         if (stop_requested)
             break;

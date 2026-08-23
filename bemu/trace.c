@@ -76,7 +76,8 @@ static void emit_footer(struct trace *t)
     fprintf(t->file, "}\n");
 }
 
-void trace_event_boot(struct trace *t, const char *kernel, const char *root, unsigned ram_mib)
+void trace_event_boot(struct trace *t, const char *kernel, const char *root, unsigned ram_mib,
+                      unsigned trace_version)
 {
     if (!t || !t->enabled)
         return;
@@ -85,7 +86,7 @@ void trace_event_boot(struct trace *t, const char *kernel, const char *root, uns
     emit_string(t->file, kernel);
     fprintf(t->file, ",\"root\":");
     emit_string(t->file, root);
-    fprintf(t->file, ",\"ram_mib\":%u}", ram_mib);
+    fprintf(t->file, ",\"ram_mib\":%u,\"trace_version\":%u}", ram_mib, trace_version);
     emit_footer(t);
 }
 
