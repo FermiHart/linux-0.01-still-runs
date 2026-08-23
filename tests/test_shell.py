@@ -34,6 +34,8 @@ KEYS = {
 COMMANDS = [
     ("hello", ["Hello from C userland"], []),
     ("/bin/hello", ["Hello from C userland"], []),
+    ("pathcheck", ["PATH=/bin:/usr/bin:."], []),
+    ("bin/hello", ["Hello from C userland"], []),
     ("help", ["built-in commands"], []),
     ("echo oi", ["oi"], []),
     ("nope", ["nope: not found"], []),
@@ -43,7 +45,7 @@ COMMANDS = [
     ("ls", ["bin", "etc", "home", "tmp"], []),
     ("ls -la", ["drwx", "tmp"], []),
     ("ls -la /dev", ["tty0"], []),
-    ("ls -la bin", ["shell", "hello", "yes"], []),
+    ("ls -la bin", ["shell", "hello", "yes", "pathcheck"], []),
     ("whoami", ["root"], []),
     ("mount", ["/dev/hd1 on / type minix"], []),
     ("df", ["Filesystem", "/dev/hd1"], []),

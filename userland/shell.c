@@ -997,7 +997,63 @@ static void __attribute__((unused)) complete(void) {
     }
 }
 
-/* ── Command execution ─────────────────────────────────────── */
+static char **shell_envp;
+
+/* ── Resolve executable along a colon-separated PATH ───────── */
+static int search_path(const char *cmd, char *out, int cap)
+{
+    const char *path, *next;
+    char **pp;
+    struct stat st;
+    int len, plen, clen;
+
+    if (strchr(cmd, '/')) {
+        if (strlen(cmd) >= (size_t)cap)
+            return -1;
+        strcpy(out, cmd);
+        return 0;
+    }
+
+    path = "PATH=/bin:.";
+    for (pp = shell_envp; pp && *pp; pp++) {
+        if ((*pp)[0] == 'P' && (*pp)[1] == 'A' && (*pp)[2] == 'T' && (*pp)[3] == 'H' && (*pp)[4] == '=') {
+            path = *pp;
+            break;
+        }
+    }
+
+    path += 5; /* skip "PATH=" */
+    clen = strlen(cmd);
+    while (*path) {
+        next = path;
+        while (*next && *next != ':') next++;
+        plen = (int)(next - path);
+        if (plen == 0) {
+            path = next + (*next == ':');
+            continue;
+        }
+        len = plen;
+        if (path[plen - 1] != '/')
+            len++;
+        len += clen;
+        if (len < cap) {
+            int i;
+            for (i = 0; i < plen; i++)
+                out[i] = path[i];
+            if (path[plen - 1] != '/') {
+                out[plen] = '/';
+                plen++;
+            }
+            for (i = 0; i <= clen; i++)
+                out[plen + i] = cmd[i];
+            if (_stat(out, &st) == 0)
+                return 0;
+        }
+        path = next;
+        if (*path == ':') path++;
+    }
+    return -1;
+}
 static int run_builtin(int argc, char **argv);
 static void builtin_not_found(char *cmd);
 
@@ -1011,12 +1067,16 @@ static int has_slash(const char *s) {
 
 static int run_external(int argc, char **argv) {
     int pid, status;
+    char resolved[MAX_LINE];
     const char *path;
-    static char *envp[] = { "HOME=/home/fermihart", 0 };
     (void)argc;
-    path = shell_path(argv[0]);
-    if (!has_slash(path))
-        return 0;
+    if (has_slash(argv[0])) {
+        path = shell_path(argv[0]);
+    } else {
+        if (search_path(argv[0], resolved, sizeof(resolved)) < 0)
+            return 0;
+        path = resolved;
+    }
     pid = _fork();
     if (pid < 0) {
         puts(CR "fork failed" C0 "\n");
@@ -1024,7 +1084,7 @@ static int run_external(int argc, char **argv) {
     }
     if (pid == 0) {
         argv[0] = (char *)path;
-        _execve(path, argv, envp);
+        _execve(path, argv, shell_envp);
         puts(CR "exec failed: " C0); puts_c(CY, path); putc('\n');
         _exit(127);
     }
@@ -2246,12 +2306,13 @@ static void shell_loop(void) {
 }
 
 /* ── Entry point ────────────────────────────────────────────── */
-int main(int argc, char **argv) {
+int main(int argc, char **argv, char **envp) {
 	int motd_fd, motd_n, r;
 	char motd_buf[1800];
 
 	(void)argc;
 	(void)argv;
+	shell_envp = envp;
 	cwd[0] = '/';
 	cwd[1] = 0;
 	boot_time = time((long *)0);

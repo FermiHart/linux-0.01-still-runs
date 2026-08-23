@@ -1,14 +1,14 @@
-[bemu-linux01] BBP @ 0xc0000: 5 tags, kernel=88897 bytes, root=/dev/hd1 ide=977,5,17
+[bemu-linux01] BBP @ 0xc0000: 5 tags, kernel=88929 bytes, root=/dev/hd1 ide=977,5,17
 [bemu-linux01] direct KVM entry: build/kernel.bin @ PA 0, 8 MiB, no firmware, no bootloader
 [bbp] bEMU handoff: ok, 5 tags, root=/dev/hd1 ide=977,5,17
 
 [36mPartition table[0m [32mok.[0m
 
 
-[32m961[0m/[37m1024[0m free blocks
+[32m955[0m/[37m1024[0m free blocks
 
 
-[32m241[0m/[37m256[0m free inodes
+[32m239[0m/[37m256[0m free inodes
 
 
 [35msys_setup[0m [32mreturning[0m
@@ -140,4 +140,4 @@ Welcome to 1991. It still runs in 2026.
 GOLDEN_BOOT_MARKER
 
 [32mfermihart@linux01[0m:[34m/[0m[33m$
-[bemu-linux01] RESULT: PASS after 6079 KVM exits
+[bemu-linux01] RESULT: PASS after 5989 KVM exits

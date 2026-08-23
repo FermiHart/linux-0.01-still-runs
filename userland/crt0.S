@@ -26,9 +26,11 @@ _entry:
     movl    $45, %eax               /* __NR_brk */
     int     $0x80
 
-    /* Call main(argc, argv) */
+    /* The kernel's execve() builds: argc, argv, envp on the stack. */
     popl    %eax                    /* argc */
     popl    %ebx                    /* argv */
+    popl    %ecx                    /* envp */
+    pushl   %ecx
     pushl   %ebx
     pushl   %eax
     call    _main

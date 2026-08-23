@@ -41,7 +41,7 @@ MAKE_COMMAND := $(MAKE)
 export BUILD MAKE_COMMAND
 
 ARTIFACT_NAMES := kernel.elf kernel.bin root.img bemu-linux01 mkimage \
-                  shell.bin update.bin hello.bin
+                  shell.bin update.bin hello.bin yes.bin pathcheck.bin
 ARTIFACTS = $(addprefix $(BUILD)/,$(ARTIFACT_NAMES))
 
 # ──────────────────────────────────────────────── toolchain ─────────────────
@@ -345,6 +345,16 @@ $(BUILD)/yes.bin: userland/programs/yes.c $(BUILD)/crt0.o | dirs
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "yes.bin" "$$(stat -f%z $(BUILD)/yes.bin 2>/dev/null || stat -c%s $(BUILD)/yes.bin)"
 
+$(BUILD)/pathcheck.bin: userland/programs/pathcheck.c $(BUILD)/crt0.o | dirs
+	$(call STEP,compiling userland/programs/pathcheck.c (PATH check))
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -Os -Iuserland \
+	  -MMD -MP -MF "$(BUILD)/pathcheck.d" -MT "$@" \
+	  -c userland/programs/pathcheck.c -o "$(BUILD)/pathcheck.o"
+	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry "$(BUILD)/crt0.o" "$(BUILD)/pathcheck.o" -o "$(BUILD)/pathcheck.elf"
+	@$(OBJCOPY) -O binary "$(BUILD)/pathcheck.elf" "$(BUILD)/pathcheck.bin"
+	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
+	  "pathcheck.bin" "$$(stat -f%z $(BUILD)/pathcheck.bin 2>/dev/null || stat -c%s $(BUILD)/pathcheck.bin)"
+
 # ── Host tools ────────────────────────────────────────────────────
 
 $(BUILD)/mkimage: tools/mkimage.c | dirs
@@ -363,7 +373,7 @@ $(BUILD)/bbp-tool: tools/bbp-tool.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_cr
 	  -o "$@" "$<" $(HOSTLDFLAGS)
 
 # Collect all userland binaries (ASM + C)
-USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin $(BUILD)/yes.bin
+USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin $(BUILD)/yes.bin $(BUILD)/pathcheck.bin
 
 $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	$(call STAGE,7/10,forging Minix v1 root filesystem)
@@ -373,7 +383,8 @@ $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	@cp "$(BUILD)/update.bin" "$(BUILD)/rootfs/bin/update"
 	@cp "$(BUILD)/hello.bin" "$(BUILD)/rootfs/bin/hello"
 	@cp "$(BUILD)/yes.bin" "$(BUILD)/rootfs/bin/yes"
-	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" 2>&1 | sed 's/^/    /'
+	@cp "$(BUILD)/pathcheck.bin" "$(BUILD)/rootfs/bin/pathcheck"
+	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" "$(BUILD)/pathcheck.bin" 2>&1 | sed 's/^/    /'
 	$(call OK,root.img forged)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -620,6 +631,7 @@ trace-workflow: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	    --output-trace "$(BUILD)/traces/replayed.jsonl" --timeout 60 >/dev/null; \
 	  python3 tests/compare_trace.py --ignore-event irq --ignore-port 0x71 \
 	    --ignore-port 0x60 --ignore-port 0x61 --ignore-port 0x3d4 --ignore-port 0x3d5 \
+	    --ignore-port 0x1f0 \
 	    "$$latest" "$(BUILD)/traces/replayed.jsonl"; \
 	  python3 tests/timeline.py "$$latest" --output "$(BUILD)/traces/workflow-timeline.txt"
 

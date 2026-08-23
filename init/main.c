@@ -153,7 +153,7 @@ static int printf(const char *fmt, ...)
 }
 
 static char * argv[] = { "-",NULL };
-static char * envp[] = { "HOME=/home/fermihart", NULL };
+static char * envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", NULL };
 
 void init(void)
 {
