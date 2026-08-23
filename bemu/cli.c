@@ -8,7 +8,7 @@ void cli_usage(const char *program)
 {
     fprintf(stderr, "usage: %s [--kernel FILE] [--root FILE] "
             "[--keys TEXT] [--expect TEXT] [--trace] [--trace-file PATH] "
-            "[--no-timer] [--raw-console] [--max-exits N]\n", program);
+            "[--trace-syscalls] [--no-timer] [--raw-console] [--max-exits N]\n", program);
 }
 
 static int parse_max_exits(const char *text, long *value)
@@ -44,6 +44,7 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
     out->trace = 0;
     out->no_timer = 0;
     out->raw_console = 0;
+    out->trace_syscalls = 0;
 
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--kernel") && i + 1 < argc) {
@@ -63,6 +64,8 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
             out->trace = 1;
         } else if (!strcmp(argv[i], "--trace-file") && i + 1 < argc) {
             out->trace_file = argv[++i];
+        } else if (!strcmp(argv[i], "--trace-syscalls")) {
+            out->trace_syscalls = 1;
         } else if (!strcmp(argv[i], "--no-timer")) {
             out->no_timer = 1;
         } else if (!strcmp(argv[i], "--raw-console")) {

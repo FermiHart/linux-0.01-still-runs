@@ -193,7 +193,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -455,6 +455,8 @@ test: all
 	@python3 tests/replay.py --bemu build/bemu-linux01 --trace tests/golden/boot.jsonl --timeout 60
 	@python3 tests/test_compare_trace.py --bemu build/bemu-linux01 --golden tests/golden/boot.jsonl --timeout 60
 	@python3 tests/test_timeline.py --trace tests/golden/boot.jsonl
+	@python3 tests/test_trace_syscalls.py --bemu build/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -577,6 +579,11 @@ timeline: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	  python3 tests/timeline.py tests/golden/boot.jsonl \
 	    --output "$(BUILD)/traces/boot-timeline.txt"; \
 	  printf '  $(CG)$(G_OK)$(CR) wrote %s\n' "$(BUILD)/traces/boot-timeline.txt"
+
+test-trace-syscalls:
+	$(call STEP,syscall instrumentation test)
+	@python3 tests/test_trace_syscalls.py --bemu build/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 
 test-timeline:
 	$(call STEP,timeline visualizer test)

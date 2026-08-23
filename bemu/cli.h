@@ -11,6 +11,7 @@ struct cli_options {
     int trace;
     int no_timer;
     int raw_console;
+    int trace_syscalls;
 };
 
 void cli_usage(const char *program);

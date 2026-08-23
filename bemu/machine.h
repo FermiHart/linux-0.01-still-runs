@@ -30,7 +30,7 @@ enum console_state {
 };
 
 struct machine {
-    int vm, vcpu, io_trace, no_timer, sanitize_console;
+    int vm, vcpu, io_trace, no_timer, sanitize_console, trace_syscalls;
     size_t run_size;
     uint8_t *ram;
     struct kvm_run *run;

@@ -438,6 +438,7 @@ int main(int argc, char **argv)
     m.no_timer = opts.no_timer;
     m.script = opts.script;
     m.expect = opts.expect;
+    m.trace_syscalls = opts.trace_syscalls;
     if (opts.trace_file && trace_open(&m.trace, &m.clock, opts.trace_file) < 0)
         fail("could not open trace file");
     if (atexit(restore_host_input_at_exit) != 0)
@@ -445,6 +446,13 @@ int main(int argc, char **argv)
     m.sanitize_console = isatty(STDOUT_FILENO) && !opts.raw_console;
     map_disk(&m.ide, opts.root);
     setup_kvm(&m, opts.kernel);
+    if (m.trace_syscalls) {
+        struct kvm_guest_debug dbg;
+        memset(&dbg, 0, sizeof dbg);
+        dbg.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
+        if (ioctl(m.vcpu, KVM_SET_GUEST_DEBUG, &dbg) < 0)
+            die("KVM_SET_GUEST_DEBUG");
+    }
     signal_run = m.run;
     if (setup_host_input() < 0) {
         (void)restore_host_input();
@@ -478,6 +486,21 @@ int main(int argc, char **argv)
         case KVM_EXIT_HLT:
             break;
         case KVM_EXIT_IRQ_WINDOW_OPEN:
+            break;
+        case KVM_EXIT_DEBUG:
+            if (m.trace_syscalls) {
+                struct kvm_regs regs;
+                uint64_t addr;
+                if (ioctl(m.vcpu, KVM_GET_REGS, &regs) == 0) {
+                    addr = regs.rip;
+                    if (addr + 1 < RAM_SIZE &&
+                        m.ram[addr] == 0xcd && m.ram[addr + 1] == 0x80) {
+                        uint64_t args[6] = { regs.rbx, regs.rcx, regs.rdx,
+                                              regs.rsi, regs.rdi, regs.rbp };
+                        trace_event_syscall(&m.trace, (unsigned)regs.rax, args, 6);
+                    }
+                }
+            }
             break;
         case KVM_EXIT_SHUTDOWN:
             fail("guest triple fault");
