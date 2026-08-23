@@ -40,6 +40,9 @@ audit: all
 summarize: all
 	@python3 summarize.py
 
+classify: summarize
+	@python3 classify.py
+
 build:
 	@mkdir -p build
 
