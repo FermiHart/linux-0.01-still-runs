@@ -33,6 +33,7 @@ void irq_level(struct machine *m, unsigned irq, int level)
     line.level = level;
     if (ioctl(m->vm, KVM_IRQ_LINE, &line) < 0)
         die("KVM_IRQ_LINE");
+    trace_event_irq(&m->trace, irq, level ? "raise" : "lower");
 }
 
 void irq_pulse(struct machine *m, unsigned irq)
@@ -46,6 +47,7 @@ int machine_create(struct machine *m)
     memset(m, 0, sizeof *m);
     m->vm = -1;
     m->vcpu = -1;
+    memset(&m->trace, 0, sizeof m->trace);
     trace_clock_reset(&m->clock);
     pic_reset(&m->pic);
     pit_reset(&m->pit);
@@ -57,6 +59,7 @@ int machine_create(struct machine *m)
 
 void machine_destroy(struct machine *m)
 {
+    trace_close(&m->trace);
     if (m->run && m->run != MAP_FAILED && m->run_size) {
         munmap(m->run, m->run_size);
         m->run = NULL;

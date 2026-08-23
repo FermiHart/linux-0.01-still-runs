@@ -7,8 +7,8 @@
 void cli_usage(const char *program)
 {
     fprintf(stderr, "usage: %s [--kernel FILE] [--root FILE] "
-            "[--keys TEXT] [--expect TEXT] [--trace] [--no-timer] "
-            "[--raw-console] [--max-exits N]\n", program);
+            "[--keys TEXT] [--expect TEXT] [--trace] [--trace-file PATH] "
+            "[--no-timer] [--raw-console] [--max-exits N]\n", program);
 }
 
 static int parse_max_exits(const char *text, long *value)
@@ -39,6 +39,7 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
     out->root = "build/root.img";
     out->script = NULL;
     out->expect = NULL;
+    out->trace_file = NULL;
     out->max_exits = 50000000;
     out->trace = 0;
     out->no_timer = 0;
@@ -60,6 +61,8 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
             }
         } else if (!strcmp(argv[i], "--trace")) {
             out->trace = 1;
+        } else if (!strcmp(argv[i], "--trace-file") && i + 1 < argc) {
+            out->trace_file = argv[++i];
         } else if (!strcmp(argv[i], "--no-timer")) {
             out->no_timer = 1;
         } else if (!strcmp(argv[i], "--raw-console")) {

@@ -10,6 +10,7 @@
 #include "pit.h"
 #include "uart.h"
 #include "trace_clock.h"
+#include "trace.h"
 
 #define RAM_SIZE       (8ULL << 20)
 #define GDT_GPA        0x90000ULL
@@ -29,11 +30,12 @@ enum console_state {
 };
 
 struct machine {
-    int vm, vcpu, trace, no_timer, sanitize_console;
+    int vm, vcpu, io_trace, no_timer, sanitize_console;
     size_t run_size;
     uint8_t *ram;
     struct kvm_run *run;
     struct trace_clock clock;
+    struct trace trace;
     struct ide_state ide;
     struct pic_state pic;
     struct uart_state uart;

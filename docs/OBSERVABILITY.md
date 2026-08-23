@@ -211,6 +211,20 @@ reproducible builds without depending on the host `time(NULL)`.
 | `trace_clock_now()` | Current logical timestamp |
 | `trace_clock_seq()` | Monotonic event sequence number |
 
+## Producing traces
+
+traces are emitted by bEMU when the `--trace-file PATH` command-line option is
+used.  The file contains one JSON object per line.  Pass `-` to write the trace
+to standard error.  Console UART bytes (`0x3f8`) are intentionally omitted from
+`io_access` events to keep traces focused on device I/O and to avoid noise.
+
+Example:
+
+```bash
+./build/bemu-linux01 --kernel build/kernel.bin --root build/root.img \
+  --expect fermihart@linux01 --trace-file boot.trace
+```
+
 ## Stability guarantees
 
 - New event types may be added without bumping the trace version.

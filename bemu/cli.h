@@ -6,6 +6,7 @@ struct cli_options {
     const char *root;
     const char *script;
     const char *expect;
+    const char *trace_file;
     long max_exits;
     int trace;
     int no_timer;

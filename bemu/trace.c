@@ -43,12 +43,12 @@ int trace_open(struct trace *t, struct trace_clock *tc, const char *path)
     }
     if (strcmp(path, "-") == 0) {
         t->file = stderr;
-        t->enabled = 1;
-        return 0;
+    } else {
+        t->file = fopen(path, "w");
+        if (!t->file)
+            return -1;
+        setvbuf(t->file, NULL, _IOFBF, 1 << 20);
     }
-    t->file = fopen(path, "w");
-    if (!t->file)
-        return -1;
     t->enabled = 1;
     return 0;
 }
@@ -74,7 +74,6 @@ static void emit_header(struct trace *t, const char *type)
 static void emit_footer(struct trace *t)
 {
     fprintf(t->file, "}\n");
-    fflush(t->file);
 }
 
 void trace_event_boot(struct trace *t, const char *kernel, const char *root, unsigned ram_mib)

@@ -42,6 +42,7 @@
 #include "uart.h"
 #include "console.h"
 #include "trace_clock.h"
+#include "trace.h"
 #include "keyboard.h"
 #include "error.h"
 
@@ -339,8 +340,12 @@ static void handle_io(struct machine *m)
             value = io_read(m, run->io.port, run->io.size);
             memcpy(item, &value, run->io.size);
         }
+        if (run->io.port != 0x3f8 && run->io.port != 0x3fd)
+            trace_event_io_access(&m->trace,
+                                  run->io.direction == KVM_EXIT_IO_OUT ? "out" : "in",
+                                  run->io.port, run->io.size, value);
     }
-    if (m->trace && run->io.port != 0x3f8 && run->io.port != 0x3fd)
+    if (m->io_trace && run->io.port != 0x3f8 && run->io.port != 0x3fd)
         fprintf(stderr, "[io] %s port=%#x size=%u count=%u\n",
                 run->io.direction == KVM_EXIT_IO_OUT ? "out" : "in",
                 run->io.port, run->io.size, run->io.count);
@@ -421,10 +426,12 @@ int main(int argc, char **argv)
         cli_usage(argv[0]);
         return BEMU_EXIT_CLI;
     }
-    m.trace = opts.trace;
+    m.io_trace = opts.trace;
     m.no_timer = opts.no_timer;
     m.script = opts.script;
     m.expect = opts.expect;
+    if (opts.trace_file && trace_open(&m.trace, &m.clock, opts.trace_file) < 0)
+        fail("could not open trace file");
     if (atexit(restore_host_input_at_exit) != 0)
         fail("could not register host-state cleanup");
     m.sanitize_console = isatty(STDOUT_FILENO) && !opts.raw_console;
@@ -438,6 +445,7 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "[bemu-linux01] direct KVM entry: %s @ PA 0, 8 MiB, no firmware, no bootloader\n",
             opts.kernel);
+    trace_event_boot(&m.trace, opts.kernel, opts.root, 8);
     while (exits < opts.max_exits && !m.done) {
         if (stop_requested)
             break;
@@ -489,6 +497,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "\n[bemu-linux01] RESULT: PASS after %ld KVM exits\n", exits);
         status = BEMU_EXIT_OK;
     }
+    trace_event_shutdown(&m.trace,
+                         stop_requested ? "signal" :
+                         (!m.done ? "max_exits" : "halt"),
+                         (unsigned long)exits, status);
 out:
     if (restore_host_input() < 0 && status == BEMU_EXIT_OK)
         status = BEMU_EXIT_RUNTIME;
