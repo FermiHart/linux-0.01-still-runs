@@ -43,7 +43,7 @@ COMMANDS = [
     ("ls", ["bin", "etc", "home", "tmp"], []),
     ("ls -la", ["drwx", "tmp"], []),
     ("ls -la /dev", ["tty0"], []),
-    ("ls -la bin", ["shell", "hello"], []),
+    ("ls -la bin", ["shell", "hello", "yes"], []),
     ("whoami", ["root"], []),
     ("mount", ["/dev/hd1 on / type minix"], []),
     ("df", ["Filesystem", "/dev/hd1"], []),

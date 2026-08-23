@@ -335,6 +335,16 @@ $(BUILD)/shell.bin: userland/shell.c $(BUILD)/crt0.o | dirs
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "shell.bin" "$$(stat -f%z $(BUILD)/shell.bin 2>/dev/null || stat -c%s $(BUILD)/shell.bin)"
 
+$(BUILD)/yes.bin: userland/programs/yes.c $(BUILD)/crt0.o | dirs
+	$(call STEP,compiling userland/programs/yes.c (classic yes))
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -Os -Iuserland \
+	  -MMD -MP -MF "$(BUILD)/yes.d" -MT "$@" \
+	  -c userland/programs/yes.c -o "$(BUILD)/yes.o"
+	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry "$(BUILD)/crt0.o" "$(BUILD)/yes.o" -o "$(BUILD)/yes.elf"
+	@$(OBJCOPY) -O binary "$(BUILD)/yes.elf" "$(BUILD)/yes.bin"
+	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
+	  "yes.bin" "$$(stat -f%z $(BUILD)/yes.bin 2>/dev/null || stat -c%s $(BUILD)/yes.bin)"
+
 # ── Host tools ────────────────────────────────────────────────────
 
 $(BUILD)/mkimage: tools/mkimage.c | dirs
@@ -353,11 +363,17 @@ $(BUILD)/bbp-tool: tools/bbp-tool.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_cr
 	  -o "$@" "$<" $(HOSTLDFLAGS)
 
 # Collect all userland binaries (ASM + C)
-USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin
+USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin $(BUILD)/yes.bin
 
 $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	$(call STAGE,7/10,forging Minix v1 root filesystem)
-	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" 2>&1 | sed 's/^/    /'
+	@rm -f "$@"
+	@mkdir -p "$(BUILD)/rootfs/bin"
+	@cp "$(BUILD)/shell.bin" "$(BUILD)/rootfs/bin/shell"
+	@cp "$(BUILD)/update.bin" "$(BUILD)/rootfs/bin/update"
+	@cp "$(BUILD)/hello.bin" "$(BUILD)/rootfs/bin/hello"
+	@cp "$(BUILD)/yes.bin" "$(BUILD)/rootfs/bin/yes"
+	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" 2>&1 | sed 's/^/    /'
 	$(call OK,root.img forged)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
