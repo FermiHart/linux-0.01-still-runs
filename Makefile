@@ -445,6 +445,7 @@ test: all
 	@python3 tests/test_harness_utils.py
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory bbp-conformance
+	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_trace_io.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
@@ -623,6 +624,14 @@ test-trace-format: require-artifacts
 	$(call STEP,trace format validation)
 	@python3 tests/test_trace_format.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
+
+compiler-cases:
+	$(call STEP,compiler case investigation)
+	@$(MAKE) -C tests/compiler-cases clean run
+
+test-compiler-cases:
+	$(call STEP,compiler case harness check)
+	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
 
 test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)
