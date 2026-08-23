@@ -214,23 +214,31 @@ static void pump_input(struct machine *m)
         irq_pulse(m, 0);
     if (m->script && !m->script_queued && m->prompt_count) {
         const char *p;
-        for (p = m->script; *p; p++)
+        size_t script_len = 0;
+        for (p = m->script; *p; p++) {
             if (*p == '\r' || *p == '\n')
                 m->script_prompts_pending++;
+            script_len++;
+        }
         keyboard_queue_text(m, m->script);
         m->script_queued = 1;
+        trace_event_input(&m->trace, script_len, "script");
     }
     if (m->prompt_count) {
         uint8_t input[128];
         ssize_t got;
+        size_t stdin_bytes = 0;
         do {
             got = read(STDIN_FILENO, input, sizeof input);
             if (got > 0) {
                 ssize_t i;
+                stdin_bytes += (size_t)got;
                 for (i=0; i<got; i++)
                     keyboard_queue_input_byte(m, input[i], &m->host_escape_state);
             }
         } while (got > 0);
+        if (stdin_bytes)
+            trace_event_input(&m->trace, stdin_bytes, "stdin");
     }
     keyboard_pump(m);
 }

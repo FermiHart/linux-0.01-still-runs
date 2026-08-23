@@ -193,7 +193,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -447,6 +447,8 @@ test: all
 	@$(MAKE) --no-print-directory bbp-conformance
 	@python3 tests/test_trace_io.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
+	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -479,6 +481,11 @@ test-quick: require-artifacts
 test-trace-io: require-artifacts
 	$(call STEP,trace IO/IDE event test)
 	@python3 tests/test_trace_io.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
+
+test-trace-input: require-artifacts
+	$(call STEP,trace keyboard input event test)
+	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 
 test-shell: all
