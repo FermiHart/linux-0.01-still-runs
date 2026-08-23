@@ -30,6 +30,10 @@ run: all
 report: run
 	@cat build/report.txt
 
+compare-assembly: all
+	@bash compare_asm.sh x86_64
+	@bash compare_asm.sh i386
+
 build:
 	@mkdir -p build
 
