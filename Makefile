@@ -459,6 +459,7 @@ test: all
 	@python3 tests/test_compiler_classification.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compiler_bugreport.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compiler_matrix.py --make "$(MAKE_COMMAND)"
+	@python3 tests/test_compiler_dataset.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_trace_io.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
@@ -666,6 +667,10 @@ compiler-matrix:
 	$(call STEP,compiler version behavior matrix)
 	@$(MAKE) -C tests/compiler-cases matrix
 
+compiler-dataset:
+	$(call STEP,package compiler cases as academic dataset)
+	@$(MAKE) -C tests/compiler-cases package-dataset
+
 test-compiler-cases:
 	$(call STEP,compiler case harness check)
 	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
@@ -693,6 +698,10 @@ test-compiler-bugreport:
 test-compiler-matrix:
 	$(call STEP,compiler matrix check)
 	@python3 tests/test_compiler_matrix.py --make "$(MAKE_COMMAND)"
+
+test-compiler-dataset:
+	$(call STEP,compiler dataset package check)
+	@python3 tests/test_compiler_dataset.py --make "$(MAKE_COMMAND)"
 
 test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)

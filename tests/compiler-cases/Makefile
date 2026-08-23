@@ -49,6 +49,9 @@ bugreport: classify
 matrix: all
 	@python3 matrix.py
 
+package-dataset: matrix bugreport compare-assembly
+	@python3 package_dataset.py
+
 build:
 	@mkdir -p build
 
