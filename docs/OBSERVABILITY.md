@@ -218,12 +218,30 @@ used.  The file contains one JSON object per line.  Pass `-` to write the trace
 to standard error.  Console UART bytes (`0x3f8`) are intentionally omitted from
 `io_access` events to keep traces focused on device I/O and to avoid noise.
 
+Useful CLI flags:
+
+| Flag | Meaning |
+|---|---|
+| `--trace-file PATH` | Write machine-readable trace to file |
+| `--trace-syscalls` | Single-step the guest and emit `syscall` events for `int 0x80` |
+| `--no-timer` | Disable PIT timer IRQs (more deterministic, but may affect `date`/`uptime`) |
+
 Example:
 
 ```bash
 ./build/bemu-linux01 --kernel build/kernel.bin --root build/root.img \
   --expect fermihart@linux01 --trace-file boot.trace
 ```
+
+## Make targets
+
+| Target | Purpose |
+|---|---|
+| `make record` | Record a compressed boot trace to `build/traces/boot-<ts>.jsonl.gz` |
+| `make replay` | Replay the golden trace inputs and emit a new trace |
+| `make compare-trace` | Compare a replayed trace to `tests/golden/boot.jsonl` |
+| `make timeline` | Generate a text timeline from the golden trace |
+| `make trace-workflow` | Run record → replay → compare → timeline in one shot |
 
 ## Stability guarantees
 

@@ -71,15 +71,10 @@ def main():
 
     kernel = boot.get("kernel", "build/kernel.bin")
     root = boot.get("root", "build/root.img")
-    if not os.path.isabs(kernel):
+    if not os.path.exists(kernel) and not os.path.isabs(kernel):
         kernel = os.path.join(os.path.dirname(args.trace), kernel)
-    if not os.path.isabs(root):
+    if not os.path.exists(root) and not os.path.isabs(root):
         root = os.path.join(os.path.dirname(args.trace), root)
-    # Fall back to defaults if relative paths don't exist next to trace
-    if not os.path.exists(kernel):
-        kernel = "build/kernel.bin"
-    if not os.path.exists(root):
-        root = "build/root.img"
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as tf:
         output_trace = args.output_trace or tf.name

@@ -193,8 +193,8 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-sanitized bbp-conformance static-analysis fuzz \
-        bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -457,6 +457,7 @@ test: all
 	@python3 tests/test_timeline.py --trace tests/golden/boot.jsonl
 	@python3 tests/test_trace_syscalls.py --bemu build/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
+	@$(MAKE) --no-print-directory test-trace-workflow BUILD=build/trace-workflow-test
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -579,6 +580,21 @@ timeline: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	  python3 tests/timeline.py tests/golden/boot.jsonl \
 	    --output "$(BUILD)/traces/boot-timeline.txt"; \
 	  printf '  $(CG)$(G_OK)$(CR) wrote %s\n' "$(BUILD)/traces/boot-timeline.txt"
+
+trace-workflow: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
+	$(call STEP,running record/replay/compare-trace workflow)
+	@$(MAKE) --no-print-directory record
+	@latest=$$(ls -t $(BUILD)/traces/boot-*.jsonl.gz 2>/dev/null | head -1); \
+	  python3 tests/replay.py --bemu "$(BUILD)/bemu-linux01" --trace "$$latest" \
+	    --output-trace "$(BUILD)/traces/replayed.jsonl" --timeout 60 >/dev/null; \
+	  python3 tests/compare_trace.py --ignore-event irq --ignore-port 0x71 \
+	    --ignore-port 0x60 --ignore-port 0x61 --ignore-port 0x3d4 --ignore-port 0x3d5 \
+	    "$$latest" "$(BUILD)/traces/replayed.jsonl"; \
+	  python3 tests/timeline.py "$$latest" --output "$(BUILD)/traces/workflow-timeline.txt"
+
+test-trace-workflow:
+	$(call STEP,trace workflow test)
+	@$(MAKE) --no-print-directory trace-workflow BUILD=build/trace-workflow-test
 
 test-trace-syscalls:
 	$(call STEP,syscall instrumentation test)
@@ -1010,7 +1026,13 @@ help:
 	@printf '    $(CWH)test-fs-inspect$(CR) independent fs inspector check\n'
 	@printf '    $(CWH)test-fs-real$(CR)   real filesystem verification\n'
 	@printf '\n  $(CB)$(CP)trace$(CR)\n'
-	@printf '    $(CWH)golden-trace$(CR)  capture bEMU boot trace to tests/golden/\n'
+	@printf '    $(CWH)golden-trace$(CR)  capture console boot trace to tests/golden/\n'
+	@printf '    $(CWH)golden-trace-jsonl$(CR) capture machine trace to tests/golden/boot.jsonl\n'
+	@printf '    $(CWH)record$(CR)          record compressed machine trace to build/traces/\n'
+	@printf '    $(CWH)replay$(CR)          replay golden trace inputs\n'
+	@printf '    $(CWH)compare-trace$(CR)   compare replayed trace to golden\n'
+	@printf '    $(CWH)timeline$(CR)        generate text timeline from golden trace\n'
+	@printf '    $(CWH)trace-workflow$(CR)  run record -> replay -> compare -> timeline\n'
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
