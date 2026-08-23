@@ -34,6 +34,9 @@ compare-assembly: all
 	@bash compare_asm.sh x86_64
 	@bash compare_asm.sh i386
 
+audit: all
+	@bash audit.sh
+
 build:
 	@mkdir -p build
 
