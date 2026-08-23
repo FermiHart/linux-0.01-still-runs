@@ -43,6 +43,9 @@ summarize: all
 classify: summarize
 	@python3 classify.py
 
+bugreport: classify
+	@python3 bugreport.py
+
 build:
 	@mkdir -p build
 
