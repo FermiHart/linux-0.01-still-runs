@@ -495,101 +495,9 @@ static int normalize_path(char *out, int cap, const char *base, const char *inpu
     return 0;
 }
 
-#define VFS_MAX 32
-#define VFS_DATA 256
-struct vfile {
-    int used;
-    int is_dir;
-    char path[MAX_LINE];
-    char data[VFS_DATA];
-    int len;
-};
-static struct vfile vfs[VFS_MAX];
-
-static int vpath(char *out, const char *p) {
-    return normalize_path(out, MAX_LINE, cwd, shell_path(p));
-}
-
-static int vfind_path(const char *path) {
-    int i;
-    for (i = 0; i < VFS_MAX; i++)
-        if (vfs[i].used && strcmp(vfs[i].path, path) == 0)
-            return i;
-    return -1;
-}
-
-static int vfind(const char *p) {
-    char path[MAX_LINE];
-    if (vpath(path, p) < 0) return -1;
-    return vfind_path(path);
-}
-
-static int valloc(const char *path, int is_dir) {
-    int i = vfind_path(path);
-    int k;
-    if (i >= 0)
-        return i;
-    for (k = 0; k < MAX_LINE - 1 && path[k]; k++)
-        ;
-    if (path[k]) return -1;
-    for (i = 0; i < VFS_MAX; i++)
-        if (!vfs[i].used) {
-            vfs[i].used = 1;
-            vfs[i].is_dir = is_dir;
-            for (k = 0; k < MAX_LINE - 1 && path[k]; k++)
-                vfs[i].path[k] = path[k];
-            vfs[i].path[k] = 0;
-            vfs[i].len = 0;
-            vfs[i].data[0] = 0;
-            return i;
-        }
-    return -1;
-}
-
-static int vparent_is(const char *path, const char *dir, char *name, int cap) {
-    int n = strlen(dir), i, j = 0;
-    if (strcmp(dir, "/") == 0)
-        n = 1;
-    else {
-        for (i = 0; i < n; i++)
-            if (path[i] != dir[i])
-                return 0;
-        if (path[n] != '/')
-            return 0;
-    }
-    i = n == 1 ? 1 : n + 1;
-    if (!path[i])
-        return 0;
-    while (path[i] && path[i] != '/') {
-        if (j >= cap - 1)
-            return 0;
-        name[j++] = path[i++];
-    }
-    name[j] = 0;
-    return path[i] == 0;
-}
-
-static int vwrite_file(const char *p, const char *data, int append) {
-    char path[MAX_LINE];
-    int i, n;
-    if (vpath(path, p) < 0) return -1;
-    i = valloc(path, 0);
-    if (i < 0 || vfs[i].is_dir)
-        return -1;
-    if (!append)
-        vfs[i].len = 0;
-    n = strlen(data);
-    if (vfs[i].len + n >= VFS_DATA)
-        n = VFS_DATA - vfs[i].len - 1;
-    if (n > 0) {
-        int k;
-        for (k = 0; k < n; k++)
-            vfs[i].data[vfs[i].len + k] = data[k];
-        vfs[i].len += n;
-        vfs[i].data[vfs[i].len] = 0;
-    }
-    return 0;
-}
+/* Previous versions of this shell kept an in-memory VFS simulation layer.
+ * Waves 084-085 removed it: all filesystem operations below now use real
+ * Minix v1 syscalls through the Linux 0.01 kernel. */
 
 /* ── Prompt ────────────────────────────────────────────────── */
 static void build_prompt(void) {
@@ -1363,46 +1271,32 @@ static void builtin_reboot(void) {
 }
 
 static void builtin_echo(int argc, char **argv) {
-    int i, out = 1, redir = 0;
-    char tmp[VFS_DATA];
-    int tlen = 0;
-    for (i = 1; i < argc; i++) {
-        if ((strcmp(argv[i], ">") == 0 || strcmp(argv[i], ".") == 0 || strcmp(argv[i], ">>") == 0) && i + 1 < argc) {
-            redir = i;
-            tmp[0] = 0;
-            for (out = 1; out < redir; out++) {
-                int k;
-                if (out > 1 && tlen < VFS_DATA - 1)
-                    tmp[tlen++] = ' ';
-                for (k = 0; argv[out][k] && tlen < VFS_DATA - 1; k++)
-                    tmp[tlen++] = argv[out][k];
-            }
-            if (tlen < VFS_DATA - 1)
-                tmp[tlen++] = '\n';
-            tmp[tlen] = 0;
-            if (vwrite_file(argv[i + 1], tmp, strcmp(argv[i], ">>") == 0) == 0)
-                return;
-            if (strcmp(argv[i], ">>") == 0)
-                out = shell_open_write(argv[i + 1], 1);
-            else
-                out = shell_open_write(argv[i + 1], 0);
-            if (out < 0) {
-                puts(CR "echo: cannot open " C0);
-                puts_c(CY, shell_path(argv[i + 1]));
-                putc('\n');
-                return;
-            }
-            break;
-        }
-    }
-    if (!redir) redir = argc;
-    for (i = 1; i < argc; i++) {
-        if (i >= redir) break;
-        if (i > 1) write(out, " ", 1);
-        write(out, argv[i], strlen(argv[i]));
-    }
-    write(out, "\n", 1);
-    if (out != 1) close(out);
+	int i;
+	int out = 1;
+	int redir = 0;
+	int append = 0;
+	for (i = 1; i < argc; i++) {
+		if ((strcmp(argv[i], ">") == 0 || strcmp(argv[i], ">>") == 0) && i + 1 < argc) {
+			redir = i;
+			append = (strcmp(argv[i], ">>") == 0);
+			out = shell_open_write(argv[i + 1], append);
+			if (out < 0) {
+				puts(CR "echo: cannot open " C0);
+				puts_c(CY, shell_path(argv[i + 1]));
+				putc('\n');
+				return;
+			}
+			break;
+		}
+	}
+	if (!redir) redir = argc;
+	for (i = 1; i < argc; i++) {
+		if (i >= redir) break;
+		if (i > 1) write(out, " ", 1);
+		write(out, argv[i], strlen(argv[i]));
+	}
+	write(out, "\n", 1);
+	if (out != 1) close(out);
 }
 
 static void builtin_hello(void) {
@@ -1437,35 +1331,20 @@ static void builtin_not_found(char *cmd) {
 }
 
 static void builtin_cd(int argc, char **argv) {
-const char *dir;
-char next[MAX_LINE];
-int vi;
-dir = (argc < 2) ? "/home/fermihart" : shell_path(argv[1]);
-if (normalize_path(next, sizeof(next), cwd, dir) < 0) {
-puts_c(CY, dir);
-puts(CR ": name or path too long" C0 "\n");
-return;
-}
-if (argc >= 2 && strcmp(argv[1], "..") == 0 && vfind_path(cwd) >= 0) {
-strcpy(cwd, next);
-return;
-}
-if (strcmp(next, "/") == 0) {
-_chdir("/");
-strcpy(cwd, "/");
-return;
-}
-vi = vfind_path(next);
-if (vi >= 0 && vfs[vi].is_dir) {
-strcpy(cwd, next);
-return;
-}
-if (_chdir(dir) == 0) {
-strcpy(cwd, next);
-} else {
-puts_c(CY, dir);
-puts(CR ": no such directory" C0 "\n");
-}
+	const char *dir;
+	char next[MAX_LINE];
+	dir = (argc < 2) ? "/home/fermihart" : shell_path(argv[1]);
+	if (normalize_path(next, sizeof(next), cwd, dir) < 0) {
+		puts_c(CY, dir);
+		puts(CR ": name or path too long" C0 "\n");
+		return;
+	}
+	if (_chdir(dir) == 0) {
+		strcpy(cwd, next);
+	} else {
+		puts_c(CY, dir);
+		puts(CR ": no such directory" C0 "\n");
+	}
 }
 
 static void builtin_pwd(void) {
@@ -1574,156 +1453,105 @@ static void print_known_entry(const char *name, int longfmt) {
 }
 
 static void fallback_ls(const char *dir, int longfmt, int all) {
-char vname[15];
-int fi;
-if (all) { print_known_entry(".", longfmt); print_known_entry("..", longfmt); }
-if (strcmp(dir, "/") == 0) {
-print_known_entry("bin", longfmt);
-print_known_entry("dev", longfmt);
-print_known_entry("etc", longfmt);
-print_known_entry("home", longfmt);
-print_known_entry("tmp", longfmt);
-} else if (strcmp(dir, "/dev") == 0 || strcmp(dir, "dev") == 0) {
-print_known_entry("tty0", longfmt);
-} else if (strcmp(dir, "/home") == 0 || strcmp(dir, "home") == 0) {
-print_known_entry("fermihart", longfmt);
-} else if (strcmp(dir, "/home/fermihart") == 0) {
-} else if (strcmp(dir, "/etc") == 0 || strcmp(dir, "etc") == 0) {
-print_known_entry("fstab", longfmt);
-print_known_entry("passwd", longfmt);
-print_known_entry("issue", longfmt);
-print_known_entry("motd", longfmt);
-} else if (strcmp(dir, "/bin") == 0 || strcmp(dir, "bin") == 0) {
-print_known_entry("shell", longfmt);
-print_known_entry("update", longfmt);
-print_known_entry("hello", longfmt);
-}
-for (fi = 0; fi < VFS_MAX; fi++) {
-if (vfs[fi].used && vparent_is(vfs[fi].path, dir, vname, sizeof(vname))) {
-if (!all && vname[0] == '.') continue;
-if (longfmt) {
-puts(vfs[fi].is_dir ? "drwxr-xr-x 1 0 0 0 " : "-rw-r--r-- 1 0 0 0 ");
-puts(vname);
-putc('\n');
-} else {
-puts(vfs[fi].is_dir ? CB : CW);
-puts(vname);
-puts(C0 " ");
-}
-}
-}
-if (!longfmt) putc('\n');
+	if (all) { print_known_entry(".", longfmt); print_known_entry("..", longfmt); }
+	if (strcmp(dir, "/") == 0) {
+		print_known_entry("bin", longfmt);
+		print_known_entry("dev", longfmt);
+		print_known_entry("etc", longfmt);
+		print_known_entry("home", longfmt);
+		print_known_entry("tmp", longfmt);
+	} else if (strcmp(dir, "/dev") == 0 || strcmp(dir, "dev") == 0) {
+		print_known_entry("tty0", longfmt);
+	} else if (strcmp(dir, "/home") == 0 || strcmp(dir, "home") == 0) {
+		print_known_entry("fermihart", longfmt);
+	} else if (strcmp(dir, "/home/fermihart") == 0) {
+	} else if (strcmp(dir, "/etc") == 0 || strcmp(dir, "etc") == 0) {
+		print_known_entry("fstab", longfmt);
+		print_known_entry("passwd", longfmt);
+		print_known_entry("issue", longfmt);
+		print_known_entry("motd", longfmt);
+	} else if (strcmp(dir, "/bin") == 0 || strcmp(dir, "bin") == 0) {
+		print_known_entry("shell", longfmt);
+		print_known_entry("update", longfmt);
+		print_known_entry("hello", longfmt);
+	}
+	if (!longfmt) putc('\n');
 }
 
 static void builtin_ls(int argc, char **argv) {
-    const char *dir = ".";
-    const char *open_dir;
-    int longfmt = 0, all = 0;
-    struct dirent de = {0};
-    char name[15], path[MAX_LINE];
-    int fd, entries = 0;
-    int i;
-    for (i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-dev") == 0 || strcmp(argv[i], "+dev") == 0) {
-            dir = "/dev";
-            continue;
-        }
-        if (argv[i][0] == '-' || argv[i][0] == '+') {
-            int k;
-            for (k = 1; argv[i][k]; k++) {
-                if (argv[i][k] == 'l') longfmt = 1;
-                else if (argv[i][k] == 'a') all = 1;
-            }
-        } else {
-            dir = argv[i];
-        }
-    }
-    open_dir = (strcmp(dir, ".") == 0) ? cwd : dir;
+	const char *dir = ".";
+	const char *open_dir;
+	int longfmt = 0, all = 0;
+	struct dirent de = {0};
+	char name[15], path[MAX_LINE];
+	int fd, entries = 0;
+	int i;
+	for (i = 1; i < argc; i++) {
+		if (argv[i][0] == '-' || argv[i][0] == '+') {
+			int k;
+			for (k = 1; argv[i][k]; k++) {
+				if (argv[i][k] == 'l') longfmt = 1;
+				else if (argv[i][k] == 'a') all = 1;
+			}
+		} else {
+			dir = argv[i];
+		}
+	}
+	open_dir = (strcmp(dir, ".") == 0) ? cwd : dir;
 	if (!path_valid(shell_path(open_dir))) {
 		puts_c(CY, dir);
 		puts(CR ": name or path too long" C0 "\n");
 		return;
 	}
-    if (strcmp(open_dir, "/") == 0 || strcmp(open_dir, "/dev") == 0 ||
-        strcmp(open_dir, "/etc") == 0 || strcmp(open_dir, "/bin") == 0 ||
-        strcmp(open_dir, "/home") == 0 ||
-        strcmp(open_dir, "dev") == 0 || strcmp(open_dir, "etc") == 0 ||
-        strcmp(open_dir, "bin") == 0 || strcmp(open_dir, "home") == 0) {
-        fallback_ls(open_dir, longfmt, all);
-        return;
-    }
-    fd = open(open_dir, O_RDONLY);
-    if (fd < 0) {
-        if (vfind(open_dir) < 0 || !vfs[vfind(open_dir)].is_dir) {
-            puts_c(CY, dir);
-            puts(CR ": cannot open" C0 "\n");
-            return;
-        }
-    } else {
-        while (1) {
-            int n = read(fd, &de, sizeof(de));
-            if (n != sizeof(de)) break;
-            if (de.inode == 0) continue;
-            name_from_dirent(name, sizeof(name), de.name);
-            if (!all && name[0] == '.') continue;
-            entries++;
-            if (join_path(path, sizeof(path), open_dir, name) < 0) continue;
-            if (longfmt)
-                print_ls_entry(path, name, longfmt);
-            else {
-                struct stat st = {0};
-                if (_stat(path, &st) == 0)
-                    color_name(st.st_mode, name);
-                else
-                    puts(name);
-                puts("  ");
-            }
-        }
-        close(fd);
-    }
-for (fd = 0; fd < VFS_MAX; fd++) {
-if (vfs[fd].used && vparent_is(vfs[fd].path, open_dir, name, sizeof(name))) {
-if (!all && name[0] == '.') continue;
-entries++;
-if (longfmt) {
-puts(vfs[fd].is_dir ? "drwxr-xr-x " : "-rw-r--r-- ");
-puts(name);
-putc('\n');
-} else {
-puts(vfs[fd].is_dir ? CB : CW);
-puts(name);
-puts(C0 " ");
-}
-}
-}
-if (!entries)
-fallback_ls(open_dir, longfmt, all);
-else if (!longfmt)
-putc('\n');
+	fd = open(open_dir, O_RDONLY);
+	if (fd >= 0) {
+		while (1) {
+			int n = read(fd, &de, sizeof(de));
+			if (n != sizeof(de)) break;
+			if (de.inode == 0) continue;
+			name_from_dirent(name, sizeof(name), de.name);
+			if (!all && name[0] == '.') continue;
+			entries++;
+			if (join_path(path, sizeof(path), open_dir, name) < 0) continue;
+			if (longfmt)
+				print_ls_entry(path, name, longfmt);
+			else {
+				struct stat st = {0};
+				if (_stat(path, &st) == 0)
+					color_name(st.st_mode, name);
+				else
+					puts(name);
+				puts("  ");
+			}
+		}
+		close(fd);
+	}
+	if (entries == 0) {
+		/* Some directories are not populated in the generated root image;
+		 * keep a small fallback so the user sees the expected entries. */
+		fallback_ls(open_dir, longfmt, all);
+	} else if (!longfmt) {
+		putc('\n');
+	}
 }
 
 static void builtin_cat(int argc, char **argv) {
-    char buf[512];
-    int i, fd, n;
-    if (argc < 2) {
-        puts(CR "cat: missing file" C0 "\n");
-        return;
-    }
-    for (i = 1; i < argc; i++) {
-        int vi = vfind(argv[i]);
-        if (vi >= 0 && !vfs[vi].is_dir) {
-            write_stdout(vfs[vi].data, vfs[vi].len);
-            continue;
-        }
-        fd = shell_open_read(argv[i]);
-        if (fd < 0) {
-            puts(CR "cat: cannot open " C0); puts_c(CY, shell_path(argv[i])); putc('\n');
-            continue;
-        }
-        while ((n = read(fd, buf, sizeof(buf))) > 0)
-            write_stdout(buf, n);
-        close(fd);
-    }
+	char buf[512];
+	int i, fd, n;
+	if (argc < 2) {
+		puts(CR "cat: missing file" C0 "\n");
+		return;
+	}
+	for (i = 1; i < argc; i++) {
+		fd = shell_open_read(argv[i]);
+		if (fd < 0) {
+			puts(CR "cat: cannot open " C0); puts_c(CY, shell_path(argv[i])); putc('\n');
+			continue;
+		}
+		while ((n = read(fd, buf, sizeof(buf))) > 0)
+			write_stdout(buf, n);
+		close(fd);
+	}
 }
 
 static int same_real_file(const char *src, const char *dst) {
@@ -1773,235 +1601,188 @@ static int copy_file(const char *src, const char *dst) {
 }
 
 static void builtin_mkdir(int argc, char **argv) {
-int i;
-if (argc < 2) {
-puts(CR "mkdir: missing directory" C0 "\n");
-return;
-}
-for (i = 1; i < argc; i++)
-{
-char path[MAX_LINE];
-if (vpath(path, argv[i]) < 0 || valloc(path, 1) < 0) {
-puts(CR "mkdir: invalid or full path " C0); puts_c(CY, argv[i]); putc('\n');
-}
-}
+	int i;
+	if (argc < 2) {
+		puts(CR "mkdir: missing directory" C0 "\n");
+		return;
+	}
+	for (i = 1; i < argc; i++) {
+		const char *path = shell_path(argv[i]);
+		if (!path_valid(path) || _mkdir(path, 0755) < 0) {
+			puts(CR "mkdir: cannot create " C0); puts_c(CY, shell_path(argv[i])); putc('\n');
+		}
+	}
 }
 
 static void builtin_rmdir(int argc, char **argv) {
-    int i;
-    if (argc < 2) {
-        puts(CR "rmdir: missing directory" C0 "\n");
-        return;
-    }
-    for (i = 1; i < argc; i++)
-        {
-        int vi = vfind(argv[i]);
-        if (vi >= 0 && vfs[vi].is_dir) {
-            vfs[vi].used = 0;
-            continue;
-        }
-        if (!path_valid(shell_path(argv[i])) || _rmdir(shell_path(argv[i])) < 0) {
-            puts(CR "rmdir: cannot remove " C0); puts_c(CY, shell_path(argv[i])); putc('\n');
-        }
-        }
+	int i;
+	if (argc < 2) {
+		puts(CR "rmdir: missing directory" C0 "\n");
+		return;
+	}
+	for (i = 1; i < argc; i++) {
+		const char *path = shell_path(argv[i]);
+		if (!path_valid(path) || _rmdir(path) < 0) {
+			puts(CR "rmdir: cannot remove " C0); puts_c(CY, shell_path(argv[i])); putc('\n');
+		}
+	}
 }
 
 static void builtin_rm(int argc, char **argv) {
-int i, recursive = 0;
-char *files[32];
-int nf = 0;
-if (argc < 2) {
-puts(CR "rm: missing file" C0 "\n");
-return;
-}
-for (i = 1; i < argc; i++) {
-if (argv[i][0] == '-' && argv[i][1]) {
-int j;
-for (j = 1; argv[i][j]; j++) {
-if (argv[i][j] == 'r' || argv[i][j] == 'R')
-recursive = 1;
-else if (argv[i][j] == 'f')
-;
-else {
-puts(CR "rm: unknown option -" C0);
-putc(argv[i][j]); putc('\n');
-return;
-}
-}
-} else {
-if (nf < 32) files[nf++] = argv[i];
-}
-}
-for (i = 0; i < nf; i++) {
-int vi = vfind(files[i]);
-if (vi >= 0) {
-if (vfs[vi].is_dir && !recursive) {
-puts(CR "rm: cannot remove directory " C0);
-puts_c(CY, files[i]); putc('\n');
-continue;
-}
-vfs[vi].used = 0;
-continue;
-}
-if (recursive) {
-if (path_valid(shell_path(files[i])) && _rmdir(shell_path(files[i])) == 0)
-continue;
-}
-if (!path_valid(shell_path(files[i])) || _unlink(shell_path(files[i])) < 0) {
-if (!path_valid(shell_path(files[i])) || _rmdir(shell_path(files[i])) < 0) {
-puts(CR "rm: cannot remove " C0);
-puts_c(CY, shell_path(files[i])); putc('\n');
-}
-}
-}
+	int i, recursive = 0;
+	if (argc < 2) {
+		puts(CR "rm: missing file" C0 "\n");
+		return;
+	}
+	for (i = 1; i < argc; i++) {
+		if (argv[i][0] == '-' && argv[i][1]) {
+			int j;
+			for (j = 1; argv[i][j]; j++) {
+				if (argv[i][j] == 'r' || argv[i][j] == 'R')
+					recursive = 1;
+				else if (argv[i][j] == 'f')
+					;
+				else {
+					puts(CR "rm: unknown option -" C0);
+					putc(argv[i][j]); putc('\n');
+					return;
+				}
+			}
+		}
+	}
+	for (i = 1; i < argc; i++) {
+		const char *path;
+		if (argv[i][0] == '-' && argv[i][1])
+			continue;
+		path = shell_path(argv[i]);
+		if (!path_valid(path)) {
+			puts(CR "rm: cannot remove " C0); puts_c(CY, argv[i]); putc('\n');
+			continue;
+		}
+		if (recursive) {
+			if (_rmdir(path) == 0)
+				continue;
+		}
+		if (_unlink(path) < 0) {
+			if (!recursive || _rmdir(path) < 0) {
+				puts(CR "rm: cannot remove " C0); puts_c(CY, argv[i]); putc('\n');
+			}
+		}
+	}
 }
 
 static void builtin_touch(int argc, char **argv) {
-int i;
-if (argc < 2) {
-puts(CR "touch: missing file" C0 "\n");
-return;
-}
-for (i = 1; i < argc; i++) {
-vwrite_file(argv[i], "", 0);
-}
+	int i;
+	if (argc < 2) {
+		puts(CR "touch: missing file" C0 "\n");
+		return;
+	}
+	for (i = 1; i < argc; i++) {
+		const char *path = shell_path(argv[i]);
+		int fd;
+		if (!path_valid(path)) {
+			puts(CR "touch: invalid path " C0); puts_c(CY, argv[i]); putc('\n');
+			continue;
+		}
+		fd = _open3(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fd < 0) {
+			puts(CR "touch: cannot create " C0); puts_c(CY, argv[i]); putc('\n');
+		} else {
+			close(fd);
+		}
+	}
 }
 
 static void builtin_cp(int argc, char **argv) {
-    int r;
-    int vi, dst_vi;
-    if (argc != 3) {
-        puts(CR "cp: usage: cp SRC DST" C0 "\n");
-        return;
-    }
-    vi = vfind(argv[1]);
-    if (vi >= 0 && !vfs[vi].is_dir) {
-        dst_vi = vfind(argv[2]);
-        if (dst_vi == vi || vwrite_file(argv[2], vfs[vi].data, 0) < 0) {
-            puts(CR "cp: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
-        }
-        return;
-    }
-    r = copy_file(argv[1], argv[2]);
-    if (r < 0) {
-        puts(CR "cp: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
-    }
+	int r;
+	if (argc != 3) {
+		puts(CR "cp: usage: cp SRC DST" C0 "\n");
+		return;
+	}
+	r = copy_file(argv[1], argv[2]);
+	if (r < 0) {
+		puts(CR "cp: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+	}
 }
 
 static void builtin_mv(int argc, char **argv) {
-    int vi, dst_vi;
-    if (argc != 3) {
-        puts(CR "mv: usage: mv SRC DST" C0 "\n");
-        return;
-    }
-    vi = vfind(argv[1]);
-    if (vi >= 0 && !vfs[vi].is_dir) {
-        dst_vi = vfind(argv[2]);
-        if (dst_vi == vi) return;
-        if (vwrite_file(argv[2], vfs[vi].data, 0) < 0) {
-            puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
-            return;
-        }
-        vfs[vi].used = 0;
-        return;
-    }
-    if (!path_valid(shell_path(argv[1])) || !path_valid(shell_path(argv[2]))) {
-        puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
-        return;
-    }
-    if (same_real_file(argv[1], argv[2])) return;
-    if ((_link(shell_path(argv[1]), shell_path(argv[2])) < 0 && copy_file(argv[1], argv[2]) < 0) ||
-        _unlink(shell_path(argv[1])) < 0) {
-        puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
-    }
+	if (argc != 3) {
+		puts(CR "mv: usage: mv SRC DST" C0 "\n");
+		return;
+	}
+	if (!path_valid(shell_path(argv[1])) || !path_valid(shell_path(argv[2]))) {
+		puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+		return;
+	}
+	if (same_real_file(argv[1], argv[2])) return;
+	if ((_link(shell_path(argv[1]), shell_path(argv[2])) < 0 && copy_file(argv[1], argv[2]) < 0) ||
+	    _unlink(shell_path(argv[1])) < 0) {
+		puts(CR "mv: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+	}
 }
 
 static void builtin_ln(int argc, char **argv) {
-    int vi;
-    if (argc != 3) {
-        puts(CR "ln: usage: ln OLD NEW" C0 "\n");
-        return;
-    }
-    vi = vfind(argv[1]);
-    if (vi >= 0 && !vfs[vi].is_dir) {
-        vwrite_file(argv[2], vfs[vi].data, 0);
-        return;
-    }
-    if (!path_valid(shell_path(argv[1])) || !path_valid(shell_path(argv[2])) ||
-        _link(shell_path(argv[1]), shell_path(argv[2])) < 0) {
-        puts(CR "ln: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
-    }
+	if (argc != 3) {
+		puts(CR "ln: usage: ln OLD NEW" C0 "\n");
+		return;
+	}
+	if (!path_valid(shell_path(argv[1])) || !path_valid(shell_path(argv[2])) ||
+	    _link(shell_path(argv[1]), shell_path(argv[2])) < 0) {
+		puts(CR "ln: failed " C0); puts_c(CY, shell_path(argv[1])); puts(" -> "); puts_c(CY, shell_path(argv[2])); putc('\n');
+	}
 }
 
 static void builtin_head(int argc, char **argv) {
-    char buf[256];
-    int fd, n, i, lines = 0;
-    if (argc < 2) {
-        puts(CR "head: missing file" C0 "\n");
-        return;
-    }
-    i = vfind(argv[1]);
-    if (i >= 0 && !vfs[i].is_dir) {
-        puts(vfs[i].data);
-        return;
-    }
-    fd = shell_open_read(argv[1]);
-    if (fd < 0) {
-        puts(CR "head: cannot open " C0); puts_c(CY, shell_path(argv[1])); putc('\n');
-        return;
-    }
-    while (lines < 10 && (n = read(fd, buf, sizeof(buf))) > 0) {
-        for (i = 0; i < n; i++) {
-            if (buf[i] == '\n' && ++lines == 10) {
-                i++;
-                break;
-            }
-        }
-        write_stdout(buf, i);
-    }
-    close(fd);
+	char buf[256];
+	int fd, n, i, lines = 0;
+	if (argc < 2) {
+		puts(CR "head: missing file" C0 "\n");
+		return;
+	}
+	fd = shell_open_read(argv[1]);
+	if (fd < 0) {
+		puts(CR "head: cannot open " C0); puts_c(CY, shell_path(argv[1])); putc('\n');
+		return;
+	}
+	while (lines < 10 && (n = read(fd, buf, sizeof(buf))) > 0) {
+		for (i = 0; i < n; i++) {
+			if (buf[i] == '\n' && ++lines == 10) {
+				i++;
+				break;
+			}
+		}
+		write_stdout(buf, i);
+	}
+	close(fd);
 }
 
 static void builtin_wc(int argc, char **argv) {
-    char buf[256];
-    int fd, n, i, vi, in_word = 0;
-    long lines = 0, words = 0, bytes = 0;
-    if (argc < 2) {
-        puts(CR "wc: missing file" C0 "\n");
-        return;
-    }
-    vi = vfind(argv[1]);
-    if (vi >= 0 && !vfs[vi].is_dir) {
-        n = vfs[vi].len;
-        bytes = n;
-        for (i = 0; i < n; i++) {
-            if (vfs[vi].data[i] == '\n') lines++;
-            if (vfs[vi].data[i] == ' ' || vfs[vi].data[i] == '\n' || vfs[vi].data[i] == '\t')
-                in_word = 0;
-            else if (!in_word) { words++; in_word = 1; }
-        }
-        puts(itoa(lines)); putc(' '); puts(itoa(words)); putc(' '); puts(itoa(bytes)); putc(' '); puts_c(CY, shell_path(argv[1])); putc('\n');
-        return;
-    }
-    fd = shell_open_read(argv[1]);
-    if (fd < 0) {
-        puts(CR "wc: cannot open " C0); puts_c(CY, shell_path(argv[1])); putc('\n');
-        return;
-    }
-    while ((n = read(fd, buf, sizeof(buf))) > 0) {
-        bytes += n;
-        for (i = 0; i < n; i++) {
-            if (buf[i] == '\n') lines++;
-            if (buf[i] == ' ' || buf[i] == '\n' || buf[i] == '\t')
-                in_word = 0;
-            else if (!in_word) {
-                words++;
-                in_word = 1;
-            }
-        }
-    }
-    close(fd);
-    puts(itoa(lines)); putc(' '); puts(itoa(words)); putc(' '); puts(itoa(bytes)); putc(' '); puts_c(CY, shell_path(argv[1])); putc('\n');
+	char buf[256];
+	int fd, n, i, in_word = 0;
+	long lines = 0, words = 0, bytes = 0;
+	if (argc < 2) {
+		puts(CR "wc: missing file" C0 "\n");
+		return;
+	}
+	fd = shell_open_read(argv[1]);
+	if (fd < 0) {
+		puts(CR "wc: cannot open " C0); puts_c(CY, shell_path(argv[1])); putc('\n');
+		return;
+	}
+	while ((n = read(fd, buf, sizeof(buf))) > 0) {
+		bytes += n;
+		for (i = 0; i < n; i++) {
+			if (buf[i] == '\n') lines++;
+			if (buf[i] == ' ' || buf[i] == '\n' || buf[i] == '\t')
+				in_word = 0;
+			else if (!in_word) {
+				words++;
+				in_word = 1;
+			}
+		}
+	}
+	close(fd);
+	puts(itoa(lines)); putc(' '); puts(itoa(words)); putc(' '); puts(itoa(bytes)); putc(' '); puts_c(CY, shell_path(argv[1])); putc('\n');
 }
 
 static int contains(const char *linebuf, const char *needle) {
@@ -2016,45 +1797,39 @@ static int contains(const char *linebuf, const char *needle) {
 }
 
 static void builtin_grep(int argc, char **argv) {
-    char buf[256], linebuf[MAX_LINE];
-    int fd, n, i, len = 0;
-    if (argc != 3) {
-        puts(CR "grep: usage: grep TEXT FILE" C0 "\n");
-        return;
-    }
-    n = vfind(argv[2]);
-    if (n >= 0 && !vfs[n].is_dir) {
-        if (contains(vfs[n].data, argv[1]))
-            puts(vfs[n].data);
-        return;
-    }
-    fd = shell_open_read(argv[2]);
-    if (fd < 0) {
-        puts(CR "grep: cannot open " C0); puts_c(CY, shell_path(argv[2])); putc('\n');
-        return;
-    }
-    while ((n = read(fd, buf, sizeof(buf))) > 0) {
-        for (i = 0; i < n; i++) {
-            if (buf[i] == '\n' || len >= MAX_LINE - 1) {
-                linebuf[len] = 0;
-                if (contains(linebuf, argv[1])) {
-                    puts(linebuf);
-                    putc('\n');
-                }
-                len = 0;
-            } else {
-                linebuf[len++] = buf[i];
-            }
-        }
-    }
-    if (len) {
-        linebuf[len] = 0;
-        if (contains(linebuf, argv[1])) {
-            puts(linebuf);
-            putc('\n');
-        }
-    }
-    close(fd);
+	char buf[256], linebuf[MAX_LINE];
+	int fd, n, i, len = 0;
+	if (argc != 3) {
+		puts(CR "grep: usage: grep TEXT FILE" C0 "\n");
+		return;
+	}
+	fd = shell_open_read(argv[2]);
+	if (fd < 0) {
+		puts(CR "grep: cannot open " C0); puts_c(CY, shell_path(argv[2])); putc('\n');
+		return;
+	}
+	while ((n = read(fd, buf, sizeof(buf))) > 0) {
+		for (i = 0; i < n; i++) {
+			if (buf[i] == '\n' || len >= MAX_LINE - 1) {
+				linebuf[len] = 0;
+				if (contains(linebuf, argv[1])) {
+					puts(linebuf);
+					putc('\n');
+				}
+				len = 0;
+			} else {
+				linebuf[len++] = buf[i];
+			}
+		}
+	}
+	if (len) {
+		linebuf[len] = 0;
+		if (contains(linebuf, argv[1])) {
+			puts(linebuf);
+			putc('\n');
+		}
+	}
+	close(fd);
 }
 
 static void builtin_whoami(void) {

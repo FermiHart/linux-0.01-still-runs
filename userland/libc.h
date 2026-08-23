@@ -28,7 +28,10 @@ typedef int pid_t;
 #define __NR_getpid  20
 #define __NR_pause   29
 #define __NR_sync    36
+#define __NR_dup     41
+#define __NR_pipe    42
 #define __NR_uname   59
+#define __NR_dup2    63
 
 /* Inline syscall wrappers — match kernel's _syscall0/1/2/3 pattern */
 static inline int _exit(int status)
@@ -129,6 +132,33 @@ static inline pid_t wait(int *status)
     return __res;
 }
 
+static inline int dup(int fd)
+{
+    int __res;
+    __asm__ volatile("int $0x80"
+        : "=a" (__res) : "0" (__NR_dup), "b" (fd));
+    return __res;
+}
+
+static inline int dup2(int oldfd, int newfd)
+{
+    int __res;
+    __asm__ volatile("int $0x80"
+        : "=a" (__res)
+        : "0" (__NR_dup2), "b" (oldfd), "c" (newfd));
+    return __res;
+}
+
+static inline int pipe(int fds[2])
+{
+    int __res;
+    __asm__ volatile("int $0x80"
+        : "=a" (__res)
+        : "0" (__NR_pipe), "b" (fds)
+        : "memory");
+    return __res;
+}
+
 /* String functions */
 static inline size_t strlen(const char *s)
 {
@@ -150,6 +180,15 @@ static inline int strcmp(const char *a, const char *b)
     return (unsigned char)*a - (unsigned char)*b;
 }
 
+static inline char *strchr(const char *s, int c)
+{
+    while (*s) {
+        if (*s == (char)c) return (char *)s;
+        s++;
+    }
+    return NULL;
+}
+
 /* Convert integer to ASCII (returns pointer to static buffer) */
 static inline char *itoa(long n)
 {
@@ -164,7 +203,7 @@ static inline char *itoa(long n)
     return p;
 }
 
-/* Simple printf (only %s, %d, %x, %%, \\n → \\r\\n) */
+/* Simple printf (only %s, %d, %x, %%, \\n → \\r\n) */
 static inline int printf(const char *fmt, ...)
 {
     int len = strlen(fmt);
