@@ -46,6 +46,9 @@ classify: summarize
 bugreport: classify
 	@python3 bugreport.py
 
+matrix: all
+	@python3 matrix.py
+
 build:
 	@mkdir -p build
 
