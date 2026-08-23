@@ -91,32 +91,42 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
   `while (tmp != free_list || (tmp=NULL))` idiom. Add null guard in
   `remove_from_hash_queue()`.
 - **Files**: `fs/buffer.c`
-- **Category**: Compiler / UndefinedBehavior
+- **Category**: Compiler / HistoricalHypothesis
 - **Evidence**: At `-O2` the second `_open3(O_CREAT)` after a write panics.
-  Whether this is a GCC optimization bug or UB in the 1991 idiom is under
-  investigation (Waves 075–083).
-- **Test**: `tests/test_shell.py` creates files repeatedly without panic.
-- **Status**: UNDER_INVESTIGATION
+  The isolated reproduction in `tests/compiler-cases/buffer_freelist.c` does not
+  fail on GCC 13.3, so the historical claim of a GCC `-O2` miscompilation is
+  currently not reproduced. The `-O1` workaround is retained as a defensive
+  shield.
+- **Test**: `tests/test_shell.py` creates files repeatedly without panic;
+  `tests/compiler-cases/buffer_freelist.c` documents the isolated pattern.
+- **Status**: QUALIFIED → see `tests/compiler-cases/CLASSIFICATION.md`
 
 ### Bitmap `-O1` workaround
 
 - **Change**: Compile `fs/bitmap.o` at `-O1` instead of `-O2`.
 - **Files**: `fs/bitmap.c`, `Makefile`
-- **Category**: Compiler / UndefinedBehavior
-- **Evidence**: Same symptom class as `fs/buffer.c`; filesystem operations fail
-  or panic at `-O2`.
-- **Test**: Filesystem smoke tests pass.
-- **Status**: UNDER_INVESTIGATION
+- **Category**: UndefinedBehavior (inline-asm contract)
+- **Evidence**: The `set_bit`/`clear_bit`/`find_first_zero` macros use inline asm
+  that modifies memory without a `"memory"` clobber. The isolated reproduction
+  `tests/compiler-cases/bitmap_inline_asm.c` fails at `-O2` on x86_64 because
+  GCC keeps the bitmap word in a register across the asm block. This is a source
+  contract violation, not a compiler bug.
+- **Test**: Filesystem smoke tests pass;
+  `tests/compiler-cases/bitmap_inline_asm.c` reproduces the contract violation.
+- **Status**: CORRECTED → see `tests/compiler-cases/CLASSIFICATION.md`
 
 ### `vsprintf` `%s` handling
 
 - **Change**: Compile `kernel/vsprintf.o` at `-O1` instead of `-O2`.
 - **Files**: `kernel/vsprintf.c`, `Makefile`
-- **Category**: Compiler / UndefinedBehavior
-- **Evidence**: At `-O2` non-empty `%s` format strings read the pointer from the
-  wrong slot and render garbage.
-- **Test**: BBP status strings and shell `printk` output contain valid text.
-- **Status**: UNDER_INVESTIGATION
+- **Category**: Compiler / HistoricalHypothesis
+- **Evidence**: The reported symptom of `-O2` reading the `%s` pointer from the
+  wrong slot could not be reproduced in the isolated case
+  `tests/compiler-cases/vsprintf_percent_s.c` on GCC 13.3. The `-O1` workaround
+  is retained as a defensive shield.
+- **Test**: BBP status strings and shell `printk` output contain valid text;
+  `tests/compiler-cases/vsprintf_percent_s.c` documents the isolated pattern.
+- **Status**: QUALIFIED → see `tests/compiler-cases/CLASSIFICATION.md`
 
 ### ATA PIO read helper and port macros
 

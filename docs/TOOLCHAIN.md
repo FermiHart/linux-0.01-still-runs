@@ -43,13 +43,20 @@ native path.
 
 ## Heisenbug workarounds
 
-The following files are deliberately compiled at `-O1` because modern GCC
-miscompiles them at `-O2`. The root cause is tracked in the Porting Ledger and
-will be investigated in Waves 075–083.
+The following files are deliberately compiled at `-O1` as a conservative shield
+against historical `-O2` sensitivity:
 
 - `fs/buffer.c`
 - `fs/bitmap.c`
 - `kernel/vsprintf.c`
+
+The investigation in `tests/compiler-cases/` (Waves 075–083) found that
+`fs/bitmap.c` contains inline-asm macros that modify memory without a `"memory"`
+clobber, which is undefined behavior in the GCC contract and explains the `-O2`
+failure on x86_64. The `-O2` symptoms originally attributed to
+`fs/buffer.c` and `kernel/vsprintf.c` could not be reproduced in isolation on
+GCC 13.3 and are recorded as historical hypotheses. See
+`tests/compiler-cases/CLASSIFICATION.md` and `docs/AUDIT-STATEMENTS.md`.
 
 ## Container lock
 

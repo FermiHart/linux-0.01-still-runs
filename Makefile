@@ -220,26 +220,33 @@ dirs:
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s\n' "$<" "$@"
 	@$(CC) $(CFLAGS) $(DEPFLAGS) -c -o "$@" "$<"
 
-# fs/buffer.c + fs/bitmap.c: -O2 mis-compiles the buffer-cache walk and
-# new_block's getblk result handling on modern GCC (Heisenbug — masked by
-# any printk in the hot path, repros only with debug-free -O2). Drop to
-# -O1 here only. Same class as the sys_ioctl `volatile int ret` fix.
+# fs/buffer.c: keep -O1 as a conservative shield.  The original 1991 free-list
+# walk `do { ... } while (tmp != free_list || (tmp = NULL))` could not be
+# reproduced as a miscompilation in isolation on GCC 13.3, so the -O1 workaround
+# is retained as a defensive measure while the investigation continues in
+# tests/compiler-cases/ (see CLASSIFICATION.md).  Waves 075-083.
 fs/buffer.o: fs/buffer.c
-	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 heisenbug]$(CR)\n' "$<" "$@"
+	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 compiler-shield]$(CR)\n' "$<" "$@"
 	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
+# fs/bitmap.c: -O1 workaround.  The inline-asm bit-operation macros in this
+# file lack a "memory" clobber, which is undefined behavior in the GCC
+# inline-asm contract.  The isolated reproduction in
+# tests/compiler-cases/bitmap_inline_asm.c fails at -O2 on x86_64 because the
+# compiler keeps the bitmap word in a register across set_bit.  Keeping this
+# object at -O1 avoids the observable failure in the full kernel.
+# See tests/compiler-cases/CLASSIFICATION.md.  Waves 075-083.
 fs/bitmap.o: fs/bitmap.c
-	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 heisenbug]$(CR)\n' "$<" "$@"
+	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 asm-memory-shield]$(CR)\n' "$<" "$@"
 	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
-# kernel/vsprintf.c: -O2 miscompiles the `%s` case (va_arg(char*) fetch) on
-# modern GCC — a non-empty %s renders garbage (the pointer is read off by a
-# slot), while %x/%c/%d are fine. Same heisenbug class as fs/buffer.o and
-# fs/bitmap.o above. The 1991 boot path only ever passed empty strings to %s
-# (hd.c "Partition table%s"), so this latent bug went unseen until the BBP
-# adapter printed a real status string. Drop to -O1 here only.
+# kernel/vsprintf.c: keep -O1 as a conservative shield.  The reported -O2 issue
+# with %s reading a pointer from the wrong va_arg slot could not be reproduced
+# in isolation on GCC 13.3.  The -O1 workaround is retained defensively while
+# the investigation continues in tests/compiler-cases/ (see CLASSIFICATION.md).
+# Waves 075-083.
 kernel/vsprintf.o: kernel/vsprintf.c
-	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 %%s heisenbug]$(CR)\n' "$<" "$@"
+	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 %%s compiler-shield]$(CR)\n' "$<" "$@"
 	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
 # ── BBP objects: same kernel flags (incl. -fleading-underscore so _printk /

@@ -150,13 +150,14 @@ repeat:
 	if ((tmp=get_hash_table(dev,block)))
 		return tmp;
 	tmp = free_list;
-	/* Walk the free list looking for an unused buffer. Original 1991 code
-	 * used `while (tmp != free_list || (tmp=NULL))` — an assignment-inside-
-	 * condition trick that GCC -O2 can mis-optimize on modern toolchains:
-	 * the (tmp=NULL) side effect may be dropped, so after a full cycle the
-	 * loop exits with tmp pointing back at free_list rather than NULL, and
-	 * getblk returns a buffer it shouldn't or panics in new_block. Rewrite
-	 * with an explicit cycle check — same semantics, no compiler ambiguity. */
+	/* Walk the free list looking for an unused buffer. The original 1991 code
+	 * used `do { ... } while (tmp != free_list || (tmp=NULL))` — an
+	 * assignment-inside-condition idiom. The current rewrite keeps the same
+	 * intended semantics with an explicit cycle check. The isolated reproduction
+	 * in tests/compiler-cases/buffer_freelist.c does not fail on GCC 13.3, so
+	 * the historical claim of a GCC -O2 miscompilation remains unproven on
+	 * modern toolchains; see tests/compiler-cases/CLASSIFICATION.md. The -O1
+	 * workaround in the Makefile is retained as a conservative shield. */
 	for (;;) {
 		if (!tmp->b_count) {
 			wait_on_buffer(tmp);

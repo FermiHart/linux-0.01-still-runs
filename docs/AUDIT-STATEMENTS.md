@@ -45,20 +45,57 @@ against the official tarball" and references the two-layer design.
 
 ### "GCC -O2 mis-compiled fs/buffer.c"
 
-**Source**: README.md "Notable fixes".
+**Source**: README.md "Notable fixes" and Makefile comments.
 
-**Audit**: the symptom is real and reproducible: at `-O2` the second
-`_open3(O_CREAT)` after a filesystem write panics. The root cause is not yet
-fully classified. Possibilities include a GCC optimization bug, undefined
-behavior in the original `while (tmp != free_list || (tmp=NULL))` idiom,
-aliasing assumptions, or calling-convention dependence. The `-O1` workaround is
-valid but does not prove the cause.
+**Audit**: the full-kernel symptom is real: at `-O2` the second `_open3(O_CREAT)`
+after a filesystem write panics.  An isolated reproduction of the original
+`getblk()` free-list pattern in `tests/compiler-cases/buffer_freelist.c` does
+not fail on GCC 13.3 at any optimization level.  The case is therefore classified
+as **HISTORICAL_HYPOTHESIS / NOT_REPRODUCED** in `tests/compiler-cases/CLASSIFICATION.md`.
+The `-O1` workaround is retained as a conservative shield while the historical
+claim remains unproven on modern toolchains.
 
-**Status**: PENDING → investigation assigned to Waves 075–083.
+**Status**: QUALIFIED → Waves 075–083 completed.
 
-**Correction**: README now describes the symptom and the `-O1` workaround
-without asserting an unproven GCC bug. A reference to the investigation waves
-is included.
+**Correction**: Makefile comments now describe the `-O1` override as a
+"compiler-shield" rather than asserting a GCC bug.  README and porting ledger
+refer to `tests/compiler-cases/` for the investigation outcome.
+
+### "GCC -O2 mis-compiled fs/bitmap.c"
+
+**Source**: Makefile comments and `docs/PORTING_LEDGER.md`.
+
+**Audit**: the isolated reproduction `tests/compiler-cases/bitmap_inline_asm.c`
+fails at `-O2` on x86_64.  The root cause is the inline-asm macros in
+`fs/bitmap.c` (`set_bit`, `clear_bit`, `find_first_zero`) that modify memory
+without declaring a `"memory"` clobber.  GCC is therefore permitted to keep the
+bitmap word in a register across the asm block, making the write invisible to a
+subsequent read.  This is undefined behavior in the GCC inline-asm contract, not
+a compiler bug.  The case is classified as **UNDEFINED_BEHAVIOR** in
+`tests/compiler-cases/CLASSIFICATION.md`.
+
+**Status**: CORRECTED → Waves 075–083 completed.
+
+**Correction**: Makefile comments now describe the `-O1` override as an
+"asm-memory-shield" and point to the classification.  The porting ledger was
+updated to reflect the real root cause.
+
+### "GCC -O2 mis-compiled kernel/vsprintf.c %s handling"
+
+**Source**: Makefile comments and `docs/PORTING_LEDGER.md`.
+
+**Audit**: an isolated reproduction of the `%s` case in
+`tests/compiler-cases/vsprintf_percent_s.c` does not fail on GCC 13.3 at any
+optimization level for either x86_64 or i386.  No strict-aliasing,
+sequence-point or UBSan issues were found.  The case is classified as
+**HISTORICAL_HYPOTHESIS / NOT_REPRODUCED** in
+`tests/compiler-cases/CLASSIFICATION.md`.
+
+**Status**: QUALIFIED → Waves 075–083 completed.
+
+**Correction**: Makefile comments now describe the `-O1` override as a
+"compiler-shield" rather than asserting a GCC bug.  The porting ledger was
+updated.
 
 ### "CMOS Y2K rollover"
 
