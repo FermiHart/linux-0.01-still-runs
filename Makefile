@@ -448,6 +448,7 @@ test: all
 	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compare_assembly.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compiler_audit.py --make "$(MAKE_COMMAND)"
+	@python3 tests/test_compiler_summary.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_trace_io.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
@@ -639,6 +640,10 @@ compiler-audit:
 	$(call STEP,compiler case UB audit)
 	@$(MAKE) -C tests/compiler-cases audit
 
+compiler-summary:
+	$(call STEP,compiler case summary)
+	@$(MAKE) -C tests/compiler-cases summarize
+
 test-compiler-cases:
 	$(call STEP,compiler case harness check)
 	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
@@ -650,6 +655,10 @@ test-compare-assembly:
 test-compiler-audit:
 	$(call STEP,compiler audit log check)
 	@python3 tests/test_compiler_audit.py --make "$(MAKE_COMMAND)"
+
+test-compiler-summary:
+	$(call STEP,compiler summary JSON check)
+	@python3 tests/test_compiler_summary.py --make "$(MAKE_COMMAND)"
 
 test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)

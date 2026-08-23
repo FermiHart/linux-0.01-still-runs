@@ -37,6 +37,9 @@ compare-assembly: all
 audit: all
 	@bash audit.sh
 
+summarize: all
+	@python3 summarize.py
+
 build:
 	@mkdir -p build
 
