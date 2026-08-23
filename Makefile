@@ -193,8 +193,8 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-sanitized bbp-conformance static-analysis fuzz \
-        bbp-golden-vectors golden-trace golden-trace-jsonl toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-sanitized bbp-conformance static-analysis fuzz \
+        bbp-golden-vectors golden-trace golden-trace-jsonl record toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -451,6 +451,7 @@ test: all
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_trace_format.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
+	@python3 tests/test_record.py --make "$(MAKE_COMMAND)" --timeout 120
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -544,6 +545,22 @@ golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 golden-trace-jsonl: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace_jsonl.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
+
+record: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
+	$(call STEP,recording bEMU machine trace)
+	@ts="$${SOURCE_DATE_EPOCH:-$$(date -u +%Y%m%d-%H%M%S)}"; \
+	  mkdir -p "$(BUILD)/traces"; \
+	  trace="$(BUILD)/traces/boot-$${ts}.jsonl"; \
+	  printf -v keys 'cat /etc/motd\n'; \
+	  "$(BUILD)/bemu-linux01" --kernel "$(BUILD)/kernel.bin" --root "$(BUILD)/root.img" \
+	    --keys "$$keys" --expect "Welcome to 1991" \
+	    --trace-file "$$trace" >/dev/null 2>&1; \
+	  gzip -f "$$trace"; \
+	  printf '  $(CG)$(G_OK)$(CR) recorded %s.gz\n' "$$trace"
+
+test-record:
+	$(call STEP,record mode test)
+	@python3 tests/test_record.py --make "$(MAKE_COMMAND)" --timeout 120
 
 test-trace-format: require-artifacts
 	$(call STEP,trace format validation)
