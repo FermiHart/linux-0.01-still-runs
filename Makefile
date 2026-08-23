@@ -193,8 +193,8 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-sanitized bbp-conformance static-analysis fuzz \
-        bbp-golden-vectors golden-trace golden-trace-jsonl record toolchain
+        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-sanitized bbp-conformance static-analysis fuzz \
+        bbp-golden-vectors golden-trace golden-trace-jsonl record replay toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -452,6 +452,7 @@ test: all
 	@python3 tests/test_trace_format.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 	@python3 tests/test_record.py --make "$(MAKE_COMMAND)" --timeout 120
+	@python3 tests/replay.py --bemu build/bemu-linux01 --trace tests/golden/boot.jsonl --timeout 60
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
@@ -557,6 +558,16 @@ record: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	    --trace-file "$$trace" >/dev/null 2>&1; \
 	  gzip -f "$$trace"; \
 	  printf '  $(CG)$(G_OK)$(CR) recorded %s.gz\n' "$$trace"
+
+replay: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
+	$(call STEP,replaying bEMU machine trace)
+	@python3 tests/replay.py --bemu "$(BUILD)/bemu-linux01" \
+	  --trace tests/golden/boot.jsonl --timeout 60
+
+test-replay:
+	$(call STEP,replay test)
+	@python3 tests/replay.py --bemu build/bemu-linux01 \
+	  --trace tests/golden/boot.jsonl --timeout 60
 
 test-record:
 	$(call STEP,record mode test)

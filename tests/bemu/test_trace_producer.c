@@ -106,7 +106,7 @@ static void test_basic_events(void)
     trace_event_io_access(&t, "out", 0x3f8, 1, 65);
     trace_event_irq(&t, 1, "raise");
     trace_event_timer(&t, 0x40, "latch");
-    trace_event_input(&t, 1, "script");
+    trace_event_input(&t, (const uint8_t *)"x", 1, "script");
     trace_event_shutdown(&t, "halt", 1000, 0);
     trace_close(&t);
 
@@ -118,6 +118,8 @@ static void test_basic_events(void)
     check(find_line(content, "\"type\":\"irq\"") != NULL, "irq event");
     check(find_line(content, "\"type\":\"timer\"") != NULL, "timer event");
     check(find_line(content, "\"type\":\"input\"") != NULL, "input event");
+    check(find_line(content, "\"bytes\":1") != NULL, "input bytes");
+    check(find_line(content, "\"hex\":\"78\"") != NULL, "input hex");
     check(find_line(content, "\"type\":\"shutdown\"") != NULL, "shutdown event");
     check(find_line(content, "\"kernel\":\"build/kernel.bin\"") != NULL, "kernel field");
     check(find_line(content, "\"exit_count\":1") != NULL, "exit_count increments");

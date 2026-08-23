@@ -136,12 +136,16 @@ void trace_event_timer(struct trace *t, uint16_t port, const char *action)
     emit_footer(t);
 }
 
-void trace_event_input(struct trace *t, size_t bytes, const char *source)
+void trace_event_input(struct trace *t, const uint8_t *bytes, size_t len, const char *source)
 {
+    size_t i;
     if (!t || !t->enabled)
         return;
     emit_header(t, "input");
-    fprintf(t->file, "{\"bytes\":%zu,\"source\":", bytes);
+    fprintf(t->file, "{\"bytes\":%zu,\"hex\":\"", len);
+    for (i = 0; i < len && i < 64; i++)
+        fprintf(t->file, "%02x", bytes[i]);
+    fprintf(t->file, "\",\"source\":");
     emit_string(t->file, source);
     fprintf(t->file, "}");
     emit_footer(t);

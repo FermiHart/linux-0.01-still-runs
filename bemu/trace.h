@@ -52,7 +52,8 @@ void trace_event_timer(struct trace *t,
                        const char *action);
 
 void trace_event_input(struct trace *t,
-                       size_t bytes,
+                       const uint8_t *bytes,
+                       size_t len,
                        const char *source);
 
 /*
