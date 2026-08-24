@@ -45,6 +45,8 @@
 #include <stddef.h>
 #include <limits.h>
 #include <unistd.h>
+
+#include "../bemu/experience.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -617,10 +619,19 @@ static void publish_image(const char *out_path, const uint8_t *disk, size_t len)
 /* ------------------------------------------------------------------ */
 int main(int argc, char **argv)
 {
-    if (argc < 2) die("usage: %s out.img [file.bin ...]", argv[0]);
-    const char *out_path = argv[1];
-    size_t n_files = (size_t)(argc - 2);
-    char **file_paths = argv + 2;
+    int experience_1991 = 0;
+    int first_path = 1;
+    if (argc > 1 && strcmp(argv[1], "--experience") == 0) {
+        if (argc < 4 || strcmp(argv[2], "1991") != 0)
+            die("usage: %s [--experience 1991] out.img [file.bin ...]", argv[0]);
+        experience_1991 = 1;
+        first_path = 3;
+    }
+    if (argc <= first_path)
+        die("usage: %s [--experience 1991] out.img [file.bin ...]", argv[0]);
+    const char *out_path = argv[first_path];
+    size_t n_files = (size_t)(argc - first_path - 1);
+    char **file_paths = argv + first_path + 1;
     char (*names)[NAME_LEN + 1] = NULL;
 
     if (n_files > 0) {
@@ -663,15 +674,26 @@ int main(int argc, char **argv)
     int dev_ino = add_dir(root_ino, "dev");
     int etc_ino = add_dir(root_ino, "etc");
     int home_ino = add_dir(root_ino, "home");
-    add_dir(home_ino, "fermihart");
+    if (!experience_1991)
+        add_dir(home_ino, "fermihart");
     add_dir(root_ino, "tmp");
 
 	add_file(etc_ino, "fstab", "/dev/hd1 / minix rw 0 0\n", 0644);
-	add_file(etc_ino, "passwd", "root:x:0:0:root:/home/fermihart:/bin/shell\n", 0644);
-	add_file(etc_ino, "issue",
+	if (experience_1991) {
+		add_file(etc_ino, "passwd", "root:x:0:0:root:/:/bin/shell\n", 0644);
+		add_file(etc_ino, "issue", "Linux 0.01 historical experience\n", 0644);
+		add_file(etc_ino, "motd",
+			"Linux 0.01\n"
+			"\n"
+			"Experience profile: 1991\n"
+			"8 MiB RAM, Minix v1 filesystem, and a small Unix shell.\n",
+			0644);
+	} else {
+		add_file(etc_ino, "passwd", "root:x:0:0:root:/home/fermihart:/bin/shell\n", 0644);
+		add_file(etc_ino, "issue",
 		"Linux 0.01 modern root filesystem\n"
 		"Try: ls -la, cat /etc/fstab, whoami, mount, df, ps aux\n", 0644);
-	add_file(etc_ino, "motd",
+		add_file(etc_ino, "motd",
 		"There is a specific feeling that comes from booting an operating\n"
 		"system written three and a half decades ago. It is not nostalgia\n"
 		"-- nostalgia implies distance, the safe view from behind glass.\n"
@@ -704,6 +726,7 @@ int main(int argc, char **argv)
 		"kernel, a console, a shell, and you.\n"
 		"\n"
 		"Welcome to 1991. It still runs in 2026.\n", 0644);
+	}
 	add_chr(dev_ino, "tty0", 4, 0);
 
     for (size_t i = 0; i < n_files; i++) {
@@ -749,6 +772,9 @@ int main(int argc, char **argv)
     put_le32(&p[0].nr_sects, (uint32_t)(disk_sectors - 1));
     disk[510] = 0x55;
     disk[511] = 0xAA;
+    if (experience_1991)
+        memcpy(disk + EXPERIENCE_IMAGE_MARKER_OFFSET,
+               EXPERIENCE_IMAGE_MARKER_1991, EXPERIENCE_IMAGE_MARKER_LEN);
 
     memcpy(disk + SECTOR_SIZE, fs_img, (size_t)fs_size);
 

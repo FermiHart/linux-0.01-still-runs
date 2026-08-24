@@ -47,6 +47,7 @@ struct machine {
     size_t key_head, key_tail;
     uint8_t key_data;
     int key_ready;
+    const char *experience;
     const char *script, *expect;
     int script_queued, prompt_count, expect_seen, done;
     size_t script_prompts_pending;

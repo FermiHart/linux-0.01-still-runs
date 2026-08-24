@@ -38,6 +38,7 @@ struct ide_state {
 
 void ide_reset(struct ide_state *ide);
 void map_disk(struct ide_state *ide, const char *path);
+int ide_experience_matches(const struct ide_state *ide, const char *experience);
 void ide_command(struct machine *m, uint8_t command);
 uint32_t ide_data_read(struct machine *m, unsigned size);
 void ide_data_write(struct machine *m, uint32_t value, unsigned size);

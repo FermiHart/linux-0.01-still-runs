@@ -3,8 +3,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-ROOT_IMG="${ROOT_DIR}/build/root.img"
-TMP_IMG="${ROOT_DIR}/build/.root-partition.img"
+ROOT_IMG="${1:-${ROOT_DIR}/build/root.img}"
+TMP_IMG=$(mktemp "${ROOT_DIR}/build/.root-partition.XXXXXX.img")
+trap 'rm -f "${TMP_IMG}"' EXIT
 
 if [ ! -f "${ROOT_IMG}" ]; then
     printf 'root image not found: %s\n' "${ROOT_IMG}" >&2
@@ -22,4 +23,3 @@ sectors=$((sectors / 512 - 1))
 dd if="${ROOT_IMG}" of="${TMP_IMG}" bs=512 skip=1 count="${sectors}" status=none
 
 fsck.minix -v "${TMP_IMG}"
-rm -f "${TMP_IMG}"

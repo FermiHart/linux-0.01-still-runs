@@ -1,9 +1,9 @@
 # Experience Fidelity Specification
 
 This document defines the target meaning of "fidelity" for the Vesica Piscis
-artifact. The two deliberate modes are specifications for Waves 089 and 090;
-the current runtime remains a single transitional experience until those waves
-are completed.
+artifact. The historical mode is selected with `make run EXPERIENCE=1991`.
+The alive mode remains a specification for Wave 090; an empty `EXPERIENCE`
+continues to select the transitional default until that wave is completed.
 
 ## Dimensions of fidelity
 
@@ -25,9 +25,18 @@ are completed.
 Goal: reproduce the closest possible feel of sitting in front of a 1991 PC
 running Linux 0.01.
 
+Implemented in Wave 089:
+
+- Explicit Make and bEMU profile validation.
+- A distinct `root-1991.img` containing a concise ASCII MOTD and period identity.
+- Profile identity carried through the CRC-checked BBP command line.
+- `HOME=/` and `EXPERIENCE=1991` supplied by init to the real shell process.
+- The same 8 MiB machine, Minix v1 filesystem, syscalls, process model, pipes,
+  redirections, and documented shell limits as the transitional runtime.
+
+Scheduled for Waves 091 and 095:
+
 - Boot date fixed to a reference point (e.g., 1991-10-05).
-- MOTD is the original era message.
-- Prompt uses `/` as home and minimal path.
 - No anachronistic quotes, Easter eggs or Unicode art.
 - Commands fail with historically plausible error messages.
 - `date`, `uptime`, `cal` report the fixed historical time.
@@ -67,15 +76,16 @@ The following are considered regressions in either mode:
 
 ## Current gaps
 
-- `EXPERIENCE=1991` and `EXPERIENCE=alive` are not implemented yet.
+- `EXPERIENCE=alive` is not implemented yet.
+- `EXPERIENCE=1991` still uses the transitional RTC source until Wave 091.
 - Cross-boot persistence is blocked by incomplete IDE write-completion IRQ
   delivery in bEMU; `sync()` can still block.
 - `mount` reports the configured root mount because Linux 0.01 has no live
   mount-table interface; `ps` exposes at most 16 task slots.
 - Guest halt/reset requests do not yet terminate or restart the bEMU host
   process, and they remain downstream of the blocking `sync()` path.
-- The current prompt and help are shared transitional defaults, not proof that
-  either future mode is active.
+- Prompt and help remain shared while Wave 095 audits conveniences that should
+  not appear in the historical profile.
 
 ## Future fidelity gate
 

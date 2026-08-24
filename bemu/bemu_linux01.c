@@ -434,6 +434,7 @@ int main(int argc, char **argv)
     }
     m.io_trace = opts.trace;
     m.no_timer = opts.no_timer;
+    m.experience = opts.experience;
     m.script = opts.script;
     m.expect = opts.expect;
     m.trace_syscalls = opts.trace_syscalls;
@@ -443,6 +444,8 @@ int main(int argc, char **argv)
         fail("could not register host-state cleanup");
     m.sanitize_console = isatty(STDOUT_FILENO) && !opts.raw_console;
     map_disk(&m.ide, opts.root);
+    if (!ide_experience_matches(&m.ide, opts.experience))
+        fail("root image does not match selected experience");
     setup_kvm(&m, opts.kernel);
     if (m.trace_syscalls) {
         struct kvm_guest_debug dbg;

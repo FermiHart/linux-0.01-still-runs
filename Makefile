@@ -40,7 +40,17 @@ BUILD      ?= build
 MAKE_COMMAND := $(MAKE)
 export BUILD MAKE_COMMAND
 
-ARTIFACT_NAMES := kernel.elf kernel.bin root.img bemu-linux01 mkimage \
+EXPERIENCE ?=
+ifneq ($(strip $(EXPERIENCE)),)
+ifneq ($(strip $(EXPERIENCE)),1991)
+$(error EXPERIENCE must be empty or 1991)
+endif
+endif
+
+EXPERIENCE_ROOT = $(if $(filter 1991,$(EXPERIENCE)),$(BUILD)/root-1991.img,$(BUILD)/root.img)
+EXPERIENCE_ARGS = $(if $(filter 1991,$(EXPERIENCE)),--experience 1991,)
+
+ARTIFACT_NAMES := kernel.elf kernel.bin root.img root-1991.img bemu-linux01 mkimage \
                   shell.bin update.bin hello.bin yes.bin pathcheck.bin cat.bin
 ARTIFACTS = $(addprefix $(BUILD)/,$(ARTIFACT_NAMES))
 
@@ -191,7 +201,7 @@ endef
 .PHONY: help all clean run run-headless kernel image bemu bemu-sanitized dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact inspect-rootfs \
-        fsck-rootfs banner require-artifacts test test-quick test-shell test-large-rootfs \
+        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
         test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
@@ -367,7 +377,7 @@ $(BUILD)/cat.bin: userland/programs/cat.c $(BUILD)/crt0.o | dirs
 
 # ── Host tools ────────────────────────────────────────────────────
 
-$(BUILD)/mkimage: tools/mkimage.c | dirs
+$(BUILD)/mkimage: tools/mkimage.c bemu/experience.h | dirs
 	$(call STEP,building tools/mkimage (Minix v1 + MBR forge))
 	@$(HOSTCC) $(HOSTCFLAGS) -MMD -MP -MF "$(BUILD)/mkimage.d" -MT "$@" \
 	  -o "$@" "$<" $(HOSTLDFLAGS)
@@ -398,11 +408,17 @@ $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" "$(BUILD)/pathcheck.bin" "$(BUILD)/cat.bin" 2>&1 | sed 's/^/    /'
 	$(call OK,root.img forged)
 
+$(BUILD)/root-1991.img: $(BUILD)/mkimage $(USERLAND_BINS)
+	$(call STAGE,7/10,forging 1991 Minix v1 root filesystem)
+	@rm -f "$@"
+	@"$(BUILD)/mkimage" --experience 1991 "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" "$(BUILD)/pathcheck.bin" "$(BUILD)/cat.bin" 2>&1 | sed 's/^/    /'
+	$(call OK,root-1991.img forged)
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                                bEMU                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-$(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h \
+$(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/experience.h bemu/machine.h \
                         bemu/machine.c bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
                         bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                         bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
@@ -416,7 +432,7 @@ $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h 
 	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bemu/trace.c bbp/bbp_build.c $(BEMU_LDFLAGS)
 	$(call OK,bemu-linux01 ready)
 
-$(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/machine.h \
+$(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/experience.h bemu/machine.h \
                         bemu/machine.c bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
                         bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                         bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
@@ -437,9 +453,10 @@ bemu-sanitized: $(BUILD)/bemu-linux01-sanitized
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 run: all
+	@$(MAKE) --no-print-directory "$(EXPERIENCE_ROOT)"
 	$(call STAGE,9/10,launching bEMU (direct KVM, no firmware))
 	$(call _curtain_up)
-	@"$(BUILD)/bemu-linux01" --kernel "$(BUILD)/kernel.bin" --root "$(BUILD)/root.img"
+	@"$(BUILD)/bemu-linux01" --kernel "$(BUILD)/kernel.bin" --root "$(EXPERIENCE_ROOT)" $(EXPERIENCE_ARGS)
 
 run-headless: run
 
@@ -516,7 +533,8 @@ test: all
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
-	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120 --interactive
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 180 --interactive
+	@$(MAKE) --no-print-directory test-experience-1991
 	@python3 tests/test_large_rootfs.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --mkimage $(BUILD)/mkimage \
 	  --shell $(BUILD)/shell.bin --update $(BUILD)/update.bin \
@@ -539,6 +557,13 @@ test-quick: require-artifacts
 	$(call STEP,boot test (existing artifacts))
 	@python3 tests/test_boot.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
+
+test-experience-1991: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
+	$(call STEP,1991 experience mode test)
+	@python3 tests/test_experience.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root-1991.img \
+	  --default-img $(BUILD)/root.img \
+	  --make "$(MAKE_COMMAND)" --timeout 60
 
 test-trace-io: require-artifacts
 	$(call STEP,trace IO/IDE event test)
@@ -991,6 +1016,9 @@ inspect-rootfs: $(BUILD)/root.img $(BUILD)/minix-inspect
 fsck-rootfs: $(BUILD)/root.img
 	@bash "$(REPO_ROOT)/scripts/fsck-rootfs.sh"
 
+fsck-rootfs-1991: $(BUILD)/root-1991.img
+	@bash "$(REPO_ROOT)/scripts/fsck-rootfs.sh" "$(BUILD)/root-1991.img"
+
 watch:
 	@printf '  $(CB)watching source tree for changes (Ctrl-C to stop)$(CR)\n\n'
 	@rebuild() { \
@@ -1117,6 +1145,7 @@ help:
 	@printf '    $(CWH)bemu$(CR)           build only the KVM runner\n'
 	@printf '\n  $(CB)$(CC1)launch$(CR)\n'
 	@printf '    $(CWH)run$(CR)            $(CY)★$(CR) build + boot directly with bEMU\n'
+	@printf '    $(CWH)run EXPERIENCE=1991$(CR) boot the explicit historical profile\n'
 	@printf '    $(CWH)boom$(CR)           $(CY)★$(CR) clean + build + run (one shot)\n'
 	@printf '    $(CWH)run-headless$(CR)   alias for the terminal-native bEMU run\n'
 	@printf '\n  $(CB)$(CM)diagnose$(CR)\n'
@@ -1135,6 +1164,7 @@ help:
 	@printf '    $(CWH)test$(CR)           build + full boot test in bEMU\n'
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
+	@printf '    $(CWH)test-experience-1991$(CR) historical profile integration test\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'
 	@printf '    $(CWH)test-fs-write$(CR)   write/append/truncate smoke test\n'
 	@printf '    $(CWH)test-fs-mkdir$(CR)  mkdir/rmdir smoke test\n'
@@ -1154,6 +1184,7 @@ help:
 	@printf '\n  $(CB)$(CP)inspect filesystem$(CR)\n'
 	@printf '    $(CWH)inspect-rootfs$(CR)  dump Minix v1 structure of build/root.img\n'
 	@printf '    $(CWH)fsck-rootfs$(CR)    validate root.img with fsck.minix\n'
+	@printf '    $(CWH)fsck-rootfs-1991$(CR) validate root-1991.img with fsck.minix\n'
 	@printf '\n  $(CB)$(CP)workflow$(CR)\n'
 	@printf '    $(CWH)watch$(CR)          auto-rebuild on file change\n'
 	@printf '    $(CWH)ci$(CR)             clean build + full tests + checksums\n'

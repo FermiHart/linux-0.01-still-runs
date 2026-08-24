@@ -23,6 +23,7 @@ tar -czf "${ARTIFACT}" \
     --exclude='*.o' --exclude='*.d' --exclude='*.tmp' \
     build/kernel.bin \
     build/root.img \
+    build/root-1991.img \
     build/bemu-linux01 \
     build/SHA256SUMS \
     build/REPRODUCIBLE.sha256 \

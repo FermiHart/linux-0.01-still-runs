@@ -210,6 +210,23 @@ longer prints invented user counts or load averages.
 
 **Status**: QUALIFIED.
 
+### "EXPERIENCE=1991 selects a historical profile"
+
+**Source**: README.md and `EXPERIENCE.md`.
+
+**Audit**: Make selects a distinct Minix v1 image and passes `--experience
+1991`; bEMU includes the selector in the CRC-checked BBP command line; init
+derives the shell environment only after validating that handoff. The profile
+has a concise ASCII identity and uses `/` as root's home. Its deterministic
+historical clock is not claimed before Wave 091.
+
+**Status**: PROVEN.
+
+**Evidence**: `tests/test_experience.py` checks invalid selectors, rejects both
+directions of profile/image mismatch, verifies Make dry-run selection, guest BBP
+output, real `/etc/issue` and `/etc/motd` files, shell mode identity, and bare
+`cd` behavior.
+
 ### bEMU provenance
 
 **Source**: `bemu/README.md`.

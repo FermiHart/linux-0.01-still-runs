@@ -153,12 +153,15 @@ static int printf(const char *fmt, ...)
 }
 
 static char * argv[] = { "-",NULL };
-static char * envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", NULL };
+static char * default_envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", NULL };
+static char * historical_envp[] = { "HOME=/", "PATH=/bin:/usr/bin:.", "EXPERIENCE=1991", NULL };
 
 void init(void)
 {
 	int i,j;
+	char **shell_envp;
 
+	shell_envp = bbp_linux01_experience() ? historical_envp : default_envp;
 	setup();
 /*	if (!fork())
 		_exit(execve("/bin/update",NULL,NULL));  */
@@ -178,7 +181,7 @@ void init(void)
 		(void) open("/dev/tty0",O_RDWR,0);
 		(void) dup(0);
 		(void) dup(0);
-		_exit(execve("/bin/shell",argv,envp));
+		_exit(execve("/bin/shell",argv,shell_envp));
 	}
 	j=wait(&i);
 	printf("child %d died with code %04x\n",j,i);

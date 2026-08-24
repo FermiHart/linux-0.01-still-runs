@@ -45,14 +45,18 @@ SOURCE_DATE_EPOCH=1700000000 make reproducible
 
 | Artifact | Reference SHA-256 (prefix) |
 |---|---|
-| `build/kernel.elf` | `8e63088c` |
-| `build/kernel.bin` | `551c8c52` |
-| `build/root.img` | `5f6a6614` |
-| `build/bemu-linux01` | `6e6b4776` |
-| `build/mkimage` | `d474d4fc` |
-| `build/shell.bin` | `9e22e556` |
+| `build/kernel.elf` | `5cb6e6fd` |
+| `build/kernel.bin` | `be754669` |
+| `build/root.img` | `b1b1a197` |
+| `build/root-1991.img` | `7c2df309` |
+| `build/bemu-linux01` | `739269d8` |
+| `build/mkimage` | `f77331fa` |
+| `build/shell.bin` | `9fd7a474` |
 | `build/update.bin` | `4a0212fc` |
-| `build/hello.bin` | `32c7c08f` |
+| `build/hello.bin` | `7596c6b3` |
+| `build/yes.bin` | `32937906` |
+| `build/pathcheck.bin` | `95c7a190` |
+| `build/cat.bin` | `0b555928` |
 
 See `build/REPRODUCIBLE.sha256` after running `make reproducible` for the full
 checksums.
@@ -62,4 +66,5 @@ checksums.
 `build/bemu-linux01` is a host ELF binary. It is deterministic between runs on
 the same host with the same toolchain, but different distributions or linker
 versions may produce different host binary bytes. The kernel (`build/kernel.bin`)
-and root image (`build/root.img`) are fully deterministic.
+and root images (`build/root.img` and `build/root-1991.img`) are fully
+deterministic.

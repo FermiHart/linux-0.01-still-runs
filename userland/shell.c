@@ -1015,6 +1015,22 @@ static void __attribute__((unused)) complete(void) {
 
 static char **shell_envp;
 
+static const char *env_value(const char *name, const char *fallback)
+{
+    char **entry;
+    for (entry = shell_envp; entry && *entry; entry++) {
+        const char *left = *entry;
+        const char *right = name;
+        while (*right && *left == *right) {
+            left++;
+            right++;
+        }
+        if (!*right && *left == '=')
+            return left + 1;
+    }
+    return fallback;
+}
+
 struct shell_command {
     int argc;
     char *argv[MAX_ARGS];
@@ -1027,7 +1043,6 @@ struct shell_command {
 static int search_path(const char *cmd, char *out, int cap)
 {
     const char *path, *next;
-    char **pp;
     struct stat st;
     int len, plen, clen;
 
@@ -1038,15 +1053,7 @@ static int search_path(const char *cmd, char *out, int cap)
         return 0;
     }
 
-    path = "PATH=/bin:.";
-    for (pp = shell_envp; pp && *pp; pp++) {
-        if ((*pp)[0] == 'P' && (*pp)[1] == 'A' && (*pp)[2] == 'T' && (*pp)[3] == 'H' && (*pp)[4] == '=') {
-            path = *pp;
-            break;
-        }
-    }
-
-    path += 5; /* skip "PATH=" */
+    path = env_value("PATH", "/bin:.");
     clen = strlen(cmd);
     while (*path) {
         next = path;
@@ -1653,7 +1660,7 @@ static void builtin_not_found(char *cmd) {
 static void builtin_cd(int argc, char **argv) {
 	const char *dir;
 	char next[MAX_LINE];
-	dir = (argc < 2) ? "/home/fermihart" : shell_path(argv[1]);
+	dir = (argc < 2) ? env_value("HOME", "/home/fermihart") : shell_path(argv[1]);
 	if (normalize_path(next, sizeof(next), cwd, dir) < 0) {
 		puts_c(CY, dir);
 		puts(CR ": name or path too long" C0 "\n");
@@ -2517,10 +2524,12 @@ static void shell_loop(void) {
 int main(int argc, char **argv, char **envp) {
 	int motd_fd, motd_n, r;
 	char motd_buf[1800];
+	const char *experience;
 
 	(void)argc;
 	(void)argv;
 	shell_envp = envp;
+	experience = env_value("EXPERIENCE", "transitional");
 	cwd[0] = '/';
 	cwd[1] = 0;
 	boot_time = time((long *)0);
@@ -2542,7 +2551,9 @@ puts("\n");
 puts(motd_buf);
 }
 	}
-	puts("\033[0m\n linux 0.01 \033[37m\376\033[0m interactive shell\n\n");
+	puts("\033[0m\n linux 0.01 -- experience: ");
+	puts(experience);
+	puts(" -- interactive shell\n\n");
 	load_history();
 
 	shell_loop();

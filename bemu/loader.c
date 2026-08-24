@@ -68,12 +68,14 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
     struct bbp_tag_hypervisor *hypervisor;
     bbp_phys_t command_phys;
     uint32_t command_len;
+    const char *command;
     uint64_t now = monotonic_ns();
 
     memset(info, 0, BBP_L01_HANDOFF_END - BBP_L01_HANDOFF_PHYS);
     bbp_builder_init(&b, arena, BBP_L01_HANDOFF_PHYS + sizeof(*info), capacity);
 
-    command_phys = bbp_arena_strdup(&b, BBP_L01_ROOT_CMDLINE, &command_len);
+    command = m->experience ? BBP_L01_1991_CMDLINE : BBP_L01_ROOT_CMDLINE;
+    command_phys = bbp_arena_strdup(&b, command, &command_len);
 
     hhdm = bbp_alloc_tag(&b, BBP_TAG_HHDM, 1, sizeof(*hhdm));
     if (hhdm)
@@ -111,7 +113,7 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
     if (cmdline) {
         cmdline->string = command_phys;
         cmdline->length = command_len;
-        cmdline->string_crc = bbp_crc64(BBP_L01_ROOT_CMDLINE, command_len);
+        cmdline->string_crc = bbp_crc64(command, command_len);
     }
 
     hypervisor = bbp_alloc_tag(&b, BBP_TAG_HYPERVISOR, 1, sizeof(*hypervisor));
@@ -137,5 +139,5 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
     fprintf(stderr,
             "[bemu-linux01] BBP @ %#lx: %u tags, kernel=%zu bytes, %s\n",
             (unsigned long)BBP_L01_HANDOFF_PHYS, info->tag_count,
-            kernel_size, BBP_L01_ROOT_CMDLINE);
+             kernel_size, command);
 }

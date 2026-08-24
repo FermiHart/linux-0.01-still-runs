@@ -223,6 +223,19 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 - **Test**: Userland C programs build and run.
 - **Status**: QUALIFIED
 
+### Validated experience environment bridge
+
+- **Change**: Read the validated BBP experience selector in `init` and pass
+  `HOME=/` plus `EXPERIENCE=1991` to the shell for the historical profile.
+- **Files**: `init/main.c`
+- **Category**: Experience
+- **Evidence**: A host-only Make or bEMU selector cannot change guest-visible
+  identity without one minimal environment bridge after BBP validation.
+- **Test**: `tests/test_experience.py` rejects mismatched images, boots the
+  profile, verifies its BBP command line and real image files, and checks that
+  bare `cd` returns to `/` rather than the shell's transitional fallback.
+- **Status**: PROVEN
+
 ## Test traceability
 
 | Test | Ledger entries covered |
@@ -230,6 +243,7 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 | `make all` | Syscall wrappers, VGA 50-row setup, include/header adjustments, memory-management compatibility, kernel assembly constraints |
 | `tests/test_boot.py` | CMOS Y2K, serial UART, console duplication, ATA PIO, fs/buffer -O1 workaround, fs/bitmap -O1 workaround, filesystem Minix v1 patches, sys_ioctl volatile, pipe macro |
 | `tests/test_shell.py` | CMOS Y2K, serial UART, console duplication, CP437 glyphs, fs/buffer workaround, filesystem patches, vsprintf %s workaround |
+| `tests/test_experience.py` | Validated experience environment bridge |
 | `tests/test_large_rootfs.py` | fs/buffer workaround, filesystem patches |
 | `make sizes` | VGA 80×50 mode (kernel.elf sections) |
 
@@ -246,7 +260,7 @@ compiler investigation waves.
 | Hardware | 4 | bEMU/KVM devices differ from 1991 PC assumptions |
 | Time | 1 | CMOS century rollover |
 | Usability | 2 | Without these the shell becomes unresponsive or unusable |
-| Experience | 2 | Cosmetic/aesthetic choices that preserve or enhance feel |
+| Experience | 3 | Profile and presentation choices that preserve or enhance feel |
 | HistoricalBug | 0 | Intentional fixes of original Linux 0.01 bugs |
 
 Counts are based on the ledger entries above. Entries marked QUALIFIED or

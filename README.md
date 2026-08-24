@@ -44,7 +44,13 @@ git clone https://github.com/fermihart/linux-0.01-still-runs
 cd linux-0.01-still-runs
 make toolchain   # verify/install missing build tools and KVM access
 make boom        # clean + build + direct bEMU/KVM boot
+make run EXPERIENCE=1991  # explicit historical profile
 ```
+
+The 1991 profile selects `build/root-1991.img`, carries its identity through the
+validated BBP command line, uses `/` as root's home, and boots with a concise
+period-style MOTD. Its fixed historical clock is added separately in Wave 091;
+until then it uses the same RTC source as the transitional default.
 
 Inside the booted system:
 

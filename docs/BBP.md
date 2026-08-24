@@ -175,6 +175,18 @@ Memory types:
 4. Pointers in tags are physical addresses; a higher-half kernel must add the
    HHDM offset before dereferencing.
 
+The Linux 0.01 port accepts two exact command-line contracts during the Wave 089
+transition:
+
+```text
+root=/dev/hd1 ide=977,5,17
+root=/dev/hd1 ide=977,5,17 experience=1991
+```
+
+The second form is converted by `init` into `HOME=/` and `EXPERIENCE=1991` for
+the shell. Unknown profiles invalidate the handoff rather than silently
+selecting a different experience.
+
 ## Authentication limits
 
 CRC-64/XZ is used throughout BBP for data integrity:
@@ -203,4 +215,3 @@ In practice, for `linux-0.01-still-runs` running under bEMU/KVM, the producer
 is the host runner and the consumer is the guest kernel inside the same
 process address space. CRC64 here protects against host memory corruption and
 file-system bit rot, not against a malicious host.
-

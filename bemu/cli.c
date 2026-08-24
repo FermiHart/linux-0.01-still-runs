@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "experience.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -8,7 +9,8 @@ void cli_usage(const char *program)
 {
     fprintf(stderr, "usage: %s [--kernel FILE] [--root FILE] "
             "[--keys TEXT] [--expect TEXT] [--trace] [--trace-file PATH] "
-            "[--trace-syscalls] [--no-timer] [--raw-console] [--max-exits N]\n", program);
+            "[--trace-syscalls] [--no-timer] [--raw-console] [--max-exits N] "
+            "[--experience 1991]\n", program);
 }
 
 static int parse_max_exits(const char *text, long *value)
@@ -35,11 +37,13 @@ static int parse_max_exits(const char *text, long *value)
 int cli_parse_args(int argc, char **argv, struct cli_options *out)
 {
     int i;
+    int root_explicit = 0;
     out->kernel = "build/kernel.bin";
     out->root = "build/root.img";
     out->script = NULL;
     out->expect = NULL;
     out->trace_file = NULL;
+    out->experience = NULL;
     out->max_exits = 50000000;
     out->trace = 0;
     out->no_timer = 0;
@@ -51,10 +55,18 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
             out->kernel = argv[++i];
         } else if (!strcmp(argv[i], "--root") && i + 1 < argc) {
             out->root = argv[++i];
+            root_explicit = 1;
         } else if (!strcmp(argv[i], "--keys") && i + 1 < argc) {
             out->script = argv[++i];
         } else if (!strcmp(argv[i], "--expect") && i + 1 < argc) {
             out->expect = argv[++i];
+        } else if (!strcmp(argv[i], "--experience") && i + 1 < argc) {
+            out->experience = argv[++i];
+            if (strcmp(out->experience, EXPERIENCE_1991)) {
+                fprintf(stderr, "[bemu-linux01] invalid experience: %s\n",
+                        out->experience);
+                return -1;
+            }
         } else if (!strcmp(argv[i], "--max-exits") && i + 1 < argc) {
             if (parse_max_exits(argv[++i], &out->max_exits) < 0) {
                 fprintf(stderr, "[bemu-linux01] invalid --max-exits value: %s\n", argv[i]);
@@ -74,5 +86,7 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
             return -1;
         }
     }
+    if (out->experience && !root_explicit)
+        out->root = "build/root-1991.img";
     return 0;
 }

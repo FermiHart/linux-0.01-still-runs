@@ -6,5 +6,6 @@
 #define BBP_L01_HANDOFF_PHYS 0x000C0000UL
 #define BBP_L01_HANDOFF_END  0x000D0000UL
 #define BBP_L01_ROOT_CMDLINE "root=/dev/hd1 ide=977,5,17"
+#define BBP_L01_1991_CMDLINE "root=/dev/hd1 ide=977,5,17 experience=1991"
 
 #endif
