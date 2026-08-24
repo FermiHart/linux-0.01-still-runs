@@ -88,9 +88,9 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 ## What you get
 
 - **VGA 80×50 text mode** using an 8×8 PC-compatible character set derived from SeaBIOS VGA font data
-- **Colored interactive shell** (`userland/shell.c`) with emacs line editing, tab completion, history, and ANSI colors on `ls`
+- **Colored interactive shell** (`userland/shell.c`) with emacs line editing, tab completion, history, `$PATH`, kernel pipes, and `<`, `>`, `>>` redirection
 - **1991 Unix command suite**: `date`, `cal`, `uptime`, `fortune`, `yes`, `true`, `false`, plus an Easter-egg `linus` that prints the original comp.os.minix announcement
-- **Minix v1 filesystem** built by hand at image time (`tools/mkimage.c`), with `/etc/motd`, `/etc/passwd`, `/bin/{shell,hello,update}`, `/dev/tty0`
+- **Minix v1 filesystem** built by hand at image time (`tools/mkimage.c`), with `/etc/motd`, `/etc/passwd`, `/bin/{shell,hello,update,yes,pathcheck,cat}`, `/dev/tty0`
 - **Firmware-free bEMU boot** — KVM enters `kernel.bin` at physical zero with no BIOS, UEFI, ISO, or bootloader
 - **Real BBP handoff** — bEMU publishes CRC64-checksummed RAM, kernel, root-disk, and machine identity tags at physical `0xC0000`; CRC64 detects corruption but does not authenticate the producer
 - **Real CMOS time** (Y2K rollover patched in `init/main.c` so `date` returns 2026 not 1970)
@@ -121,7 +121,7 @@ make all             # full build (kernel + root.img + bEMU), -Werror clean
 make run             # build + direct KVM boot in the terminal
 make run-headless    # alias for make run; bEMU is terminal-native
 make boom            # clean + build + run — cinematic one-shot demo
-make test            # boot + 53 shell commands + editor + large-rootfs tests
+make test            # boot + full shell, editor, trace, and large-rootfs tests
 make doctor          # toolchain health check
 make sizes           # kernel section sizes
 make hash            # SHA-256 of all artifacts
@@ -144,11 +144,11 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 |---------|--------------|
 | `help` | List built-ins |
 | `clear` | Clear the screen |
-| `echo <text>` | Print text; supports `> file` and `>> file` |
-| `cat <file>` | Read regular files |
+| `echo <text>` | Print text; generic `<`, `>`, and `>>` redirection is handled by the shell |
+| `cat [file]` | Read regular files or standard input |
 | `ls` / `ls -la` | Coloured directory listing (blue dirs, green executables, yellow devices) |
 | `cd <dir>` / `pwd` | Change directory + track cwd |
-| `mkdir` / `rmdir` / `touch` / `rm [-rf]` | Session-local FS ops via the shell's VFS layer |
+| `mkdir` / `rmdir` / `touch` / `rm [-rf]` | Real Minix v1 operations through Linux 0.01 syscalls |
 | `cp` / `mv` / `ln` | Copy, move, hard-link |
 | `head` / `wc` / `grep` | Classic text inspection |
 | `whoami` / `mount` / `df` / `ps aux` | System views over the live task/super-block state |
@@ -162,10 +162,15 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 | **`true`** / **`false`** | Classic exit codes |
 | **`linus`** | Easter egg: full text of the August 1991 comp.os.minix post |
 | `hello` | Built-in banner |
-| `/bin/hello` | Same banner via external `execve` |
+| `/bin/hello`, `/bin/yes`, `/bin/cat` | External programs executed through `$PATH` or an explicit path |
 | `halt` / `reboot` / `exit` | Clean shutdown / reboot / leave shell |
 
 Tab completion: press `Tab` once to complete, twice to list matches in columns. Line editing: emacs bindings (`Ctrl-A/E/K/U/W/Y`, arrow keys for cursor + history).
+
+Pipelines support up to eight simple stages. Each stage is a real child process;
+the shell connects them with Linux 0.01 `pipe(2)` and `dup2(2)`. Quoting,
+globbing, job control, and command substitution are deliberately outside the
+current historical shell surface.
 
 ---
 
@@ -183,8 +188,8 @@ Tab completion: press `Tab` once to complete, twice to list matches in columns. 
 | | |
 |---|---|
 | The supported build/test host is Linux KVM | bEMU requires Linux headers and writable `/dev/kvm`; no fallback backend is claimed |
-| Runtime file creation in the shell is session-local (VFS-only); real on-disk `mkdir`/`creat` is the focus of Waves 026–040 | shell `mkdir/touch/rm` work; they just don't survive a reboot yet |
-| External binary execution is explicit-by-path (`/bin/hello`). No `$PATH` resolution yet | by design — keeps the surface small |
+| Cross-boot persistence remains blocked by incomplete IDE write-completion IRQ delivery in bEMU | in-session Minix v1 operations are real; `sync()` can still block |
+| Shell grammar is intentionally small | no quoting, globbing, job control, command substitution, or modern shell extensions |
 
 ---
 

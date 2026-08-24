@@ -9,8 +9,23 @@
 #include "../../bemu/pic.h"
 #include "../../bemu/pit.h"
 #include "../../bemu/uart.h"
+#include "../../bemu/keyboard.h"
+#include "../../bemu/machine.h"
 
 static int failures = 0;
+static struct machine keyboard_machine;
+
+void fail(const char *what)
+{
+    fprintf(stderr, "FAIL: %s\n", what);
+    failures++;
+}
+
+void irq_pulse(struct machine *m, unsigned irq)
+{
+    (void)m;
+    (void)irq;
+}
 
 static void check(int condition, const char *name)
 {
@@ -84,6 +99,25 @@ static void test_uart_dll_dlm(void)
     check(uart_read(&u, 0x3fd) == 0x60, "uart LSR value");
 }
 
+static void test_keyboard_shell_operators(void)
+{
+    static const unsigned char expected[] = {
+        0xe0, 0x38, 0x56, 0xd6, 0xe0, 0xb8,
+        0x2a, 0x33, 0xb3, 0xaa,
+    };
+    size_t i;
+    int match;
+
+    memset(&keyboard_machine, 0, sizeof(keyboard_machine));
+    keyboard_reset(&keyboard_machine);
+    keyboard_queue_text(&keyboard_machine, "|<");
+    match = keyboard_machine.key_head == sizeof(expected);
+    for (i = 0; i < sizeof(expected) && i < keyboard_machine.key_head; i++)
+        if (keyboard_machine.keys[i] != expected[i])
+            match = 0;
+    check(match, "keyboard queues pipe and input redirect scancodes");
+}
+
 int main(void)
 {
     test_pic_init();
@@ -91,6 +125,7 @@ int main(void)
     test_pic_eoi();
     test_pit_latch();
     test_uart_dll_dlm();
+    test_keyboard_shell_operators();
     if (failures) {
         fprintf(stderr, "\n%d test(s) failed\n", failures);
         return 1;

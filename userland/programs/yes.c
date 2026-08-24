@@ -12,8 +12,7 @@ int main(int argc, char **argv)
     size_t len = strlen(msg);
 
     for (;;) {
-        write(1, msg, len);
-        write(1, "\n", 1);
+        if (write(1, msg, len) != (ssize_t)len || write(1, "\n", 1) != 1)
+            return 1;
     }
-    return 0;
 }

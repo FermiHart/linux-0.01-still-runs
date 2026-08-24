@@ -259,6 +259,7 @@ static inline char *strcat(char *d, const char *s) {
 #define MAX_LINE     256
 #define MAX_HISTORY  100
 #define MAX_ARGS      32
+#define MAX_COMMANDS   8
 #define MAX_MATCHES    64   /* keep complete() stack frame <= 16KB */
 #define NAME_LEN       14
 #define PROMPT_STR   "fermihart@linux01"
@@ -274,6 +275,7 @@ static inline char *strcat(char *d, const char *s) {
 
 /* ── State ─────────────────────────────────────────────────── */
 static char line[MAX_LINE];
+static char parse_line[MAX_LINE * 3];
 static int  cursor;
 static int  linelen;
 
@@ -292,6 +294,7 @@ static int  yank_len;
 
 static struct termio saved_termio;
 static int raw_active;
+static int stdout_terminal = 1;
 
 static char scratch[2048];
 
@@ -339,6 +342,10 @@ static void wr(const char *s, int len) {
 
 static void write_stdout(const char *buf, int len) {
     int i, start = 0;
+    if (!stdout_terminal) {
+        write_all(1, buf, len);
+        return;
+    }
     for (i = 0; i < len; i++) {
         if (buf[i] == '\n') {
             if (i > start)
@@ -356,7 +363,7 @@ static void puts(const char *s) {
 }
 
 static void putc(char c) {
-    if (c == '\n')
+    if (c == '\n' && stdout_terminal)
         write_all(1, "\r\n", 2);
     else
         write_all(1, &c, 1);
@@ -999,6 +1006,14 @@ static void __attribute__((unused)) complete(void) {
 
 static char **shell_envp;
 
+struct shell_command {
+    int argc;
+    char *argv[MAX_ARGS];
+    char *input;
+    char *output;
+    int append;
+};
+
 /* ── Resolve executable along a colon-separated PATH ───────── */
 static int search_path(const char *cmd, char *out, int cap)
 {
@@ -1065,89 +1080,303 @@ static int has_slash(const char *s) {
     return 0;
 }
 
+static int resolve_external(char **argv, char *resolved, int cap)
+{
+    const char *path;
+
+    if (has_slash(argv[0])) {
+        path = shell_path(argv[0]);
+        if (strlen(path) >= (size_t)cap)
+            return -1;
+        strcpy(resolved, path);
+        return 0;
+    }
+    return search_path(argv[0], resolved, cap);
+}
+
+static void exec_external_child(char **argv)
+{
+    char resolved[MAX_LINE];
+
+    if (resolve_external(argv, resolved, sizeof(resolved)) < 0) {
+        builtin_not_found(argv[0]);
+        _exit(127);
+    }
+    argv[0] = resolved;
+    _execve(resolved, argv, shell_envp);
+    puts(CR "exec failed: " C0); puts_c(CY, resolved); putc('\n');
+    _exit(127);
+}
+
 static int run_external(int argc, char **argv) {
     int pid, status;
     char resolved[MAX_LINE];
-    const char *path;
     (void)argc;
-    if (has_slash(argv[0])) {
-        path = shell_path(argv[0]);
-    } else {
-        if (search_path(argv[0], resolved, sizeof(resolved)) < 0)
-            return 0;
-        path = resolved;
-    }
+    if (resolve_external(argv, resolved, sizeof(resolved)) < 0)
+        return 0;
     pid = _fork();
     if (pid < 0) {
         puts(CR "fork failed" C0 "\n");
         return 1;
     }
     if (pid == 0) {
-        argv[0] = (char *)path;
-        _execve(path, argv, shell_envp);
-        puts(CR "exec failed: " C0); puts_c(CY, path); putc('\n');
-        _exit(127);
+        exec_external_child(argv);
     }
     while (wait(&status) != pid)
         ;
     return 1;
 }
 
+static int normalize_operators(const char *src)
+{
+    int i = 0, out = 0;
+    char c;
+
+    while ((c = src[i++]) != 0) {
+        if (c == '|' || c == '<' || c == '>') {
+            if (out && parse_line[out - 1] != ' ')
+                parse_line[out++] = ' ';
+            parse_line[out++] = c;
+            if (c == '>' && src[i] == '>') {
+                parse_line[out++] = '>';
+                i++;
+            }
+            parse_line[out++] = ' ';
+        } else {
+            parse_line[out++] = c;
+        }
+        if (out >= (int)sizeof(parse_line) - 2)
+            return -1;
+    }
+    parse_line[out] = 0;
+    return 0;
+}
+
+static int is_operator(const char *s)
+{
+    return strcmp(s, "|") == 0 || strcmp(s, "<") == 0 ||
+           strcmp(s, ">") == 0 || strcmp(s, ">>") == 0;
+}
+
+static int parse_commands(struct shell_command *commands)
+{
+    char *tokens[MAX_ARGS * 2];
+    char *p;
+    int ntokens = 0, ncommands = 1, i, j;
+
+    for (i = 0; i < MAX_COMMANDS; i++) {
+        commands[i].argc = 0;
+        commands[i].input = 0;
+        commands[i].output = 0;
+        commands[i].append = 0;
+        for (j = 0; j < MAX_ARGS; j++)
+            commands[i].argv[j] = 0;
+    }
+
+    if (normalize_operators(line) < 0)
+        return -1;
+    p = parse_line;
+    while (*p) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (!*p) break;
+        if (ntokens >= (int)(sizeof(tokens) / sizeof(tokens[0])))
+            return -1;
+        tokens[ntokens++] = p;
+        while (*p && *p != ' ' && *p != '\t') p++;
+        if (*p) *p++ = 0;
+    }
+    if (!ntokens)
+        return 0;
+
+    for (i = 0; i < ntokens; i++) {
+        struct shell_command *cmd = &commands[ncommands - 1];
+        if (strcmp(tokens[i], "|") == 0) {
+            if (!cmd->argc || ncommands >= MAX_COMMANDS)
+                return -1;
+            cmd->argv[cmd->argc] = 0;
+            ncommands++;
+        } else if (strcmp(tokens[i], "<") == 0 ||
+                   strcmp(tokens[i], ">") == 0 ||
+                   strcmp(tokens[i], ">>") == 0) {
+            char *op = tokens[i];
+            if (++i >= ntokens || is_operator(tokens[i]))
+                return -1;
+            if (op[0] == '<') {
+                if (cmd->input) return -1;
+                cmd->input = tokens[i];
+            } else {
+                if (cmd->output) return -1;
+                cmd->output = tokens[i];
+                cmd->append = (op[1] == '>');
+            }
+        } else {
+            if (cmd->argc >= MAX_ARGS - 1)
+                return -1;
+            cmd->argv[cmd->argc++] = tokens[i];
+        }
+    }
+
+    if (!commands[ncommands - 1].argc)
+        return -1;
+    commands[ncommands - 1].argv[commands[ncommands - 1].argc] = 0;
+    return ncommands;
+}
+
+static int apply_redirections(struct shell_command *cmd)
+{
+    int fd;
+
+    if (cmd->input) {
+        fd = shell_open_read(cmd->input);
+        if (fd < 0) {
+            puts(CR "cannot open " C0); puts_c(CY, shell_path(cmd->input)); putc('\n');
+            return -1;
+        }
+        if (fd != 0) {
+            if (dup2(fd, 0) < 0) {
+                close(fd);
+                return -1;
+            }
+            close(fd);
+        }
+    }
+    if (cmd->output) {
+        fd = shell_open_write(cmd->output, cmd->append);
+        if (fd < 0) {
+            puts(CR "cannot open " C0); puts_c(CY, shell_path(cmd->output)); putc('\n');
+            return -1;
+        }
+        if (fd != 1) {
+            if (dup2(fd, 1) < 0) {
+                close(fd);
+                return -1;
+            }
+            close(fd);
+        }
+        stdout_terminal = 0;
+    }
+    return 0;
+}
+
+static void execute_children(struct shell_command *commands, int ncommands)
+{
+    int previous = -1, fds[2], pid, children = 0;
+    int i, status;
+
+    for (i = 0; i < ncommands; i++) {
+        fds[0] = fds[1] = -1;
+        if (i + 1 < ncommands && pipe(fds) < 0) {
+            puts(CR "pipe failed" C0 "\n");
+            break;
+        }
+        pid = _fork();
+        if (pid < 0) {
+            puts(CR "fork failed" C0 "\n");
+            if (fds[0] >= 0) close(fds[0]);
+            if (fds[1] >= 0) close(fds[1]);
+            break;
+        }
+        if (pid == 0) {
+            if (previous >= 0 && previous != 0 && dup2(previous, 0) < 0)
+                _exit(1);
+            if (fds[1] >= 0) {
+                if (fds[1] != 1 && dup2(fds[1], 1) < 0)
+                    _exit(1);
+                stdout_terminal = 0;
+            }
+            if (previous >= 0) close(previous);
+            if (fds[0] >= 0) close(fds[0]);
+            if (fds[1] >= 0) close(fds[1]);
+            if (apply_redirections(&commands[i]) < 0)
+                _exit(1);
+            if (strcmp(commands[i].argv[0], "exit") == 0)
+                _exit(0);
+            if (run_builtin(commands[i].argc, commands[i].argv))
+                _exit(0);
+            exec_external_child(commands[i].argv);
+        }
+        children++;
+        if (previous >= 0) close(previous);
+        if (fds[1] >= 0) close(fds[1]);
+        previous = fds[0];
+    }
+    if (previous >= 0) close(previous);
+    while (children-- > 0)
+        wait(&status);
+}
+
+static void remember_command(const char *cmd)
+{
+    strcpy(line, cmd);
+    linelen = strlen(line);
+    cursor = linelen;
+    history_add();
+}
+
+static int is_stateful_builtin(const char *name)
+{
+    return strcmp(name, "cd") == 0 || strcmp(name, "exit") == 0;
+}
+
+static void execute_stateful_builtin(struct shell_command *cmd)
+{
+    int saved_input = -1, saved_output = -1;
+    int was_terminal = stdout_terminal;
+
+    if (cmd->input)
+        saved_input = dup(0);
+    if (cmd->output)
+        saved_output = dup(1);
+    if ((cmd->input && saved_input < 0) ||
+        (cmd->output && saved_output < 0)) {
+        puts(CR "dup failed" C0 "\n");
+    } else if (apply_redirections(cmd) == 0) {
+        run_builtin(cmd->argc, cmd->argv);
+    }
+    if (saved_input >= 0) {
+        dup2(saved_input, 0);
+        close(saved_input);
+    }
+    if (saved_output >= 0) {
+        dup2(saved_output, 1);
+        close(saved_output);
+    }
+    stdout_terminal = was_terminal;
+}
+
 static void execute(void) {
-    char *argv[MAX_ARGS];
-    int argc = 0;
-    int i, j;
-	char cmd[MAX_LINE];
+    struct shell_command commands[MAX_COMMANDS];
+    char cmd[MAX_LINE];
+    int ncommands;
 
-	line[linelen] = 0;
-
-	/* Parse line into argv */
-    i = 0;
-    while (i < linelen && argc < MAX_ARGS - 1) {
-        while (i < linelen && line[i] == ' ') i++;
-        if (i >= linelen) break;
-        argv[argc] = line + i;
-        argc++;
-        while (i < linelen && line[i] != ' ' && line[i] != ';' && line[i] != '|') i++;
-        if (i < linelen && (line[i] == ' ' || line[i] == ';' || line[i] == '|')) {
-            line[i] = 0;
-            i++;
-        }
+    line[linelen] = 0;
+    strcpy(cmd, line);
+    ncommands = parse_commands(commands);
+    if (ncommands == 0)
+        return;
+    if (ncommands < 0) {
+        puts(CR "syntax error" C0 "\n");
+        return;
     }
-    argv[argc] = 0;
 
-    if (argc == 0) return;
-
-    /* Save command for history */
-    strcpy(cmd, argv[0]);
-    if (argc > 1) {
-        for (j = 1; j < argc; j++) {
-            int k = strlen(cmd);
-            cmd[k] = ' ';
-            strcpy(cmd + k + 1, argv[j]);
-        }
+    if (ncommands == 1 &&
+        (commands[0].input || commands[0].output) &&
+        is_stateful_builtin(commands[0].argv[0])) {
+        execute_stateful_builtin(&commands[0]);
+        remember_command(cmd);
+        return;
     }
-	/* Try built-in */
-	if (run_builtin(argc, argv)) {
-		strcpy(line, cmd);
-		linelen = strlen(line);
-		cursor = linelen;
-		history_add();
-		return;
-	}
-	if (run_external(argc, argv)) {
-		strcpy(line, cmd);
-		linelen = strlen(line);
-		cursor = linelen;
-		history_add();
-		return;
-	}
-
-	builtin_not_found(argv[0]);
-	strcpy(line, cmd);
-	linelen = strlen(line);
-	cursor = linelen;
-	history_add();
+    if (ncommands == 1 && !commands[0].input && !commands[0].output) {
+        if (run_builtin(commands[0].argc, commands[0].argv) ||
+            run_external(commands[0].argc, commands[0].argv)) {
+            remember_command(cmd);
+            return;
+        }
+        builtin_not_found(commands[0].argv[0]);
+    } else {
+        execute_children(commands, ncommands);
+    }
+    remember_command(cmd);
 }
 
 static int read_line_raw(void) {
@@ -1599,7 +1828,8 @@ static void builtin_cat(int argc, char **argv) {
 	char buf[512];
 	int i, fd, n;
 	if (argc < 2) {
-		puts(CR "cat: missing file" C0 "\n");
+		while ((n = read(0, buf, sizeof(buf))) > 0)
+			write_stdout(buf, n);
 		return;
 	}
 	for (i = 1; i < argc; i++) {
@@ -1794,12 +2024,9 @@ static void builtin_ln(int argc, char **argv) {
 
 static void builtin_head(int argc, char **argv) {
 	char buf[256];
-	int fd, n, i, lines = 0;
-	if (argc < 2) {
-		puts(CR "head: missing file" C0 "\n");
-		return;
-	}
-	fd = shell_open_read(argv[1]);
+	int fd = 0, n, i, lines = 0;
+	if (argc >= 2)
+		fd = shell_open_read(argv[1]);
 	if (fd < 0) {
 		puts(CR "head: cannot open " C0); puts_c(CY, shell_path(argv[1])); putc('\n');
 		return;
@@ -1813,18 +2040,15 @@ static void builtin_head(int argc, char **argv) {
 		}
 		write_stdout(buf, i);
 	}
-	close(fd);
+	if (fd != 0) close(fd);
 }
 
 static void builtin_wc(int argc, char **argv) {
 	char buf[256];
-	int fd, n, i, in_word = 0;
+	int fd = 0, n, i, in_word = 0;
 	long lines = 0, words = 0, bytes = 0;
-	if (argc < 2) {
-		puts(CR "wc: missing file" C0 "\n");
-		return;
-	}
-	fd = shell_open_read(argv[1]);
+	if (argc >= 2)
+		fd = shell_open_read(argv[1]);
 	if (fd < 0) {
 		puts(CR "wc: cannot open " C0); puts_c(CY, shell_path(argv[1])); putc('\n');
 		return;
@@ -1841,8 +2065,10 @@ static void builtin_wc(int argc, char **argv) {
 			}
 		}
 	}
-	close(fd);
-	puts(itoa(lines)); putc(' '); puts(itoa(words)); putc(' '); puts(itoa(bytes)); putc(' '); puts_c(CY, shell_path(argv[1])); putc('\n');
+	if (fd != 0) close(fd);
+	puts(itoa(lines)); putc(' '); puts(itoa(words)); putc(' '); puts(itoa(bytes));
+	if (argc >= 2) { putc(' '); puts_c(CY, shell_path(argv[1])); }
+	putc('\n');
 }
 
 static int contains(const char *linebuf, const char *needle) {
@@ -1858,12 +2084,13 @@ static int contains(const char *linebuf, const char *needle) {
 
 static void builtin_grep(int argc, char **argv) {
 	char buf[256], linebuf[MAX_LINE];
-	int fd, n, i, len = 0;
-	if (argc != 3) {
-		puts(CR "grep: usage: grep TEXT FILE" C0 "\n");
+	int fd = 0, n, i, len = 0;
+	if (argc != 2 && argc != 3) {
+		puts(CR "grep: usage: grep TEXT [FILE]" C0 "\n");
 		return;
 	}
-	fd = shell_open_read(argv[2]);
+	if (argc == 3)
+		fd = shell_open_read(argv[2]);
 	if (fd < 0) {
 		puts(CR "grep: cannot open " C0); puts_c(CY, shell_path(argv[2])); putc('\n');
 		return;
@@ -1889,7 +2116,7 @@ static void builtin_grep(int argc, char **argv) {
 			putc('\n');
 		}
 	}
-	close(fd);
+	if (fd != 0) close(fd);
 }
 
 static void builtin_whoami(void) {

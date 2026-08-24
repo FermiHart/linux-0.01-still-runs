@@ -37,6 +37,7 @@ static int ascii_key(unsigned char ch, uint8_t *code, int *shift)
     case '+': *code=0x0d; *shift=1; return 0;
     case ';': *code=0x27; return 0;
     case ':': *code=0x27; *shift=1; return 0;
+    case '<': *code=0x33; *shift=1; return 0;
     case '>': *code=0x34; *shift=1; return 0;
     default: return -1;
     }
@@ -60,6 +61,14 @@ static void queue_character(struct machine *m, unsigned char ch)
     } else if (ch == '\t') {
         key_push(m, 0x0f);
         key_push(m, 0x8f);
+    } else if (ch == '|') {
+        /* Linux 0.01's Finnish keymap uses AltGr + the ISO < key. */
+        key_push(m, 0xe0);
+        key_push(m, 0x38);
+        key_push(m, 0x56);
+        key_push(m, 0xd6);
+        key_push(m, 0xe0);
+        key_push(m, 0xb8);
     } else if (!ascii_key(ch, &code, &shift)) {
         if (shift) key_push(m, 0x2a);
         key_push(m, code);

@@ -17,7 +17,7 @@
 #define VGA_GPA        0xB8000ULL
 #define KERNEL_MAX     (512U << 10)
 #define SERIAL_LOG_MAX (1U << 20)
-#define KEY_QUEUE_MAX  8192
+#define KEY_QUEUE_MAX  16384
 
 enum console_state {
     CONSOLE_TEXT,

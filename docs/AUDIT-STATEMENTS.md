@@ -150,17 +150,34 @@ producer.
 **Evidence**: `make -j8 ci` green on the reference host; GitHub Actions
 workflow.
 
-### "Session-local filesystem"
+### "Real filesystem operations"
 
-**Source**: README.md "Known limitations".
+**Source**: README.md and `EXPERIENCE.md`.
 
-**Audit**: currently true. The shell implements some filesystem operations in
-its own VFS layer rather than writing through to the Minix v1 disk. The project
-has identified real persistent filesystem as the highest-priority next step.
+**Audit**: the shell no longer maintains a private VFS. File creation, reads,
+writes, links, renames and directories use Linux 0.01 syscalls against the
+mounted Minix v1 image. Cross-boot durability is still limited because bEMU does
+not yet complete the IDE interrupt path required by `sync()`.
 
-**Status**: PROVEN / PLANNED.
+**Status**: CORRECTED / QUALIFIED.
 
-**Correction**: limitation retained but cross-referenced to Waves 026–040.
+**Evidence**: `tests/test_shell.py` and the filesystem tests exercise the real
+kernel paths; `docs/FS-LIMITATIONS.md` records the remaining reboot limitation.
+
+### "Pipes and redirection are handled by the kernel"
+
+**Source**: `EXPERIENCE.md`.
+
+**Audit**: the shell parses simple pipelines and `<`, `>`, `>>`, then creates
+child processes with `fork`, connects stages with Linux 0.01 `pipe(2)` and
+`dup2(2)`, and opens redirected files through the real Minix v1 VFS.
+
+**Status**: PROVEN.
+
+**Evidence**: `tests/test_shell.py` covers external-to-external pipelines,
+builtin pipelines, input/output/append redirection, pipeline output to a file,
+byte counts, and malformed syntax. `tests/bemu/test_bemu_devices.c` validates
+the Finnish-keymap scancode sequence used to inject `|` and `<`.
 
 ### bEMU provenance
 

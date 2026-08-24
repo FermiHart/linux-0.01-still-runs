@@ -41,7 +41,7 @@ MAKE_COMMAND := $(MAKE)
 export BUILD MAKE_COMMAND
 
 ARTIFACT_NAMES := kernel.elf kernel.bin root.img bemu-linux01 mkimage \
-                  shell.bin update.bin hello.bin yes.bin pathcheck.bin
+                  shell.bin update.bin hello.bin yes.bin pathcheck.bin cat.bin
 ARTIFACTS = $(addprefix $(BUILD)/,$(ARTIFACT_NAMES))
 
 # ──────────────────────────────────────────────── toolchain ─────────────────
@@ -355,6 +355,16 @@ $(BUILD)/pathcheck.bin: userland/programs/pathcheck.c $(BUILD)/crt0.o | dirs
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "pathcheck.bin" "$$(stat -f%z $(BUILD)/pathcheck.bin 2>/dev/null || stat -c%s $(BUILD)/pathcheck.bin)"
 
+$(BUILD)/cat.bin: userland/programs/cat.c $(BUILD)/crt0.o | dirs
+	$(call STEP,compiling userland/programs/cat.c (classic cat))
+	@$(CC) $(filter-out -O2,$(CFLAGS)) -Os -Iuserland \
+	  -MMD -MP -MF "$(BUILD)/cat.d" -MT "$@" \
+	  -c userland/programs/cat.c -o "$(BUILD)/cat.o"
+	@$(LD) $(LDFLAGS) -Ttext 0 -e _entry "$(BUILD)/crt0.o" "$(BUILD)/cat.o" -o "$(BUILD)/cat.elf"
+	@$(OBJCOPY) -O binary "$(BUILD)/cat.elf" "$(BUILD)/cat.bin"
+	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
+	  "cat.bin" "$$(stat -f%z $(BUILD)/cat.bin 2>/dev/null || stat -c%s $(BUILD)/cat.bin)"
+
 # ── Host tools ────────────────────────────────────────────────────
 
 $(BUILD)/mkimage: tools/mkimage.c | dirs
@@ -373,7 +383,7 @@ $(BUILD)/bbp-tool: tools/bbp-tool.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_cr
 	  -o "$@" "$<" $(HOSTLDFLAGS)
 
 # Collect all userland binaries (ASM + C)
-USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin $(BUILD)/yes.bin $(BUILD)/pathcheck.bin
+USERLAND_BINS := $(BUILD)/shell.bin $(BUILD)/update.bin $(BUILD)/hello.bin $(BUILD)/yes.bin $(BUILD)/pathcheck.bin $(BUILD)/cat.bin
 
 $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	$(call STAGE,7/10,forging Minix v1 root filesystem)
@@ -384,7 +394,8 @@ $(BUILD)/root.img: $(BUILD)/mkimage $(USERLAND_BINS)
 	@cp "$(BUILD)/hello.bin" "$(BUILD)/rootfs/bin/hello"
 	@cp "$(BUILD)/yes.bin" "$(BUILD)/rootfs/bin/yes"
 	@cp "$(BUILD)/pathcheck.bin" "$(BUILD)/rootfs/bin/pathcheck"
-	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" "$(BUILD)/pathcheck.bin" 2>&1 | sed 's/^/    /'
+	@cp "$(BUILD)/cat.bin" "$(BUILD)/rootfs/bin/cat"
+	@"$(BUILD)/mkimage" "$@" "$(BUILD)/shell.bin" "$(BUILD)/update.bin" "$(BUILD)/hello.bin" "$(BUILD)/yes.bin" "$(BUILD)/pathcheck.bin" "$(BUILD)/cat.bin" 2>&1 | sed 's/^/    /'
 	$(call OK,root.img forged)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -759,10 +770,10 @@ fuzz: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STAGE,9/10,running bEMU fault injection fuzz)
 	@bash "$(REPO_ROOT)/scripts/fuzz-bemu.sh"
 
-$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/pic.h bemu/pit.h bemu/uart.h | dirs
+$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/pic.h bemu/pit.h bemu/uart.h bemu/keyboard.h bemu/machine.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bemu_devices.c \
-	  bemu/pic.c bemu/pit.c bemu/uart.c
+	  bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c
 
 $(BUILD)/test-bbp-invalid: tests/bemu/test_bbp_invalid.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
