@@ -104,18 +104,35 @@ void console_reset(struct machine *m)
     m->console_seq_len = 0;
     m->console_csi_valid = 0;
     m->ansi_state = 0;
+    m->console_line_redraw = 0;
+    m->console_redraw_state = 0;
 }
 
 void console_output(struct machine *m, uint8_t value)
 {
-    static const char prompt_prefix[] = "fermihart@linux01:";
-    size_t line_start;
+    static const char prompt_prefix[] = "root@linux01:";
+    size_t line_start, line_len;
     int plain_appended = 0;
     if (m->serial_len + 1 < SERIAL_LOG_MAX) {
         m->serial_log[m->serial_len++] = (char)value;
         m->serial_log[m->serial_len] = 0;
     }
     console_byte(m, value);
+    if (value == '\n') {
+        m->console_line_redraw = 0;
+        m->console_redraw_state = 0;
+    } else if (m->console_redraw_state == 0) {
+        if (value == 0x1b)
+            m->console_redraw_state = 1;
+    } else if (m->console_redraw_state == 1) {
+        m->console_redraw_state = value == '[' ? 2 : 0;
+    } else if (m->console_redraw_state == 2) {
+        m->console_redraw_state = value == '2' ? 3 : 0;
+    } else {
+        if (value == 'K')
+            m->console_line_redraw = 1;
+        m->console_redraw_state = 0;
+    }
     if (!m->ansi_state && value == 0x1b)
         m->ansi_state = 1;
     else if (m->ansi_state == 1)
@@ -134,10 +151,14 @@ void console_output(struct machine *m, uint8_t value)
     while (line_start && m->plain_log[line_start - 1] != '\r' &&
            m->plain_log[line_start - 1] != '\n')
         line_start--;
-    if (plain_appended && value == '$' &&
-        m->plain_len - line_start >= sizeof(prompt_prefix) - 1 &&
+    line_len = m->plain_len - line_start;
+    if (plain_appended && value == ' ' &&
+        !m->console_line_redraw &&
+        line_len >= sizeof(prompt_prefix) + 2 &&
         !memcmp(m->plain_log + line_start, prompt_prefix,
-                sizeof(prompt_prefix) - 1)) {
+                sizeof(prompt_prefix) - 1) &&
+        m->plain_log[line_start + sizeof(prompt_prefix) - 1] == '/' &&
+        m->plain_log[m->plain_len - 2] == '#') {
         m->prompt_count++;
         if (m->script_queued && m->script_prompts_pending)
             m->script_prompts_pending--;

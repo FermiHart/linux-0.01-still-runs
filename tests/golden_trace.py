@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -46,9 +47,11 @@ def main():
             print(diagnostic(exc.stdout, 4000))
         return 1
 
+    # Prompt padding is terminal presentation, not semantic trace data.
+    output = re.sub(r"[ \t]+(?=\r?$)", "", result.stdout, flags=re.MULTILINE)
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     with open(args.output, "w", encoding="utf-8", errors="replace") as f:
-        f.write(result.stdout)
+        f.write(output)
     print(f"golden trace written to {args.output}")
     return 0
 

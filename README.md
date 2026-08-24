@@ -21,13 +21,13 @@ Hardware-virtualized and firmware-free. Not behind glass. Running.
 
 There is a specific feeling that comes from booting an operating system written three and a half decades ago. It is not nostalgia — nostalgia implies distance, the safe view from behind glass. This is something else. This is the moment when the machine you built in 2026 loads a kernel whose ideas were typed out in a Helsinki bedroom, on a 386 with 33 megahertz and four megabytes of RAM, and *it works*.
 
-Not works in the sense of a museum exhibit under rope and velvet. Works in the sense that you can type a command, create a directory, write a file, read it back, and feel the same feedback loop that Linus felt when he posted to comp.os.minix on that October morning:
+Not works in the sense of a museum exhibit under rope and velvet. Works in the sense that you can type a command, create a directory, write a file, read it back, and feel the same feedback loop that Linus described in his 25 August 1991 comp.os.minix post:
 
 > I'm doing a (free) operating system (just a hobby, won't be big and professional).
 
 He was wrong about the scale. But he was right about the spirit.
 
-This project exists to keep that spirit running. **Not frozen. Not emulated behind a glass pane. Running.** The historical Linux 0.01 core — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a firmware-free KVM runner, a toolchain that speaks 2026 C while respecting 1991 conventions, and just enough documented runtime patches to make the thing boot without panicking on its own assumptions.
+This project exists to keep that spirit running. **Not frozen behind a glass pane. Running.** The historical Linux 0.01 core — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a firmware-free KVM runner with emulated legacy devices, a toolchain that speaks 2026 C while respecting 1991 conventions, and documented runtime patches that make the thing boot without hiding its changed assumptions.
 
 **Welcome to 1991. It still runs in 2026.**
 
@@ -49,13 +49,13 @@ make boom        # clean + build + direct bEMU/KVM boot
 Inside the booted system:
 
 ```sh
-fermihart@linux01:/$ date              # Y2K-aware: shows real 2026
-fermihart@linux01:/$ cal               # current month, today highlighted
-fermihart@linux01:/$ fortune           # 15 quotes: Linus, Ritchie, Knuth...
-fermihart@linux01:/$ linus             # the famous Aug 1991 comp.os.minix post
-fermihart@linux01:/$ uptime            # seconds since CMOS boot
-fermihart@linux01:/$ ps aux            # live task table from Linus' scheduler
-fermihart@linux01:/$ cat /etc/motd     # the letter above, on the VGA console
+root@linux01:/# date              # Y2K-aware date from the RTC
+root@linux01:/# cal               # current month, today highlighted
+root@linux01:/# fortune           # Unix quotations
+root@linux01:/# linus             # the 25 Aug 1991 comp.os.minix post
+root@linux01:/# uptime            # seconds since the shell started
+root@linux01:/# ps aux            # bounded snapshot of scheduler tasks
+root@linux01:/# cat /etc/motd     # the letter above, on the VGA console
 ```
 
 ---
@@ -78,7 +78,7 @@ fermihart@linux01:/$ cat /etc/motd     # the letter above, on the VGA console
 
 | Layer | Purpose | Status |
 |-------|---------|--------|
-| **Historical core** — `init/`, `kernel/`, `mm/`, `fs/`, `lib/`, `include/` | Original Linux 0.01 source from October 1991, patched only where modern hardware or modern GCC demand it | Recognizable line-for-line against the [kernel.org tarball](https://www.kernel.org/pub/linux/kernel/Historic/linux-0.01.tar.gz) |
+| **Historical core** — `init/`, `kernel/`, `mm/`, `fs/`, `lib/`, `include/` | Linux 0.01 source released in September 1991, with documented compatibility and artifact patches | Recognizable line-for-line against the [kernel.org tarball](https://www.kernel.org/pub/linux/kernel/Historic/linux-0.01.tar.gz) |
 | **Modern port** — `bemu/`, `bbp/`, `boot/`, `tools/`, `userland/`, `tests/`, `Makefile` | Direct KVM entry, BBP handoff, root-image generation, interactive shell, VGA 80×50 mode-set, bEMU smoke tests | New, minimal, written to feel period-correct where it touches the kernel |
 
 This is therefore best described as **Linux 0.01 that runs today**, not a byte-for-byte preservation tree. For archaeology, compare against the official tarball. For experimentation, boot this repo.
@@ -89,7 +89,7 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 
 - **VGA 80×50 text mode** using an 8×8 PC-compatible character set derived from SeaBIOS VGA font data
 - **Colored interactive shell** (`userland/shell.c`) with emacs line editing, tab completion, history, `$PATH`, kernel pipes, and `<`, `>`, `>>` redirection
-- **1991 Unix command suite**: `date`, `cal`, `uptime`, `fortune`, `yes`, `true`, `false`, plus an Easter-egg `linus` that prints the original comp.os.minix announcement
+- **Small Unix-style command suite**: `date`, `cal`, `uptime`, `fortune`, `yes`, `true`, `false`, plus a documentary `linus` command that prints the original comp.os.minix announcement
 - **Minix v1 filesystem** built by hand at image time (`tools/mkimage.c`), with `/etc/motd`, `/etc/passwd`, `/bin/{shell,hello,update,yes,pathcheck,cat}`, `/dev/tty0`
 - **Firmware-free bEMU boot** — KVM enters `kernel.bin` at physical zero with no BIOS, UEFI, ISO, or bootloader
 - **Real BBP handoff** — bEMU publishes CRC64-checksummed RAM, kernel, root-disk, and machine identity tags at physical `0xC0000`; CRC64 detects corruption but does not authenticate the producer
@@ -148,22 +148,22 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 | `cat [file]` | Read regular files or standard input |
 | `ls` / `ls -la` | Coloured directory listing (blue dirs, green executables, yellow devices) |
 | `cd <dir>` / `pwd` | Change directory + track cwd |
-| `mkdir` / `rmdir` / `touch` / `rm [-rf]` | Real Minix v1 operations through Linux 0.01 syscalls |
+| `mkdir` / `rmdir` / `touch` / `rm` | Real Minix v1 operations through Linux 0.01 syscalls; `rm` is not recursive |
 | `cp` / `mv` / `ln` | Copy, move, hard-link |
 | `head` / `wc` / `grep` | Classic text inspection |
-| `whoami` / `mount` / `df` / `ps aux` | System views over the live task/super-block state |
-| `history` | Persistent across sessions in `/.sh_history` |
+| `whoami` / `mount` / `df` / `ps aux` | Identity, configured root mount, live filesystem counters, and up to 16 task slots |
+| `history` | Up to 100 entries; saved to `/.sh_history` on an orderly halt/reboot |
 | `uname` / `uname -a` | Linux 0.01 `uname` syscall |
 | **`date`** | Current date/time from CMOS RTC |
 | **`cal`** | Month calendar, today highlighted |
-| **`uptime`** | Seconds since boot, classic BSD load-average line |
+| **`uptime`** | Seconds since the shell started; no invented load average |
 | **`fortune`** | Random Unix wisdom (Linus, Ritchie, Thompson, Knuth, Dijkstra…) |
 | **`yes [text]`** | Print `y` (or arg) 50× — terminating courtesy |
-| **`true`** / **`false`** | Classic exit codes |
+| **`true`** / **`false`** | No-output compatibility commands; this shell has no `$?` expansion |
 | **`linus`** | Easter egg: full text of the August 1991 comp.os.minix post |
 | `hello` | Built-in banner |
 | `/bin/hello`, `/bin/yes`, `/bin/cat` | External programs executed through `$PATH` or an explicit path |
-| `halt` / `reboot` / `exit` | Clean shutdown / reboot / leave shell |
+| `halt` / `reboot` / `exit` | Issue guest halt/reset requests after sync; host termination/restart is not implemented yet |
 
 Tab completion: press `Tab` once to complete, twice to list matches in columns. Line editing: emacs bindings (`Ctrl-A/E/K/U/W/Y`, arrow keys for cursor + history).
 
@@ -171,6 +171,11 @@ Pipelines support up to eight simple stages. Each stage is a real child process;
 the shell connects them with Linux 0.01 `pipe(2)` and `dup2(2)`. Quoting,
 globbing, job control, and command substitution are deliberately outside the
 current historical shell surface.
+
+The shell accepts at most 255 input bytes, 30 arguments per stage, 64 tokens
+per line, eight pipeline stages, and 64 completion matches. Minix v1 limits
+each path component to 14 bytes. These implementation limits are reported
+explicitly rather than being presented as syntax errors.
 
 ---
 
@@ -190,6 +195,7 @@ current historical shell surface.
 | The supported build/test host is Linux KVM | bEMU requires Linux headers and writable `/dev/kvm`; no fallback backend is claimed |
 | Cross-boot persistence remains blocked by incomplete IDE write-completion IRQ delivery in bEMU | in-session Minix v1 operations are real; `sync()` can still block |
 | Shell grammar is intentionally small | no quoting, globbing, job control, command substitution, or modern shell extensions |
+| System views are bounded | `mount` reports the configured root, `ps` exposes at most 16 task slots, and `uptime` starts with the shell because Linux 0.01 has no modern procfs/load-average interface |
 
 ---
 

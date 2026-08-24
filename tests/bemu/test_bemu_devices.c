@@ -3,13 +3,16 @@
  * These tests exercise PIC, PIT and UART state machines without KVM.
  */
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../../bemu/pic.h"
 #include "../../bemu/pit.h"
 #include "../../bemu/uart.h"
 #include "../../bemu/keyboard.h"
+#include "../../bemu/console.h"
 #include "../../bemu/machine.h"
 
 static int failures = 0;
@@ -118,6 +121,48 @@ static void test_keyboard_shell_operators(void)
     check(match, "keyboard queues pipe and input redirect scancodes");
 }
 
+static void feed_console(struct machine *m, const char *text)
+{
+    while (*text)
+        console_output(m, (unsigned char)*text++);
+}
+
+static void test_console_prompt_contract(void)
+{
+    struct machine m;
+    int saved_stdout, null_fd;
+    int recognized = 1, ignored_redraw = 1, rejected_malformed = 1;
+    int sanitize;
+
+    fflush(stdout);
+    saved_stdout = dup(STDOUT_FILENO);
+    null_fd = open("/dev/null", O_WRONLY);
+    if (saved_stdout < 0 || null_fd < 0 || dup2(null_fd, STDOUT_FILENO) < 0) {
+        if (saved_stdout >= 0) close(saved_stdout);
+        if (null_fd >= 0) close(null_fd);
+        check(0, "console test redirects stdout");
+        return;
+    }
+    close(null_fd);
+    for (sanitize = 0; sanitize <= 1; sanitize++) {
+        memset(&m, 0, sizeof(m));
+        m.sanitize_console = sanitize;
+        console_reset(&m);
+        feed_console(&m, "\rroot@linux01:/# ");
+        recognized = recognized && m.prompt_count == 1;
+        feed_console(&m, "\r\033[2Kroot@linux01:/# typed  \rroot@linux01:/# ");
+        ignored_redraw = ignored_redraw && m.prompt_count == 1;
+        feed_console(&m, "\nroot@linux01:not-a-path# ");
+        rejected_malformed = rejected_malformed && m.prompt_count == 1;
+    }
+    fflush(stdout);
+    dup2(saved_stdout, STDOUT_FILENO);
+    close(saved_stdout);
+    check(recognized, "console recognizes root prompt");
+    check(ignored_redraw, "console ignores prompt redraw");
+    check(rejected_malformed, "console rejects malformed prompt");
+}
+
 int main(void)
 {
     test_pic_init();
@@ -126,6 +171,7 @@ int main(void)
     test_pit_latch();
     test_uart_dll_dlm();
     test_keyboard_shell_operators();
+    test_console_prompt_contract();
     if (failures) {
         fprintf(stderr, "\n%d test(s) failed\n", failures);
         return 1;

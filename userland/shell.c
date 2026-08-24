@@ -260,9 +260,16 @@ static inline char *strcat(char *d, const char *s) {
 #define MAX_HISTORY  100
 #define MAX_ARGS      32
 #define MAX_COMMANDS   8
+#define MAX_TOKENS    (MAX_ARGS * 2)
 #define MAX_MATCHES    64   /* keep complete() stack frame <= 16KB */
 #define NAME_LEN       14
-#define PROMPT_STR   "fermihart@linux01"
+#define PROMPT_STR   "root@linux01"
+
+#define PARSE_SYNTAX       -1
+#define PARSE_STAGES       -2
+#define PARSE_ARGUMENTS    -3
+#define PARSE_TOKENS       -4
+#define PARSE_COMPLEX      -5
 
 #define C0 "\033[0m"
 #define CR "\033[31m"
@@ -510,8 +517,8 @@ static int normalize_path(char *out, int cap, const char *base, const char *inpu
 static void build_prompt(void) {
     char *p = prompt;
     const char *s;
-    /* fermihart@linux01 in green, ':' default, cwd in blue, '$' yellow.
-     * Classic Unix prompt coloring. ANSI escapes are zero-width on the
+    /* Root identity in green, cwd in blue, and the traditional # terminator.
+     * ANSI escapes are zero-width on the
      * terminal so cursor math in redraw() remains visually correct. */
     s = CG;    while (*s) *p++ = *s++;
     s = PROMPT_STR; while (*s) *p++ = *s++;
@@ -521,7 +528,7 @@ static void build_prompt(void) {
     s = cwd;   while (*s) *p++ = *s++;
     s = C0;    while (*s) *p++ = *s++;
     s = CY;    while (*s) *p++ = *s++;
-    *p++ = '$';
+    *p++ = '#';
     s = C0;    while (*s) *p++ = *s++;
     *p++ = ' ';
     *p = 0;
@@ -542,6 +549,7 @@ static void redraw(void) {
     visible = plen + linelen;
 
     *p++ = '\r';
+    *p++ = '\033'; *p++ = '['; *p++ = '2'; *p++ = 'K';
     for (i = 0; i < plen; i++) *p++ = prompt[i];
     for (i = 0; i < linelen; i++) *p++ = line[i];
 
@@ -875,6 +883,7 @@ static void __attribute__((unused)) complete(void) {
 	if (first_word && !has_path) {
 		maybe_builtin_match(matches, &match_count, word, "help");
 		maybe_builtin_match(matches, &match_count, word, "clear");
+		maybe_builtin_match(matches, &match_count, word, "sync");
 		maybe_builtin_match(matches, &match_count, word, "exit");
 		maybe_builtin_match(matches, &match_count, word, "halt");
 		maybe_builtin_match(matches, &match_count, word, "reboot");
@@ -1160,7 +1169,7 @@ static int is_operator(const char *s)
 
 static int parse_commands(struct shell_command *commands)
 {
-    char *tokens[MAX_ARGS * 2];
+    char *tokens[MAX_TOKENS];
     char *p;
     int ntokens = 0, ncommands = 1, i, j;
 
@@ -1174,13 +1183,13 @@ static int parse_commands(struct shell_command *commands)
     }
 
     if (normalize_operators(line) < 0)
-        return -1;
+        return PARSE_COMPLEX;
     p = parse_line;
     while (*p) {
         while (*p == ' ' || *p == '\t') p++;
         if (!*p) break;
-        if (ntokens >= (int)(sizeof(tokens) / sizeof(tokens[0])))
-            return -1;
+        if (ntokens >= MAX_TOKENS)
+            return PARSE_TOKENS;
         tokens[ntokens++] = p;
         while (*p && *p != ' ' && *p != '\t') p++;
         if (*p) *p++ = 0;
@@ -1191,8 +1200,10 @@ static int parse_commands(struct shell_command *commands)
     for (i = 0; i < ntokens; i++) {
         struct shell_command *cmd = &commands[ncommands - 1];
         if (strcmp(tokens[i], "|") == 0) {
-            if (!cmd->argc || ncommands >= MAX_COMMANDS)
-                return -1;
+            if (!cmd->argc)
+                return PARSE_SYNTAX;
+            if (ncommands >= MAX_COMMANDS)
+                return PARSE_STAGES;
             cmd->argv[cmd->argc] = 0;
             ncommands++;
         } else if (strcmp(tokens[i], "<") == 0 ||
@@ -1200,24 +1211,24 @@ static int parse_commands(struct shell_command *commands)
                    strcmp(tokens[i], ">>") == 0) {
             char *op = tokens[i];
             if (++i >= ntokens || is_operator(tokens[i]))
-                return -1;
+                return PARSE_SYNTAX;
             if (op[0] == '<') {
-                if (cmd->input) return -1;
+                if (cmd->input) return PARSE_SYNTAX;
                 cmd->input = tokens[i];
             } else {
-                if (cmd->output) return -1;
+                if (cmd->output) return PARSE_SYNTAX;
                 cmd->output = tokens[i];
                 cmd->append = (op[1] == '>');
             }
         } else {
             if (cmd->argc >= MAX_ARGS - 1)
-                return -1;
+                return PARSE_ARGUMENTS;
             cmd->argv[cmd->argc++] = tokens[i];
         }
     }
 
     if (!commands[ncommands - 1].argc)
-        return -1;
+        return PARSE_SYNTAX;
     commands[ncommands - 1].argv[commands[ncommands - 1].argc] = 0;
     return ncommands;
 }
@@ -1355,7 +1366,16 @@ static void execute(void) {
     if (ncommands == 0)
         return;
     if (ncommands < 0) {
-        puts(CR "syntax error" C0 "\n");
+        if (ncommands == PARSE_STAGES)
+            puts(CR "pipeline limit: 8 stages" C0 "\n");
+        else if (ncommands == PARSE_ARGUMENTS)
+            puts(CR "argument limit: 30 per command" C0 "\n");
+        else if (ncommands == PARSE_TOKENS)
+            puts(CR "token limit: 64 per line" C0 "\n");
+        else if (ncommands == PARSE_COMPLEX)
+            puts(CR "command line too complex" C0 "\n");
+        else
+            puts(CR "syntax error" C0 "\n");
         return;
     }
 
@@ -1381,7 +1401,7 @@ static void execute(void) {
 
 static int read_line_raw(void) {
     char c;
-    int n;
+    int n, overflow = 0;
 
     for (;;) {
         n = read(0, &c, 1);
@@ -1391,8 +1411,10 @@ static int read_line_raw(void) {
             tab_pressed = 0;
             putc('\n');
             line[linelen] = 0;
-            return linelen;
+            return overflow ? -1 : linelen;
         }
+        if (overflow)
+            continue;
         if (c == 127 || c == 8) {
             tab_pressed = 0;
             backward_delete();
@@ -1462,7 +1484,11 @@ static int read_line_raw(void) {
             }
             continue;
         }
-        if (c >= 32 && c < 127 && linelen < MAX_LINE - 1) {
+        if (c >= 32 && c < 127) {
+            if (linelen >= MAX_LINE - 1) {
+                overflow = 1;
+                continue;
+            }
             tab_pressed = 0;
             if (cursor == linelen) {
                 /* Append at end: echo the byte directly. Avoids redraw()'s
@@ -1486,38 +1512,42 @@ static int read_line_raw(void) {
 /* ── Help text ─────────────────────────────────────────────── */
 static void builtin_help(void) {
     puts(
-        CC "fermihart@linux01 shell" C0 " — " CG "built-in commands:" C0 "\n"
+        CC "root@linux01 shell" C0 " -- " CG "built-in commands:" C0 "\n"
         "  help         show this help\n"
         "  clear        clear the screen\n"
-        "  exit         leave shell session safely\n"
+        "  exit         request guest halt after sync\n"
         "  sync         flush filesystem buffers\n"
-        "  halt         sync and halt\n"
-        "  reboot       sync and reboot\n"
-		"  echo <text>  echo arguments; supports > and >>\n"
+        "  halt         request guest halt after sync\n"
+        "  reboot       request legacy reset after sync\n"
+		"  echo <text>  echo arguments\n"
 		"  cd <dir>     change directory\n"
 		"  pwd          print working directory\n"
 		"  ls [-la] [dir] list directory\n"
-		"  cat <file>   print file contents\n"
+		"  cat [file]   print file or standard input\n"
 		"  mkdir/rmdir  create/remove directories\n"
 		"  touch/rm     create/remove files\n"
 		"  cp/mv/ln     copy, move, hard-link files\n"
-		"  head/wc/grep inspect text files\n"
+		"  head/wc/grep inspect files or standard input\n"
 		"  whoami       print current user\n"
-		"  mount        show mounted filesystems\n"
+		"  mount        show configured root mount\n"
 		"  df           show filesystem usage\n"
-		"  ps aux       show task table snapshot\n"
+		"  ps aux       show up to 16 task slots\n"
 		"  hello        print userland demo message\n"
-		"  /bin/hello   run external demo through execve\n"
+		"  command      search PATH and run with execve\n"
 		"  uname [-a]   print kernel name/info\n"
 		"  history      show command history\n"
-		CM "  -- 1991 unix suite --\n" C0
+		CM "  -- additional commands --\n" C0
 		"  date         print current date/time\n"
 		"  cal          print month calendar\n"
-		"  uptime       seconds since boot + load avg\n"
+		"  uptime       seconds since shell start\n"
 		"  fortune      random unix wisdom\n"
-		"  yes [text]   print y (or text) repeatedly\n"
-		"  true/false   classic exit codes\n"
+		"  yes [text]   print 50 lines\n"
+		"  true/false   no-output compatibility commands\n"
 		"  linus        the comp.os.minix post (1991)\n"
+		"\n"
+		"  syntax: cmd [args] [< in] [> out|>> out] [| cmd ...]\n"
+		"  limits: 255-byte lines, 30 args/command, 64 tokens,\n"
+		"          8 stages, 14-byte names, 64 completion matches\n"
 	);
 }
 
@@ -1527,15 +1557,17 @@ static void builtin_clear(void) {
 
 static void builtin_exit(void) {
     restore_termios();
-    puts(CY "exit:" C0 " shell is the console session; halting instead\n");
+    save_history();
+    puts(CY "logout" C0 "\n");
     sync();
+    _power(0);
     for (;;) pause();
 }
 
 static void builtin_halt(void) {
 	save_history();
-	puts(CR "System halted." C0 "\n");
     sync();
+	puts(CR "System halted." C0 "\n");
     _power(0);
     for (;;) pause();
 }
@@ -1547,16 +1579,15 @@ static void builtin_sync(void) {
 
 static void builtin_reboot(void) {
 	char c = 0;
-	save_history();
 	puts(CY "reboot:" C0 " are you sure? (y/n) ");
-    sync();
     if (read(0, &c, 1) == 1 && (c == 'y' || c == 'Y')) {
+		save_history();
+        sync();
         puts("\n" CR "Rebooting." C0 "\n");
         _power(1);
         for (;;) pause();
     }
     putc('\n');
-    redraw();
 }
 
 static void builtin_echo(int argc, char **argv) {
@@ -1691,23 +1722,6 @@ static void color_name(unsigned short mode, const char *name) {
     puts("\033[0m");
 }
 
-static void color_known_name(const char *name) {
-    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 ||
-        strcmp(name, "bin") == 0 || strcmp(name, "dev") == 0 ||
-        strcmp(name, "etc") == 0 || strcmp(name, "home") == 0 ||
-        strcmp(name, "fermihart") == 0 || strcmp(name, "tmp") == 0)
-        puts("\033[34m");
-    else if (strcmp(name, "tty0") == 0)
-        puts("\033[33m");
-    else if (strcmp(name, "shell") == 0 || strcmp(name, "update") == 0 ||
-             strcmp(name, "hello") == 0)
-        puts("\033[32m");
-    else
-        puts("\033[37m");
-    puts(name);
-    puts("\033[0m");
-}
-
 static void print_ls_entry(const char *path, const char *name, int longfmt) {
     struct stat st = {0};
     char m[11];
@@ -1724,56 +1738,13 @@ static void print_ls_entry(const char *path, const char *name, int longfmt) {
     putc('\n');
 }
 
-static void print_known_entry(const char *name, int longfmt) {
-    if (longfmt) {
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0 ||
-            strcmp(name, "bin") == 0 || strcmp(name, "dev") == 0 ||
-            strcmp(name, "etc") == 0 || strcmp(name, "home") == 0 ||
-            strcmp(name, "fermihart") == 0 || strcmp(name, "tmp") == 0)
-            puts("drwxr-xr-x 1 0 0 0 ");
-        else if (strcmp(name, "tty0") == 0)
-            puts("crw-rw-rw- 1 0 0 0 ");
-        else
-            puts("-rw-r--r-- 1 0 0 0 ");
-    }
-    color_known_name(name);
-    if (longfmt) putc('\n');
-    else puts("  ");
-}
-
-static void fallback_ls(const char *dir, int longfmt, int all) {
-	if (all) { print_known_entry(".", longfmt); print_known_entry("..", longfmt); }
-	if (strcmp(dir, "/") == 0) {
-		print_known_entry("bin", longfmt);
-		print_known_entry("dev", longfmt);
-		print_known_entry("etc", longfmt);
-		print_known_entry("home", longfmt);
-		print_known_entry("tmp", longfmt);
-	} else if (strcmp(dir, "/dev") == 0 || strcmp(dir, "dev") == 0) {
-		print_known_entry("tty0", longfmt);
-	} else if (strcmp(dir, "/home") == 0 || strcmp(dir, "home") == 0) {
-		print_known_entry("fermihart", longfmt);
-	} else if (strcmp(dir, "/home/fermihart") == 0) {
-	} else if (strcmp(dir, "/etc") == 0 || strcmp(dir, "etc") == 0) {
-		print_known_entry("fstab", longfmt);
-		print_known_entry("passwd", longfmt);
-		print_known_entry("issue", longfmt);
-		print_known_entry("motd", longfmt);
-	} else if (strcmp(dir, "/bin") == 0 || strcmp(dir, "bin") == 0) {
-		print_known_entry("shell", longfmt);
-		print_known_entry("update", longfmt);
-		print_known_entry("hello", longfmt);
-	}
-	if (!longfmt) putc('\n');
-}
-
 static void builtin_ls(int argc, char **argv) {
 	const char *dir = ".";
 	const char *open_dir;
 	int longfmt = 0, all = 0;
 	struct dirent de = {0};
 	char name[15], path[MAX_LINE];
-	int fd, entries = 0;
+	int fd;
 	int i;
 	for (i = 1; i < argc; i++) {
 		if (argv[i][0] == '-' || argv[i][0] == '+') {
@@ -1793,35 +1764,30 @@ static void builtin_ls(int argc, char **argv) {
 		return;
 	}
 	fd = open(open_dir, O_RDONLY);
-	if (fd >= 0) {
-		while (1) {
-			int n = read(fd, &de, sizeof(de));
-			if (n != sizeof(de)) break;
-			if (de.inode == 0) continue;
-			name_from_dirent(name, sizeof(name), de.name);
-			if (!all && name[0] == '.') continue;
-			entries++;
-			if (join_path(path, sizeof(path), open_dir, name) < 0) continue;
-			if (longfmt)
-				print_ls_entry(path, name, longfmt);
-			else {
-				struct stat st = {0};
-				if (_stat(path, &st) == 0)
-					color_name(st.st_mode, name);
-				else
-					puts(name);
-				puts("  ");
-			}
+	if (fd < 0) {
+		puts(CR "ls: cannot open " C0); puts_c(CY, shell_path(open_dir)); putc('\n');
+		return;
+	}
+	while (1) {
+		int n = read(fd, &de, sizeof(de));
+		if (n != sizeof(de)) break;
+		if (de.inode == 0) continue;
+		name_from_dirent(name, sizeof(name), de.name);
+		if (!all && name[0] == '.') continue;
+		if (join_path(path, sizeof(path), open_dir, name) < 0) continue;
+		if (longfmt)
+			print_ls_entry(path, name, longfmt);
+		else {
+			struct stat st = {0};
+			if (_stat(path, &st) == 0)
+				color_name(st.st_mode, name);
+			else
+				puts(name);
+			puts("  ");
 		}
-		close(fd);
 	}
-	if (entries == 0) {
-		/* Some directories are not populated in the generated root image;
-		 * keep a small fallback so the user sees the expected entries. */
-		fallback_ls(open_dir, longfmt, all);
-	} else if (!longfmt) {
-		putc('\n');
-	}
+	close(fd);
+	if (!longfmt) putc('\n');
 }
 
 static void builtin_cat(int argc, char **argv) {
@@ -1974,7 +1940,7 @@ static void builtin_touch(int argc, char **argv) {
 			puts(CR "touch: invalid path " C0); puts_c(CY, argv[i]); putc('\n');
 			continue;
 		}
-		fd = _open3(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		fd = _open3(path, O_WRONLY | O_CREAT, 0644);
 		if (fd < 0) {
 			puts(CR "touch: cannot create " C0); puts_c(CY, argv[i]); putc('\n');
 		} else {
@@ -2355,8 +2321,7 @@ static void builtin_uptime(int argc, char **argv) {
         puts(CG); puts(itoa(ss)); puts(C0);
         puts(" sec");
     }
-    puts(",  1 user,  load average: ");
-    puts(CY "0.01" C0 ", " CY "0.00" C0 ", " CY "0.00" C0 "\n");
+    puts(" since shell start\n");
 }
 
 static const char *fortunes[] = {
@@ -2519,12 +2484,28 @@ static void shell_loop(void) {
 		if (raw_active) {
 			n = read_line_raw();
 		} else {
+			char discard;
 			n = read(0, line, MAX_LINE - 1);
 			if (n <= 0)
 				continue;
+			if (n == MAX_LINE - 1 && line[n - 1] != '\n' && line[n - 1] != '\r') {
+				if (read(0, &discard, 1) == 1 && discard != '\n' && discard != '\r') {
+					while (read(0, &discard, 1) == 1 && discard != '\n' && discard != '\r')
+						;
+					n = -1;
+				}
+			}
+			if (n < 0) {
+				puts(CR "line limit: 255 bytes" C0 "\n");
+				continue;
+			}
 			line[n] = 0;
 			while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r'))
 				line[--n] = 0;
+		}
+		if (n < 0) {
+			puts(CR "line limit: 255 bytes" C0 "\n");
+			continue;
 		}
 		linelen = n;
 		cursor = linelen;

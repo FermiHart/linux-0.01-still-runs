@@ -102,13 +102,13 @@ updated.
 **Source**: README.md and ARCHITECTURE.md.
 
 **Audit**: verified. `kernel_mktime()` treats `tm_year < 70` as `20yy`, so CMOS
-year `26` becomes `2026` instead of `1926`. The `date` command returns the
-current year in the alive mode.
+year `26` becomes `2026` instead of `1926`. The current transitional runtime
+returns the host RTC year; the explicit alive mode is scheduled for Wave 090.
 
 **Status**: PROVEN.
 
-**Evidence**: `tests/test_shell.py` checks `date` output; boot log shows the
-correct year.
+**Evidence**: `tests/test_shell.py` checks the current year in `date` output;
+the boot log shows the same RTC-derived date.
 
 ### "Firmware-free bEMU boot"
 
@@ -155,7 +155,7 @@ workflow.
 **Source**: README.md and `EXPERIENCE.md`.
 
 **Audit**: the shell no longer maintains a private VFS. File creation, reads,
-writes, links, renames and directories use Linux 0.01 syscalls against the
+writes, links, moves via link/copy/unlink, and directories use Linux 0.01 syscalls against the
 mounted Minix v1 image. Cross-boot durability is still limited because bEMU does
 not yet complete the IDE interrupt path required by `sync()`.
 
@@ -178,6 +178,37 @@ child processes with `fork`, connects stages with Linux 0.01 `pipe(2)` and
 builtin pipelines, input/output/append redirection, pipeline output to a file,
 byte counts, and malformed syntax. `tests/bemu/test_bemu_devices.c` validates
 the Finnish-keymap scancode sequence used to inject `|` and `<`.
+
+### "Coherent identity and documented shell limits"
+
+**Source**: README.md, `EXPERIENCE.md`, and shell help.
+
+**Audit**: the transitional shell runs as euid 0 and therefore uses
+`root@linux01:path#`. Help and README expose the effective 255-byte input,
+30-argument, 64-token, eight-stage, 64-completion-match, and 14-byte Minix name
+limits. Selected boundaries produce explicit diagnostics instead of being
+hidden behind generic syntax errors.
+
+**Status**: QUALIFIED.
+
+**Evidence**: `tests/test_shell.py` checks root prompt identity, help text,
+eight-stage success, nine-stage rejection, argument and input-line limits,
+the exact 30-argument and 64-token boundaries, Minix name boundaries, and
+non-destructive `touch` behavior. The completion-match cap is a documented
+structural limit but does not yet have a boundary test. `bemu/console.c`
+recognizes the same prompt contract for scripted input while rejecting
+carriage-return redraws.
+
+### "System views are live"
+
+**Source**: README.md and `EXPERIENCE.md`.
+
+**Audit**: `df` uses live `ustat` counters and `ps` reads a real but bounded
+16-slot scheduler snapshot. `mount` reports the configured `/dev/hd1` root; it
+is not a general mount-table query. `uptime` measures from shell startup and no
+longer prints invented user counts or load averages.
+
+**Status**: QUALIFIED.
 
 ### bEMU provenance
 

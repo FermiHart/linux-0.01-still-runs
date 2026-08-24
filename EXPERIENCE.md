@@ -1,7 +1,9 @@
 # Experience Fidelity Specification
 
-This document defines what "fidelity" means for the Vesica Piscis artifact and
-how it is enforced by two deliberate experience modes.
+This document defines the target meaning of "fidelity" for the Vesica Piscis
+artifact. The two deliberate modes are specifications for Waves 089 and 090;
+the current runtime remains a single transitional experience until those waves
+are completed.
 
 ## Dimensions of fidelity
 
@@ -10,7 +12,7 @@ how it is enforced by two deliberate experience modes.
 | Kernel source | Historical Linux 0.01 with documented patches | Same |
 | Boot path | Direct bEMU/KVM, no firmware | Same |
 | Date source | Fixed historical reference date | Real CMOS date |
-| Memory ceiling | Period-appropriate limit (e.g., 8 MiB) | Same unless overridden |
+| Memory ceiling | Fixed 8 MiB | Fixed 8 MiB |
 | Shell | Minimal built-ins using real syscalls | Same plus quality-of-life helpers |
 | Filesystem | Real Minix v1 persistence | Same |
 | Output style | Period Unix messages | Vesica Piscis MOTD and modern glyphs |
@@ -41,14 +43,15 @@ Goal: demonstrate that the 1991 kernel is literally still running today.
 - `linus` Easter egg remains available because it is documentation, not a
   modern feature.
 
-## Invariants shared by both modes
+## Required invariants for both modes
 
-The following must remain true regardless of mode:
+Once the modes are implemented, the following must remain true regardless of
+mode:
 
 - All filesystem operations go through real Linux 0.01 syscalls.
 - All process creation uses the real scheduler and `fork`/`execve`.
 - Pipes and redirection are handled by the kernel.
-- `ps aux` shows the real task table.
+- `ps aux` shows a bounded snapshot of real scheduler task slots.
 - `sync` flushes the real Minix v1 superblock, inodes and zones.
 - Reboot reads back the same bytes written before shutdown.
 
@@ -62,9 +65,21 @@ The following are considered regressions in either mode:
 - A fake `ps`, `mount`, `df` or `date` that returns invented output.
 - Any claim that the system is original when patches are not documented.
 
-## Testing fidelity
+## Current gaps
 
-Each release must pass:
+- `EXPERIENCE=1991` and `EXPERIENCE=alive` are not implemented yet.
+- Cross-boot persistence is blocked by incomplete IDE write-completion IRQ
+  delivery in bEMU; `sync()` can still block.
+- `mount` reports the configured root mount because Linux 0.01 has no live
+  mount-table interface; `ps` exposes at most 16 task slots.
+- Guest halt/reset requests do not yet terminate or restart the bEMU host
+  process, and they remain downstream of the blocking `sync()` path.
+- The current prompt and help are shared transitional defaults, not proof that
+  either future mode is active.
+
+## Future fidelity gate
+
+Completion of Waves 089-095 must establish:
 
 1. Boot to shell in both modes.
 2. Create, read, write and delete a file, then reboot and verify.

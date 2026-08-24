@@ -16,7 +16,7 @@ PATTERNS = [
     (r"^Partition table [^\n]*ok\.$", "Partition table read"),
     (r"^[0-9]+/[0-9]+ free blocks$", "Filesystem blocks visible"),
     (r"^[0-9]+/[0-9]+ free inodes$", "Filesystem inodes visible"),
-    (r"^fermihart@linux01:/[^\n]*\$$", "Shell prompt reached"),
+    (r"^root@linux01:/[^\n]*# ?$", "Shell prompt reached"),
 ]
 
 
@@ -41,7 +41,7 @@ def main():
         args.bemu,
         "--kernel", args.kernel,
         "--root", args.img,
-        "--expect", "fermihart@linux01",
+        "--expect", "root@linux01",
     ]
     try:
         result = subprocess.run(

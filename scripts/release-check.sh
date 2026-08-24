@@ -19,7 +19,7 @@ else
 fi
 
 printf 'Checking required documentation...\n'
-for doc in docs/MISSION.md docs/EXPERIENCE.md docs/AUDIT-STATEMENTS.md \
+for doc in MISSION.md EXPERIENCE.md docs/AUDIT-STATEMENTS.md \
            docs/ADRS.md docs/RISKS.md docs/PORTING_LEDGER.md \
            docs/TOOLCHAIN.md docs/CONTAINER.md docs/REPRODUCIBILITY.md \
            docs/SBOM.md; do

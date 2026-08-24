@@ -770,10 +770,10 @@ fuzz: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STAGE,9/10,running bEMU fault injection fuzz)
 	@bash "$(REPO_ROOT)/scripts/fuzz-bemu.sh"
 
-$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/pic.h bemu/pit.h bemu/uart.h bemu/keyboard.h bemu/machine.h | dirs
+$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/console.c bemu/pic.h bemu/pit.h bemu/uart.h bemu/keyboard.h bemu/console.h bemu/machine.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bemu_devices.c \
-	  bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c
+	  bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/console.c
 
 $(BUILD)/test-bbp-invalid: tests/bemu/test_bbp_invalid.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \

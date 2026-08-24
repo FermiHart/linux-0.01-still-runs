@@ -32,7 +32,7 @@ def main():
         args.bemu,
         "--kernel", args.kernel,
         "--root", args.img,
-        "--expect", "fermihart@linux01",
+        "--expect", "root@linux01",
         "--trace-file", trace_path,
     ]
     try:

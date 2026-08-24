@@ -197,8 +197,9 @@ if the file extension is `.trace.gz`.
 
 The `ts` field is produced by a deterministic logical clock (`bemu/trace_clock.h`).
 The clock is reset at machine creation and advances by one fixed quantum for every
-observable event (currently one nanosecond per KVM exit).  It does **not** read the
-host wall clock, so the same guest path yields identical `ts` values across runs.
+observable event (currently one nanosecond per KVM exit). It does **not** read the
+host wall clock. The same ordered event sequence and epoch therefore yield the
+same `ts` values, while host scheduling may still alter the event sequence.
 
 When `SOURCE_DATE_EPOCH` is present in the environment, the clock uses it as the
 boot epoch; otherwise the epoch is zero.  This makes the trace stable across
@@ -230,7 +231,7 @@ Example:
 
 ```bash
 ./build/bemu-linux01 --kernel build/kernel.bin --root build/root.img \
-  --expect fermihart@linux01 --trace-file boot.trace
+  --expect root@linux01 --trace-file boot.trace
 ```
 
 ## Make targets
@@ -248,8 +249,8 @@ Example:
 - New event types may be added without bumping the trace version.
 - Event payloads are additive: new fields may appear, but existing fields will not
   be removed or change type.
-- The `ts` field is monotonic within a trace but is not comparable across traces
-  unless both used the same `SOURCE_DATE_EPOCH` and wall-clock source.
+- The `ts` field is monotonic within a trace but is comparable across traces only
+  when both use the same `SOURCE_DATE_EPOCH` and matching event sequences.
 
 ## Replay invariants
 
@@ -260,11 +261,12 @@ side-effects:
 2. `irq` events must arrive at the same guest instruction boundary.
 3. `input` events must inject the same byte sequence at the same exit count.
 
-Non-deterministic events such as wall-clock `ts` values are ignored during
-replay comparison.
+Logical `ts` values are ignored during replay comparison because host scheduling
+can alter the number and ordering of low-level events even though no wall clock
+is read.
 
 ## Future work
 
-Waves 064–074 will implement the actual trace producer in bEMU, the record and
-replay engine, the golden-trace comparator and the timeline visualizer. This
-schema is the contract those tools share.
+Waves 064-074 implemented the trace producer, record and replay engine,
+golden-trace comparator, and timeline visualizer. Future work expands fault
+coverage while preserving this schema contract.

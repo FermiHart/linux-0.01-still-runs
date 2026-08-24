@@ -11,7 +11,7 @@ KERNEL_FAULT_RE = re.compile(
     r"^(?:Kernel panic|general protection:|double fault:|page fault:)",
     re.IGNORECASE | re.MULTILINE,
 )
-PROMPT_RE = r"fermihart@linux01:[^\n]*\$"
+PROMPT_RE = r"root@linux01:[^\n]*#"
 
 
 def as_text(value):

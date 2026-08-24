@@ -55,6 +55,8 @@ struct machine {
     char plain_log[SERIAL_LOG_MAX];
     size_t plain_len;
     int ansi_state;
+    int console_line_redraw;
+    int console_redraw_state;
     int host_escape_state;
     int console_state, console_csi_valid;
     uint8_t console_seq[64];

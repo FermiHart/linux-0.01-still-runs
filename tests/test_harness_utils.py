@@ -25,11 +25,11 @@ class TerminalSanitizerTests(unittest.TestCase):
 class TranscriptBoundaryTests(unittest.TestCase):
     def test_echoed_input_cannot_satisfy_assertion(self):
         transcript = (
-            "fermihart@linux01:/$ echo TOKENBEGIN\n"
+            "root@linux01:/# echo TOKENBEGIN\n"
             "TOKENBEGIN\n"
-            "fermihart@linux01:/$ echo echoed-only\n"
+            "root@linux01:/# echo echoed-only\n"
             "actual output\n"
-            "fermihart@linux01:/$ echo TOKENEND\n"
+            "root@linux01:/# echo TOKENEND\n"
             "TOKENEND\n"
         )
         segment, _ = extract_command_output(
@@ -43,9 +43,9 @@ class TranscriptBoundaryTests(unittest.TestCase):
         raw = (
             "noise\x1b[31m\n"
             "RAWBEGIN\r\n"
-            "\x1b[32mfermihart@linux01:/$\x1b[0m echo value\r\n"
+            "\x1b[32mroot@linux01:/#\x1b[0m echo value\r\n"
             "value\r\n"
-            "\x1b[32mfermihart@linux01:/$\x1b[0m echo RAWEND\r\n"
+            "\x1b[32mroot@linux01:/#\x1b[0m echo RAWEND\r\n"
             "RAWEND\r\n"
         )
         clean = sanitize_terminal(raw)

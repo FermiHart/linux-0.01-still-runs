@@ -33,7 +33,7 @@ def main():
         "--kernel", args.kernel,
         "--root", args.img,
         "--keys", "ls\n",
-        "--expect", "fermihart@linux01",
+        "--expect", "root@linux01",
         "--trace-file", trace_path,
     ]
     try:
