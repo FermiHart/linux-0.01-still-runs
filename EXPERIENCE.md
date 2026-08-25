@@ -83,6 +83,12 @@ The following must remain true regardless of mode:
 - `sync` flushes the real Minix v1 superblock, inodes and zones.
 - Reboot reads back the same bytes written before shutdown.
 
+`make test-experiences` runs complete, bounded sessions in both profiles. Each
+command has unique transcript boundaries and independently proves identity,
+kernel time, manual lookup, external processes, process visibility, pipes,
+redirection, and a create/read/remove filesystem cycle. Profile-specific text is
+also rejected from the other session.
+
 ## What breaks fidelity
 
 The following are considered regressions in either mode:

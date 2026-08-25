@@ -274,6 +274,24 @@ cases. `tests/test_experience.py` enumerates every page in both profiles, reads
 `limits.1`, removes it on a temporary image, and then observes lookup failure.
 Both filesystem images pass `fsck.minix` through the `test-experiences` graph.
 
+### "Both experience profiles pass complete scripted sessions"
+
+**Source**: `EXPERIENCE.md`.
+
+**Audit**: The same integration runner boots disposable copies of the 1991 and
+alive images with explicit profile selection. Unique boundaries isolate every
+command result so echoed input, boot text, or another command cannot satisfy an
+assertion. Each session covers identity, time, the manual, a real external
+process, scheduler visibility, a kernel pipe, redirection, and real Minix v1
+create/read/remove operations. Profile-specific identity is forbidden in the
+other profile's command output.
+
+**Status**: PROVEN.
+
+**Evidence**: `make test-experiences` runs both sessions after independent
+`fsck.minix` validation. `tests/test_harness_utils.py` separately validates the
+transcript-boundary extractor.
+
 ### bEMU provenance
 
 **Source**: `bemu/README.md`.

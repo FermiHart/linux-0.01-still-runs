@@ -5,6 +5,7 @@ import argparse
 import datetime
 import os
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
@@ -12,7 +13,14 @@ import sys
 import tempfile
 import time
 
-from harness_utils import BEMU_PASS_RE, KERNEL_FAULT_RE, diagnostic, sanitize_terminal
+from harness_utils import (
+    BEMU_PASS_RE,
+    KERNEL_FAULT_RE,
+    diagnostic,
+    extract_command_output,
+    line_contains,
+    sanitize_terminal,
+)
 
 MONTH_NUMBER = {
     "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
@@ -117,21 +125,64 @@ def main():
                 return 1
 
     marker = f"EXPERIENCE_{args.experience.upper()}"
-    profile_commands = "date\ncal\n" if args.experience == "1991" else "date\n"
-    script = (
-        f"echo {marker}_BEGIN\n"
-        "cat /etc/issue\n"
-        "cat /etc/motd\n"
-        f"{profile_commands}"
-        "ls /usr/man/man1\n"
-        "man limits\n"
-        "rm /usr/man/man1/limits.1\n"
-        "man limits\n"
-        "cd /tmp\n"
-        "cd\n"
-        "pwd\n"
-        f"echo {marker}_DONE\n"
-    )
+    if args.experience == "1991":
+        issue_expected = ["Linux 0.01 historical experience"]
+        issue_forbidden = ["Linux 0.01 alive experience"]
+        motd_expected = ["Experience profile: 1991"]
+        motd_forbidden = ["Vesica Piscis", "It still runs in 2026"]
+        home = "/"
+    else:
+        issue_expected = ["Linux 0.01 alive experience"]
+        issue_forbidden = ["Linux 0.01 historical experience"]
+        motd_expected = ["Vesica Piscis alive experience", "It still runs in 2026",
+                         "Today is not painted onto this screen"]
+        motd_forbidden = ["Experience profile: 1991"]
+        home = "/home/fermihart"
+
+    cases = [
+        ("cat /etc/issue", issue_expected, issue_forbidden),
+        ("cat /etc/motd", motd_expected, motd_forbidden),
+        ("whoami", ["root"], []),
+        ("uname -a", ["linux .0", "nodename", "machine"], []),
+        ("date", [], []),
+        ("man", ["LINUX01(1)", "intro, shell, commands, files, limits, date"], []),
+        ("man shell", ["SHELL(1)", "8 pipeline stages", "No quoting, globbing"], []),
+        ("/bin/hello", ["Hello from C userland"], []),
+        ("pathcheck | /bin/cat", ["PATH=/bin:/usr/bin:."], []),
+        ("ps aux", ["USER  PID   PPID  STAT  TTY    TIME  COMMAND", "shell"], []),
+        ("cd /tmp", [], []),
+        ("mkdir scripted", [], []),
+        (f"echo {args.experience} > scripted/profile", [], []),
+        ("pathcheck | /bin/cat > scripted/path", [], []),
+        ("cat scripted/profile", [args.experience], []),
+        ("cat scripted/path", ["PATH=/bin:/usr/bin:."], []),
+        ("rm scripted/profile", [], []),
+        ("rm scripted/path", [], []),
+        ("rmdir scripted", [], []),
+        ("ls /usr/man/man1", ["intro.1", "shell.1", "commands.1", "files.1",
+                              "limits.1", "date.1"], []),
+        ("man limits", ["LIMITS(1)", "8 MiB RAM"], []),
+        ("rm /usr/man/man1/limits.1", [], []),
+        ("man limits", ["man: no entry for limits"], []),
+        ("cd /", [], []),
+        ("cd", [], []),
+        ("pwd", [home], []),
+        (f"echo {marker}_DONE", [f"{marker}_DONE"], []),
+    ]
+    if args.experience == "1991":
+        cases.insert(5, ("cal", ["September 1991", "Su Mo Tu We Th Fr Sa"], []))
+
+    nonce = secrets.token_hex(6).upper()
+    begin = f"{marker}_{nonce}_BEGIN"
+    chunks = [f"echo {begin}\n"]
+    boundaries = []
+    for index, (command_text, expected, forbidden) in enumerate(cases):
+        end = f"{marker}_{nonce}_{index:02d}_END"
+        chunks.extend((command_text, "\n", f"echo {end}\n"))
+        boundaries.append((command_text, expected, forbidden, begin, end))
+        begin = end
+    script = "".join(chunks)
+    final_marker = boundaries[-1][4]
     with tempfile.TemporaryDirectory(prefix="linux001-experience-") as temp_dir:
         profile_img = os.path.join(temp_dir, "profile.img")
         corrupt_img = os.path.join(temp_dir, "corrupt.img")
@@ -163,8 +214,8 @@ def main():
                 image.write(b"\0" * 8)
 
         command = [args.bemu, "--kernel", args.kernel, "--root", profile_img,
-                   "--experience", args.experience, "--keys", script,
-                   "--expect", f"{marker}_DONE"]
+                    "--experience", args.experience, "--keys", script,
+                    "--expect", final_marker]
         host_before = time.time()
         try:
             result = subprocess.run(
@@ -181,35 +232,40 @@ def main():
         host_after = time.time()
 
     output = sanitize_terminal(result.stdout)
-    if args.experience == "1991":
-        required = ("Linux 0.01 historical experience", "Experience profile: 1991",
-                    "September 1991")
-        forbidden_values = ("Vesica Piscis", "It still runs in 2026")
-        home = "/"
-    else:
-        required = ("Linux 0.01 alive experience", "Vesica Piscis alive experience",
-                    "It still runs in 2026", "Today is not painted onto this screen")
-        forbidden_values = ("Experience profile: 1991",)
-        home = "/home/fermihart"
-    required += (
+    required = (
         f"root=/dev/hd1 ide=977,5,17 experience={args.experience}",
         f"linux 0.01 -- experience: {args.experience} -- interactive shell",
-        "LIMITS(1)",
-        "intro.1", "shell.1", "commands.1", "files.1", "limits.1", "date.1",
-        "man: no entry for limits",
         f"{marker}_DONE",
     )
     missing = [value for value in required if value not in output]
-    forbidden = [value for value in forbidden_values if value in output]
+    session_failures = []
+    clean_cursor = 0
+    date_output = ""
+    for command_text, expected, forbidden, begin, end in boundaries:
+        try:
+            segment, clean_cursor = extract_command_output(
+                output, begin, end, clean_cursor, command_text, validate=True,
+            )
+        except ValueError as exc:
+            session_failures.append(f"{command_text}: {exc}")
+            continue
+        command_missing = [value for value in expected if not line_contains(segment, value)]
+        unexpected = [value for value in forbidden if line_contains(segment, value)]
+        if command_missing or unexpected:
+            session_failures.append(
+                f"{command_text}: missing={command_missing} unexpected={unexpected}"
+            )
+        if command_text == "date":
+            date_output = segment
     historical_date_missing = (
         args.experience == "1991" and
-        re.search(r"(?m)^Tue Sep 17 00:00:[0-5][0-9] 1991$", output) is None
+        re.search(r"(?m)^Tue Sep 17 00:00:[0-5][0-9] 1991$", date_output) is None
     )
     alive_date_missing = False
     if args.experience == "alive":
         date_lines = re.findall(
             r"(?m)^[A-Z][a-z]{2} [A-Z][a-z]{2} +[0-9]{1,2} [0-9:]{8} [0-9]{4}$",
-            output,
+            date_output,
         )
         try:
             _, month, day, clock, year = date_lines[-1].split()
@@ -222,11 +278,11 @@ def main():
         except (IndexError, KeyError, ValueError):
             alive_date_missing = True
     if (result.returncode or BEMU_PASS_RE.search(output) is None or
-            KERNEL_FAULT_RE.search(output) or missing or forbidden or
-            historical_date_missing or alive_date_missing or
-            re.search(rf"(?m)^{re.escape(home)}$", output) is None):
+            KERNEL_FAULT_RE.search(output) or missing or session_failures or
+            historical_date_missing or alive_date_missing):
         print(f"{args.experience} experience failed: missing={missing} "
-              f"forbidden={forbidden} historical_date_missing={historical_date_missing} "
+              f"session_failures={session_failures} "
+              f"historical_date_missing={historical_date_missing} "
               f"alive_date_missing={alive_date_missing}")
         print(diagnostic(output, 3000))
         return 1
