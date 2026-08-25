@@ -149,11 +149,11 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 
 ---
 
-## Built-in commands
+## Guest commands
 
 | Command | What it does |
 |---------|--------------|
-| `help` | List built-ins |
+| `help` | List the bounded command surface |
 | `clear` | Clear the screen |
 | `echo <text>` | Print text; generic `<`, `>`, and `>>` redirection is handled by the shell |
 | `cat [file]` | Read regular files or standard input |
@@ -169,11 +169,11 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 | **`date`** | Current date/time from CMOS RTC |
 | **`cal`** | Month calendar, today highlighted |
 | **`uptime`** | Seconds since the shell started; no invented load average |
-| **`fortune`** | Random Unix wisdom (Linus, Ritchie, Thompson, Knuth, Dijkstra…) |
-| **`yes [text]`** | Print `y` (or arg) 50× — terminating courtesy |
+| **`fortune`** | Alive-only Unix quotations; absent from the 1991 profile |
+| **`yes [text]`** | External process that repeats until its write fails |
 | **`true`** / **`false`** | No-output compatibility commands; this shell has no `$?` expansion |
-| **`linus`** | Easter egg: full text of the August 1991 comp.os.minix post |
-| `hello` | Built-in banner |
+| **`linus`** | Alive-only text of the August 1991 post with retrospective epilogue |
+| `hello` | External userland demonstration reached through `$PATH` |
 | `/bin/hello`, `/bin/yes`, `/bin/cat` | External programs executed through `$PATH` or an explicit path |
 | `halt` / `reboot` / `exit` | Issue guest halt/reset requests after sync; host termination/restart is not implemented yet |
 
@@ -183,6 +183,13 @@ Pipelines support up to eight simple stages. Each stage is a real child process;
 the shell connects them with Linux 0.01 `pipe(2)` and `dup2(2)`. Quoting,
 globbing, job control, and command substitution are deliberately outside the
 current historical shell surface.
+
+Both profiles deliberately omit package managers, network tools, language
+runtimes, guest compilers/build suites, desktops and browsers. The experience
+tests also prove that variable, glob, quoting, substitution, command-list and
+background-job syntax remains literal rather than acquiring modern semantics.
+Modern compilers, Python and KVM belong to the host-side observation bridge,
+not to the guest.
 
 The shell accepts at most 255 input bytes, 30 arguments per stage, 64 tokens
 per line, eight pipeline stages, and 64 completion matches. Minix v1 limits
@@ -207,6 +214,7 @@ explicitly rather than being presented as syntax errors.
 | The supported build/test host is Linux KVM | bEMU requires Linux headers and writable `/dev/kvm`; no fallback backend is claimed |
 | Cross-boot persistence remains blocked by incomplete IDE write-completion IRQ delivery in bEMU | in-session Minix v1 operations are real; `sync()` can still block |
 | Shell grammar is intentionally small | no quoting, globbing, job control, command substitution, or modern shell extensions |
+| `/bin/yes | head` may block | Linux 0.01 pipe close/SIGPIPE behavior is no longer hidden by a bounded built-in `yes`; finite external pipelines are tested instead |
 | System views are bounded | `mount` reports the configured root, `ps` exposes at most 16 task slots, and `uptime` starts with the shell because Linux 0.01 has no modern procfs/load-average interface |
 
 ---

@@ -304,6 +304,7 @@ static int raw_active;
 static int stdout_terminal = 1;
 
 static char scratch[2048];
+static int historical_experience;
 
 /* ── Terminal helpers ──────────────────────────────────────── */
 static int write_all(int fd, const char *buf, int len) {
@@ -906,17 +907,17 @@ static void __attribute__((unused)) complete(void) {
 		maybe_builtin_match(matches, &match_count, word, "mount");
 		maybe_builtin_match(matches, &match_count, word, "df");
 		maybe_builtin_match(matches, &match_count, word, "ps");
-		maybe_builtin_match(matches, &match_count, word, "hello");
 	maybe_builtin_match(matches, &match_count, word, "uname");
 	maybe_builtin_match(matches, &match_count, word, "history");
 	maybe_builtin_match(matches, &match_count, word, "date");
 	maybe_builtin_match(matches, &match_count, word, "cal");
 	maybe_builtin_match(matches, &match_count, word, "uptime");
-	maybe_builtin_match(matches, &match_count, word, "fortune");
-	maybe_builtin_match(matches, &match_count, word, "yes");
 	maybe_builtin_match(matches, &match_count, word, "true");
 	maybe_builtin_match(matches, &match_count, word, "false");
-	maybe_builtin_match(matches, &match_count, word, "linus");
+	if (!historical_experience) {
+		maybe_builtin_match(matches, &match_count, word, "fortune");
+		maybe_builtin_match(matches, &match_count, word, "linus");
+	}
 }
 
 	if (first_word && !has_path) {
@@ -1519,7 +1520,7 @@ static int read_line_raw(void) {
 /* ── Help text ─────────────────────────────────────────────── */
 static void builtin_help(void) {
     puts(
-        CC "root@linux01 shell" C0 " -- " CG "built-in commands:" C0 "\n"
+		CC "root@linux01 shell" C0 " -- " CG "commands:" C0 "\n"
         "  help         show this help\n"
         "  clear        clear the screen\n"
         "  exit         request guest halt after sync\n"
@@ -1540,18 +1541,20 @@ static void builtin_help(void) {
 		"  mount        show configured root mount\n"
 		"  df           show filesystem usage\n"
 		"  ps aux       show up to 16 task slots\n"
-		"  hello        print userland demo message\n"
+		"  hello        run the external userland demo\n"
 		"  command      search PATH and run with execve\n"
 		"  uname [-a]   print kernel name/info\n"
 		"  history      show command history\n"
 		CM "  -- additional commands --\n" C0
 		"  date         print current date/time\n"
 		"  cal          print month calendar\n"
-		"  uptime       seconds since shell start\n"
-		"  fortune      random unix wisdom\n"
-		"  yes [text]   print 50 lines\n"
+		"  uptime       seconds since shell start\n");
+	if (!historical_experience)
+		puts("  fortune      random unix wisdom\n"
+		     "  linus        the comp.os.minix post (1991)\n");
+	puts(
+		"  yes [text]   external process; repeat until write fails\n"
 		"  true/false   no-output compatibility commands\n"
-		"  linus        the comp.os.minix post (1991)\n"
 		"\n"
 		"  syntax: cmd [args] [< in] [> out|>> out] [| cmd ...]\n"
 		"  limits: 255-byte lines, 30 args/command, 64 tokens,\n"
@@ -1625,15 +1628,6 @@ static void builtin_echo(int argc, char **argv) {
 	}
 	write(out, "\n", 1);
 	if (out != 1) close(out);
-}
-
-static void builtin_hello(void) {
-	puts("\033[36m\n");
-	puts("  +--------------------------------------+\n");
-	puts("  |  Hello from C userland!               |\n");
-	puts("  |  Linux 0.01 -- Torvalds, 1991         |\n");
-	puts("  +--------------------------------------+\n");
-	puts("\033[0m");
 }
 
 static void builtin_uname(int argc, char **argv) {
@@ -2398,24 +2392,6 @@ static void builtin_fortune(int argc, char **argv) {
     puts(CC); puts(fortunes[idx]); puts(C0); putc('\n');
 }
 
-static void builtin_yes(int argc, char **argv) {
-    int i, k, out_argc;
-    /* Classic yes(1) would loop forever; we cap at 50 lines so the
-     * shell stays interactive — same spirit, terminating courtesy. */
-    if (argc < 2) {
-        for (i = 0; i < 50; i++) puts("y\n");
-        return;
-    }
-    out_argc = argc;
-    for (i = 0; i < 50; i++) {
-        for (k = 1; k < out_argc; k++) {
-            puts(argv[k]);
-            if (k + 1 < out_argc) putc(' ');
-        }
-        putc('\n');
-    }
-}
-
 static void builtin_true(int argc, char **argv) {
     (void)argc; (void)argv;
 }
@@ -2457,7 +2433,6 @@ static void builtin_halt_cmd(int argc, char **argv) { (void)argc; (void)argv; bu
 static void builtin_sync_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_sync(); }
 static void builtin_pwd_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_pwd(); }
 static void builtin_help_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_help(); }
-static void builtin_hello_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_hello(); }
 static void builtin_whoami_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_whoami(); }
 static void builtin_mount_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_mount(); }
 static void builtin_df_cmd(int argc, char **argv) { (void)argc; (void)argv; builtin_df(); }
@@ -2472,7 +2447,6 @@ static int eq7(const char *s, char a, char b, char c, char d, char e, char f, ch
 
 static int run_builtin(int argc, char **argv) {
     char *s = argv[0];
-    if (eq5(s,'h','e','l','l','o')) { builtin_hello_cmd(argc, argv); return 1; }
     if (eq4(s,'h','e','l','p')) { builtin_help_cmd(argc, argv); return 1; }
     if (eq5(s,'c','l','e','a','r')) { builtin_clear_cmd(argc, argv); return 1; }
     if (eq4(s,'e','x','i','t')) { builtin_exit_cmd(argc, argv); return 1; }
@@ -2504,11 +2478,10 @@ static int run_builtin(int argc, char **argv) {
 	if (eq4(s,'d','a','t','e')) { builtin_date(argc, argv); return 1; }
 	if (eq3(s,'c','a','l')) { builtin_cal(argc, argv); return 1; }
 	if (eq6(s,'u','p','t','i','m','e')) { builtin_uptime(argc, argv); return 1; }
-	if (eq7(s,'f','o','r','t','u','n','e')) { builtin_fortune(argc, argv); return 1; }
-	if (eq3(s,'y','e','s')) { builtin_yes(argc, argv); return 1; }
+	if (!historical_experience && eq7(s,'f','o','r','t','u','n','e')) { builtin_fortune(argc, argv); return 1; }
 	if (eq4(s,'t','r','u','e')) { builtin_true(argc, argv); return 1; }
 	if (eq5(s,'f','a','l','s','e')) { builtin_false(argc, argv); return 1; }
-	if (eq5(s,'l','i','n','u','s')) { builtin_linus(argc, argv); return 1; }
+	if (!historical_experience && eq5(s,'l','i','n','u','s')) { builtin_linus(argc, argv); return 1; }
 	return 0;
 }
 
@@ -2570,6 +2543,7 @@ int main(int argc, char **argv, char **envp) {
 	(void)argv;
 	shell_envp = envp;
 	experience = env_value("EXPERIENCE", "alive");
+	historical_experience = strcmp(experience, "1991") == 0;
 	cwd[0] = '/';
 	cwd[1] = 0;
 	boot_time = time((long *)0);

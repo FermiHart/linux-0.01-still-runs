@@ -76,7 +76,7 @@ COMMANDS = [
     ("touch abcdefghijklmno", ["touch: invalid path"], []),
     ("rm abcdefghijklmn", [], []),
     ("pathcheck | /bin/cat", ["PATH=/bin:/usr/bin:."], []),
-    ("yes | head", ["y"], [], ["head: missing file"]),
+    ("pathcheck | head", ["PATH=/bin:/usr/bin:."], [], ["head: missing file"]),
     ("pathcheck | cat | cat | cat | cat | cat | cat | wc", ["1 1 21"], []),
     ("pathcheck | cat | cat | cat | cat | cat | cat | cat | wc", ["pipeline limit: 8 stages"], []),
     ("pathcheck | grep PATH", ["PATH=/bin:/usr/bin:."], []),

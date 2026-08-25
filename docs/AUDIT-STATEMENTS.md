@@ -292,6 +292,28 @@ other profile's command output.
 `fsck.minix` validation. `tests/test_harness_utils.py` separately validates the
 transcript-boundary extractor.
 
+### "The guest surface is protected from modern feature creep"
+
+**Source**: `MISSION.md`, `EXPERIENCE.md` and `README.md`.
+
+**Audit**: Both disposable profile sessions probe package managers, network
+tools, language runtimes, guest compilers/build tools, desktops and browsers and
+require a command-local `not found` result. Literal probes cover variables,
+globbing, quoting, command substitution, command lists and background syntax.
+The 1991 session additionally rejects `fortune` and the retrospective `linus`
+command, while alive retains them as narrative only. `hello` and `yes` resolve
+to real external programs instead of bounded built-in simulations.
+
+The deny policy is intentionally guest-scoped. Modern host compilers, Python,
+KVM, containers, sanitizers and tests remain part of the documented bridge.
+
+**Status**: PROVEN.
+
+**Evidence**: `make test-experiences`, `make test-shell` and
+`make test-bemu-devices`. The device test proves that the host input bridge
+actually transports the unsupported punctuation being tested instead of
+silently deleting it.
+
 ### bEMU provenance
 
 **Source**: `bemu/README.md`.

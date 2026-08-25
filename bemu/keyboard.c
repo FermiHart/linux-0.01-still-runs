@@ -37,6 +37,15 @@ static int ascii_key(unsigned char ch, uint8_t *code, int *shift)
     case '+': *code=0x0d; *shift=1; return 0;
     case ';': *code=0x27; return 0;
     case ':': *code=0x27; *shift=1; return 0;
+    case '\'': *code=0x28; return 0;
+    case '"': *code=0x28; *shift=1; return 0;
+    case '`': *code=0x2b; return 0;
+    case '~': *code=0x2b; *shift=1; return 0;
+    case '$': *code=0x05; *shift=1; return 0;
+    case '&': *code=0x08; *shift=1; return 0;
+    case '*': *code=0x09; *shift=1; return 0;
+    case '(': *code=0x0a; *shift=1; return 0;
+    case ')': *code=0x0b; *shift=1; return 0;
     case '<': *code=0x33; *shift=1; return 0;
     case '>': *code=0x34; *shift=1; return 0;
     default: return -1;

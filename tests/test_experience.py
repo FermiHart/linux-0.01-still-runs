@@ -27,6 +27,13 @@ MONTH_NUMBER = {
     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
 }
 
+FORBIDDEN_GUEST_COMMANDS = (
+    "apt", "apk", "dnf", "pacman", "pkg",
+    "curl", "wget", "ssh", "telnet", "ftp", "ping",
+    "python", "python3", "perl", "ruby", "node", "java", "gcc", "make",
+    "startx", "xinit", "weston", "firefox",
+)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Linux 0.01 experience mode tests")
@@ -171,13 +178,32 @@ def main():
     ]
     if args.experience == "1991":
         cases.insert(5, ("cal", ["September 1991", "Su Mo Tu We Th Fr Sa"], []))
+        cases.extend((
+            ("fortune", ["fortune: not found"], []),
+            ("linus", ["linus: not found"], ["three and a half decades"]),
+        ))
+    cases.extend((
+        ("echo $HOME", ["$HOME"], []),
+        ("echo *", ["*"], ["bin dev etc"]),
+        ("echo $(uname)", ["$(uname)"], ["linux .0"]),
+        ("echo `uname`", ["`uname`"], ["linux .0"]),
+        ("echo x && nope", ["x && nope"], ["nope: not found"]),
+        ("echo x &", ["x &"], []),
+        ("touch \"joined name\"", [], []),
+        ("ls", ["\"joined", "name\""], []),
+        ("rm \"joined name\"", [], []),
+    ))
+    cases.extend(
+        (command, [f"{command}: not found"], [])
+        for command in FORBIDDEN_GUEST_COMMANDS
+    )
 
-    nonce = secrets.token_hex(6).upper()
-    begin = f"{marker}_{nonce}_BEGIN"
+    nonce = secrets.token_hex(4)
+    begin = f"x{nonce}b"
     chunks = [f"echo {begin}\n"]
     boundaries = []
     for index, (command_text, expected, forbidden) in enumerate(cases):
-        end = f"{marker}_{nonce}_{index:02d}_END"
+        end = f"x{nonce}{index:02x}"
         chunks.extend((command_text, "\n", f"echo {end}\n"))
         boundaries.append((command_text, expected, forbidden, begin, end))
         begin = end

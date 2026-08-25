@@ -14,7 +14,7 @@ contracts; there is no third transitional runtime mode.
 | Boot path | Direct bEMU/KVM, no firmware | Same |
 | Date source | 1991-09-17 00:00:00 UTC boot epoch | Host UTC snapshot at boot |
 | Memory ceiling | Fixed 8 MiB | Fixed 8 MiB |
-| Shell | Minimal built-ins using real syscalls | Same plus quality-of-life helpers |
+| Shell | Small grammar and bounded interaction aids | Same grammar plus narrative commands |
 | Filesystem | Real Minix v1 persistence | Same |
 | Output style | Period Unix messages | Vesica Piscis MOTD and modern glyphs |
 | Input | Raw scancodes, no host paste | Same |
@@ -42,10 +42,15 @@ Implemented in Wave 091:
   interface; no shell output is substituted or forged.
 - The fixed epoch advances through the normal Linux 0.01 PIT and `jiffies` path.
 
-Scheduled for Wave 095:
+Implemented in Wave 095:
 
 - No anachronistic quotes, Easter eggs or Unicode art.
 - Commands fail with historically plausible error messages.
+- `fortune` and the retrospective `linus` presentation are available only in
+  alive; 1991 resolves them normally and reports `not found`.
+- `hello` and `yes` are external programs reached through `$PATH`, not bounded
+  shell simulations. The historical `/bin/yes | head` close/SIGPIPE limitation
+  is exposed rather than hidden by a terminating courtesy.
 
 ## alive mode
 
@@ -89,6 +94,29 @@ kernel time, manual lookup, external processes, process visibility, pipes,
 redirection, and a create/read/remove filesystem cycle. Profile-specific text is
 also rejected from the other session.
 
+## Guest surface guardrails
+
+The guest remains a historical experiment rather than a small modern
+distribution. These boundaries apply to both profiles:
+
+| Surface | Policy |
+|---|---|
+| Package management | No package managers, repositories or installers |
+| Network | No clients, servers, configuration tools or network stack claims |
+| Language/build tools | No guest compiler, build suite or general-purpose runtime |
+| Graphics | No desktop, display server or browser |
+| Shell grammar | No variables, globbing, quoting, command substitution, command lists or background jobs |
+
+The shell treats unsupported expansion syntax literally. It implements only
+whitespace-separated arguments, foreground execution, pipes, and `<`, `>`,
+`>>`. Bounded history, completion and line editing are interaction aids, not new
+kernel capabilities. Alive may add current-time and retrospective narrative,
+but not capabilities absent from 1991.
+
+This policy does not apply to the host bridge: compilers, Python, containers,
+KVM, sanitizers and test tooling are required to build and observe the artifact.
+They must not be installed or surfaced as guest facilities.
+
 ## What breaks fidelity
 
 The following are considered regressions in either mode:
@@ -98,6 +126,10 @@ The following are considered regressions in either mode:
 - A program that bypasses the kernel to read or write data.
 - A fake `ps`, `mount`, `df` or `date` that returns invented output.
 - Any claim that the system is original when patches are not documented.
+- A package manager, network facility, runtime, build suite, desktop or browser
+  exposed inside either guest.
+- Expansion syntax or background execution beyond the documented small shell
+  grammar.
 
 ## Current gaps
 
@@ -107,8 +139,8 @@ The following are considered regressions in either mode:
   mount-table interface; `ps` exposes at most 16 task slots.
 - Guest halt/reset requests do not yet terminate or restart the bEMU host
   process, and they remain downstream of the blocking `sync()` path.
-- Prompt and help remain shared while Wave 095 audits conveniences that should
-  not appear in the historical profile.
+- Bounded history, completion, editing and ANSI colors remain shared interaction
+  aids; they do not add kernel or distribution capabilities.
 
 ## Future fidelity gate
 

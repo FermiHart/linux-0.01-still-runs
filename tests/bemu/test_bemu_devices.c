@@ -121,6 +121,31 @@ static void test_keyboard_shell_operators(void)
     check(match, "keyboard queues pipe and input redirect scancodes");
 }
 
+static void test_keyboard_guardrail_syntax(void)
+{
+    static const unsigned char expected[] = {
+        0x2a, 0x05, 0x85, 0xaa,
+        0x2a, 0x09, 0x89, 0xaa,
+        0x2a, 0x0a, 0x8a, 0xaa,
+        0x2a, 0x0b, 0x8b, 0xaa,
+        0x28, 0xa8,
+        0x2a, 0x28, 0xa8, 0xaa,
+        0x2b, 0xab,
+        0x2a, 0x08, 0x88, 0xaa,
+    };
+    size_t i;
+    int match;
+
+    memset(&keyboard_machine, 0, sizeof(keyboard_machine));
+    keyboard_reset(&keyboard_machine);
+    keyboard_queue_text(&keyboard_machine, "$*()'\"`&");
+    match = keyboard_machine.key_head == sizeof(expected);
+    for (i = 0; i < sizeof(expected) && i < keyboard_machine.key_head; i++)
+        if (keyboard_machine.keys[i] != expected[i])
+            match = 0;
+    check(match, "keyboard preserves unsupported shell syntax for guardrails");
+}
+
 static void feed_console(struct machine *m, const char *text)
 {
     while (*text)
@@ -171,6 +196,7 @@ int main(void)
     test_pit_latch();
     test_uart_dll_dlm();
     test_keyboard_shell_operators();
+    test_keyboard_guardrail_syntax();
     test_console_prompt_contract();
     if (failures) {
         fprintf(stderr, "\n%d test(s) failed\n", failures);
