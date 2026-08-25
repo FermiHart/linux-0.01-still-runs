@@ -78,6 +78,7 @@ The following must remain true regardless of mode:
 - All filesystem operations go through real Linux 0.01 syscalls.
 - All process creation uses the real scheduler and `fork`/`execve`.
 - Pipes and redirection are handled by the kernel.
+- `man` reads shared internal Unix manual pages from the real Minix v1 image.
 - `ps aux` shows a bounded snapshot of real scheduler task slots.
 - `sync` flushes the real Minix v1 superblock, inodes and zones.
 - Reboot reads back the same bytes written before shutdown.

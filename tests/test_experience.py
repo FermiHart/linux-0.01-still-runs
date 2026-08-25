@@ -123,6 +123,10 @@ def main():
         "cat /etc/issue\n"
         "cat /etc/motd\n"
         f"{profile_commands}"
+        "ls /usr/man/man1\n"
+        "man limits\n"
+        "rm /usr/man/man1/limits.1\n"
+        "man limits\n"
         "cd /tmp\n"
         "cd\n"
         "pwd\n"
@@ -190,6 +194,9 @@ def main():
     required += (
         f"root=/dev/hd1 ide=977,5,17 experience={args.experience}",
         f"linux 0.01 -- experience: {args.experience} -- interactive shell",
+        "LIMITS(1)",
+        "intro.1", "shell.1", "commands.1", "files.1", "limits.1", "date.1",
+        "man: no entry for limits",
         f"{marker}_DONE",
     )
     missing = [value for value in required if value not in output]

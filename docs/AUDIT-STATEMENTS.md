@@ -258,6 +258,22 @@ their images, BBP identities, HOME behavior, banners, required narrative, and
 cross-profile exclusions. The alive run parses the guest `date` output as UTC
 and proves that it falls within the surrounding host-time window.
 
+### "The guest contains an internal Unix manual"
+
+**Source**: README.md and `EXPERIENCE.md`.
+
+**Audit**: Six ASCII pages are regular files under `/usr/man/man1` in both
+profile images. The `man` built-in validates a single topic, opens the
+corresponding `.1` file through Linux 0.01, and streams its bytes; it contains no
+embedded page text and accepts no path separators.
+
+**Status**: PROVEN.
+
+**Evidence**: `tests/test_shell.py` checks default, named, missing, and traversal
+cases. `tests/test_experience.py` enumerates every page in both profiles, reads
+`limits.1`, removes it on a temporary image, and then observes lookup failure.
+Both filesystem images pass `fsck.minix` through the `test-experiences` graph.
+
 ### bEMU provenance
 
 **Source**: `bemu/README.md`.

@@ -674,11 +674,68 @@ int main(int argc, char **argv)
     int dev_ino = add_dir(root_ino, "dev");
     int etc_ino = add_dir(root_ino, "etc");
     int home_ino = add_dir(root_ino, "home");
+    int usr_ino = add_dir(root_ino, "usr");
+    int man_ino = add_dir(usr_ino, "man");
+    int man1_ino = add_dir(man_ino, "man1");
     if (!experience_1991)
         add_dir(home_ino, "fermihart");
     add_dir(root_ino, "tmp");
 
 	add_file(etc_ino, "fstab", "/dev/hd1 / minix rw 0 0\n", 0644);
+	add_file(man1_ino, "intro.1",
+		"LINUX01(1)        Linux 0.01 Internal Manual        LINUX01(1)\n"
+		"\nNAME\n"
+		"    linux01 - a small Unix environment on Linux 0.01\n"
+		"\nSYNOPSIS\n"
+		"    man [topic]\n"
+		"\nDESCRIPTION\n"
+		"    Commands run through the real Linux 0.01 kernel, Minix v1\n"
+		"    filesystem, scheduler, pipes, and system calls.\n"
+		"\nTOPICS\n"
+		"    intro, shell, commands, files, limits, date\n", 0644);
+	add_file(man1_ino, "shell.1",
+		"SHELL(1)          Linux 0.01 Internal Manual          SHELL(1)\n"
+		"\nNAME\n"
+		"    shell - interactive command interpreter\n"
+		"\nSYNTAX\n"
+		"    command [arguments] [< input] [> output | >> output]\n"
+		"    command | command, with at most 8 pipeline stages.\n"
+		"\nLIMITS\n"
+		"    No quoting, globbing, job control, command substitution,\n"
+		"    variables, or modern shell expansion is implemented.\n", 0644);
+	add_file(man1_ino, "commands.1",
+		"COMMANDS(1)       Linux 0.01 Internal Manual       COMMANDS(1)\n"
+		"\nFILES\n"
+		"    cat ls cd pwd mkdir rmdir touch rm cp mv ln head wc grep\n"
+		"\nSYSTEM\n"
+		"    uname whoami mount df ps sync halt reboot\n"
+		"\nTIME AND TEXT\n"
+		"    date cal uptime echo fortune linus man help\n"
+		"\nPROGRAMS\n"
+		"    /bin/hello /bin/yes /bin/cat /bin/pathcheck\n", 0644);
+	add_file(man1_ino, "files.1",
+		"FILES(1)          Linux 0.01 Internal Manual          FILES(1)\n"
+		"\nDESCRIPTION\n"
+		"    The root disk is a real Minix v1 filesystem on /dev/hd1.\n"
+		"    Names are at most 14 bytes. Files use real inodes, zones,\n"
+		"    directory entries, buffer-cache IO, and IDE requests.\n"
+		"\nFILES\n"
+		"    /etc/issue /etc/motd /etc/fstab /usr/man/man1\n", 0644);
+	add_file(man1_ino, "limits.1",
+		"LIMITS(1)         Linux 0.01 Internal Manual         LIMITS(1)\n"
+		"\nSHELL LIMITS\n"
+		"    255 input bytes; 30 arguments per command; 64 tokens;\n"
+		"    8 pipeline stages; 14-byte names; 64 completion matches.\n"
+		"\nKERNEL LIMITS\n"
+		"    8 MiB RAM and 64 scheduler task slots; ps exposes 16.\n", 0644);
+	add_file(man1_ino, "date.1",
+		"DATE(1)           Linux 0.01 Internal Manual           DATE(1)\n"
+		"\nNAME\n"
+		"    date - print the Linux kernel clock in UTC\n"
+		"\nDESCRIPTION\n"
+		"    The 1991 profile starts at 17 September 1991. The alive\n"
+		"    profile starts from a coherent host UTC CMOS snapshot.\n"
+		"    Both advance through the kernel PIT and jiffies paths.\n", 0644);
 	if (experience_1991) {
 		add_file(etc_ino, "passwd", "root:x:0:0:root:/:/bin/shell\n", 0644);
 		add_file(etc_ino, "issue", "Linux 0.01 historical experience\n", 0644);

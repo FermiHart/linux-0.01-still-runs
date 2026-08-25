@@ -1531,6 +1531,7 @@ static void builtin_help(void) {
 		"  pwd          print working directory\n"
 		"  ls [-la] [dir] list directory\n"
 		"  cat [file]   print file or standard input\n"
+		"  man [topic]  read the internal Unix manual\n"
 		"  mkdir/rmdir  create/remove directories\n"
 		"  touch/rm     create/remove files\n"
 		"  cp/mv/ln     copy, move, hard-link files\n"
@@ -1815,6 +1816,44 @@ static void builtin_cat(int argc, char **argv) {
 			write_stdout(buf, n);
 		close(fd);
 	}
+}
+
+static void builtin_man(int argc, char **argv) {
+	const char *prefix = "/usr/man/man1/";
+	const char *topic;
+	char path[48], buf[512];
+	int i, n, fd, pos;
+
+	if (argc > 2) {
+		puts("usage: man [topic]\n");
+		return;
+	}
+	topic = argc == 2 ? argv[1] : "intro";
+	for (i = 0; topic[i]; i++) {
+		if (i >= 12 || !((topic[i] >= 'a' && topic[i] <= 'z') ||
+		                 (topic[i] >= '0' && topic[i] <= '9') || topic[i] == '-')) {
+			puts("man: invalid topic\n");
+			return;
+		}
+	}
+	if (i == 0) {
+		puts("man: invalid topic\n");
+		return;
+	}
+	pos = 0;
+	for (i = 0; prefix[i]; i++) path[pos++] = prefix[i];
+	for (i = 0; topic[i]; i++) path[pos++] = topic[i];
+	path[pos++] = '.';
+	path[pos++] = '1';
+	path[pos] = 0;
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		puts("man: no entry for "); puts(topic); putc('\n');
+		return;
+	}
+	while ((n = read(fd, buf, sizeof(buf))) > 0)
+		write_stdout(buf, n);
+	close(fd);
 }
 
 static int same_real_file(const char *src, const char *dst) {
@@ -2445,6 +2484,7 @@ static int run_builtin(int argc, char **argv) {
     if (eq3(s,'p','w','d')) { builtin_pwd_cmd(argc, argv); return 1; }
     if (eq2(s,'l','s')) { builtin_ls(argc, argv); return 1; }
     if (eq3(s,'c','a','t')) { builtin_cat(argc, argv); return 1; }
+    if (eq3(s,'m','a','n')) { builtin_man(argc, argv); return 1; }
     if (eq5(s,'m','k','d','i','r')) { builtin_mkdir(argc, argv); return 1; }
     if (eq5(s,'r','m','d','i','r')) { builtin_rmdir(argc, argv); return 1; }
     if (eq2(s,'r','m')) { builtin_rm(argc, argv); return 1; }

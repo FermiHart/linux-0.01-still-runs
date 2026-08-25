@@ -575,7 +575,7 @@ test-experience-alive: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.i
 	  --img $(BUILD)/root.img --default-img $(BUILD)/root-1991.img \
 	  --make "$(MAKE_COMMAND)" --timeout 60
 
-test-experiences: test-bemu-cli test-rtc $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
+test-experiences: test-bemu-cli test-rtc fsck-rootfs fsck-rootfs-1991 $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
 	$(call STEP,complete experience mode test)
 	@python3 tests/test_experience.py --experience 1991 --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root-1991.img \

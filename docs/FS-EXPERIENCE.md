@@ -12,8 +12,11 @@ Every file operation performed by the built-in shell goes through the Linux
 - `cat` reads back from the buffer cache
 - `touch`, `rm`, `cp`, `mv`, `ln` manage inodes and directory entries
 - `mkdir`, `rmdir` manage directories and link counts
+- `man` reads ASCII pages from real files under `/usr/man/man1`
 
-These are exercised by the new `test-fs-*` targets.
+Filesystem mutation commands are exercised by the `test-fs-*` targets. Manual
+lookup and removal are exercised on temporary profile images by
+`make test-experiences`.
 
 ## What is independently verified
 

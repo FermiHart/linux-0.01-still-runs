@@ -157,6 +157,7 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 | `clear` | Clear the screen |
 | `echo <text>` | Print text; generic `<`, `>`, and `>>` redirection is handled by the shell |
 | `cat [file]` | Read regular files or standard input |
+| `man [topic]` | Read ASCII manual pages stored in `/usr/man/man1` on the Minix v1 image |
 | `ls` / `ls -la` | Coloured directory listing (blue dirs, green executables, yellow devices) |
 | `cd <dir>` / `pwd` | Change directory + track cwd |
 | `mkdir` / `rmdir` / `touch` / `rm` | Real Minix v1 operations through Linux 0.01 syscalls; `rm` is not recursive |
