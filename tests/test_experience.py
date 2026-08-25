@@ -2,6 +2,7 @@
 """Integration tests for explicit bEMU experience profiles."""
 
 import argparse
+import datetime
 import os
 import re
 import shlex
@@ -12,6 +13,11 @@ import tempfile
 import time
 
 from harness_utils import BEMU_PASS_RE, KERNEL_FAULT_RE, diagnostic, sanitize_terminal
+
+MONTH_NUMBER = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
 
 
 def parse_args():
@@ -155,6 +161,7 @@ def main():
         command = [args.bemu, "--kernel", args.kernel, "--root", profile_img,
                    "--experience", args.experience, "--keys", script,
                    "--expect", f"{marker}_DONE"]
+        host_before = time.time()
         try:
             result = subprocess.run(
                 command,
@@ -167,6 +174,7 @@ def main():
         except subprocess.TimeoutExpired as exc:
             print(f"{args.experience} experience timed out: {diagnostic(exc.stdout, 2000)}")
             return 1
+        host_after = time.time()
 
     output = sanitize_terminal(result.stdout)
     if args.experience == "1991":
@@ -176,7 +184,7 @@ def main():
         home = "/"
     else:
         required = ("Linux 0.01 alive experience", "Vesica Piscis alive experience",
-                    "It still runs in 2026")
+                    "It still runs in 2026", "Today is not painted onto this screen")
         forbidden_values = ("Experience profile: 1991",)
         home = "/home/fermihart"
     required += (
@@ -190,18 +198,29 @@ def main():
         args.experience == "1991" and
         re.search(r"(?m)^Tue Sep 17 00:00:[0-5][0-9] 1991$", output) is None
     )
-    alive_year_missing = (
-        args.experience == "alive" and
-        re.search(rf"(?m)^[A-Z][a-z]{{2}} [A-Z][a-z]{{2}} +[0-9]{{1,2}} "
-                  rf"[0-9:]{{8}} {time.gmtime().tm_year}$", output) is None
-    )
+    alive_date_missing = False
+    if args.experience == "alive":
+        date_lines = re.findall(
+            r"(?m)^[A-Z][a-z]{2} [A-Z][a-z]{2} +[0-9]{1,2} [0-9:]{8} [0-9]{4}$",
+            output,
+        )
+        try:
+            _, month, day, clock, year = date_lines[-1].split()
+            hour, minute, second = (int(value) for value in clock.split(":"))
+            guest_time = datetime.datetime(
+                int(year), MONTH_NUMBER[month], int(day), hour, minute, second,
+                tzinfo=datetime.timezone.utc,
+            ).timestamp()
+            alive_date_missing = not (host_before - 2 <= guest_time <= host_after + 30)
+        except (IndexError, KeyError, ValueError):
+            alive_date_missing = True
     if (result.returncode or BEMU_PASS_RE.search(output) is None or
             KERNEL_FAULT_RE.search(output) or missing or forbidden or
-            historical_date_missing or alive_year_missing or
+            historical_date_missing or alive_date_missing or
             re.search(rf"(?m)^{re.escape(home)}$", output) is None):
         print(f"{args.experience} experience failed: missing={missing} "
               f"forbidden={forbidden} historical_date_missing={historical_date_missing} "
-              f"alive_year_missing={alive_year_missing}")
+              f"alive_date_missing={alive_date_missing}")
         print(diagnostic(output, 3000))
         return 1
 

@@ -692,7 +692,7 @@ int main(int argc, char **argv)
 		add_file(etc_ino, "passwd", "root:x:0:0:root:/home/fermihart:/bin/shell\n", 0644);
 		add_file(etc_ino, "issue",
 		"Linux 0.01 alive experience\n"
-		"Try: ls -la, cat /etc/fstab, whoami, mount, df, ps aux\n", 0644);
+		"Try: date, cal, ls -la, cat /etc/fstab, mount, df, ps aux\n", 0644);
 		add_file(etc_ino, "motd",
 		"Vesica Piscis alive experience\n"
 		"\n"
@@ -726,6 +726,9 @@ int main(int argc, char **argv)
 		"There is no container orchestration between you and the process\n"
 		"table. There is no init system with seventy stages. There is a\n"
 		"kernel, a console, a shell, and you.\n"
+		"\n"
+		"Today is not painted onto this screen. The date command reads Linux's\n"
+		"clock, initialized from a coherent UTC snapshot supplied by bEMU.\n"
 		"\n"
 		"Welcome to 1991. It still runs in 2026.\n", 0644);
 	}

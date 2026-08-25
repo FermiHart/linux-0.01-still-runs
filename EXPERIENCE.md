@@ -60,11 +60,12 @@ Implemented in Wave 090:
 - Legacy unmarked images remain accepted as alive images so existing writable
   research images are not made unusable by the profile marker.
 
-Wave 092 separately validates and documents the real-time policy and complete
-alive narrative.
+Implemented in Wave 092:
 
-- Real CMOS date and time (Y2K-corrected).
-- Vesica Piscis MOTD, identity and checksum banner.
+- Real CMOS date and time, validated against the host UTC window and corrected
+  for the two-digit CMOS year in the historical kernel.
+- Vesica Piscis MOTD and identity, including an explicit statement that `date`
+  reads Linux's kernel clock rather than profile-specific shell output.
 - Modern terminal glyphs where the 8x8 font supports them.
 - Shell retains historical behavior; conveniences are cosmetic only.
 - `linus` Easter egg remains available because it is documentation, not a

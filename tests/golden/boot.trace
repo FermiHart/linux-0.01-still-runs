@@ -122,6 +122,15 @@ kernel, a console, a shell, and you.
 
 
 
+Today is not painted onto this screen. The date command reads Linux's
+
+
+clock, initialized from a coherent UTC snapshot supplied by bEMU.
+
+
+
+
+
 Welcome to 1991. It still runs in 2026.
 
 
@@ -140,4 +149,4 @@ Welcome to 1991. It still runs in 2026.
 GOLDEN_BOOT_MARKER
 
 [32mroot@linux01[0m:[34m/[0m[33m#[0m
-[bemu-linux01] RESULT: PASS after 5979 KVM exits
+[bemu-linux01] RESULT: PASS after 6297 KVM exits

@@ -249,13 +249,14 @@ the Tuesday 17 September 1991 `date` output and September 1991 calendar.
 **Audit**: Empty Make selection and the bEMU CLI default resolve to `alive`, use
 the alive image, emit the exact alive BBP command line, and provide
 `HOME=/home/fermihart` plus `EXPERIENCE=alive` to the shell. The image contains
-the Vesica Piscis narrative; detailed real-time validation belongs to Wave 092.
+the Vesica Piscis narrative and states that `date` reads the kernel clock.
 
 **Status**: PROVEN.
 
 **Evidence**: `make test-experiences` boots both modes back-to-back and checks
 their images, BBP identities, HOME behavior, banners, required narrative, and
-cross-profile exclusions.
+cross-profile exclusions. The alive run parses the guest `date` output as UTC
+and proves that it falls within the surrounding host-time window.
 
 ### bEMU provenance
 
