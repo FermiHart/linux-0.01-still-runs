@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 from harness_utils import BEMU_PASS_RE, KERNEL_FAULT_RE, diagnostic, sanitize_terminal
 
@@ -110,10 +111,12 @@ def main():
                 return 1
 
     marker = f"EXPERIENCE_{args.experience.upper()}"
+    profile_commands = "date\ncal\n" if args.experience == "1991" else "date\n"
     script = (
         f"echo {marker}_BEGIN\n"
         "cat /etc/issue\n"
         "cat /etc/motd\n"
+        f"{profile_commands}"
         "cd /tmp\n"
         "cd\n"
         "pwd\n"
@@ -167,7 +170,8 @@ def main():
 
     output = sanitize_terminal(result.stdout)
     if args.experience == "1991":
-        required = ("Linux 0.01 historical experience", "Experience profile: 1991")
+        required = ("Linux 0.01 historical experience", "Experience profile: 1991",
+                    "September 1991")
         forbidden_values = ("Vesica Piscis", "It still runs in 2026")
         home = "/"
     else:
@@ -182,10 +186,22 @@ def main():
     )
     missing = [value for value in required if value not in output]
     forbidden = [value for value in forbidden_values if value in output]
+    historical_date_missing = (
+        args.experience == "1991" and
+        re.search(r"(?m)^Tue Sep 17 00:00:[0-5][0-9] 1991$", output) is None
+    )
+    alive_year_missing = (
+        args.experience == "alive" and
+        re.search(rf"(?m)^[A-Z][a-z]{{2}} [A-Z][a-z]{{2}} +[0-9]{{1,2}} "
+                  rf"[0-9:]{{8}} {time.gmtime().tm_year}$", output) is None
+    )
     if (result.returncode or BEMU_PASS_RE.search(output) is None or
             KERNEL_FAULT_RE.search(output) or missing or forbidden or
+            historical_date_missing or alive_year_missing or
             re.search(rf"(?m)^{re.escape(home)}$", output) is None):
-        print(f"{args.experience} experience failed: missing={missing} forbidden={forbidden}")
+        print(f"{args.experience} experience failed: missing={missing} "
+              f"forbidden={forbidden} historical_date_missing={historical_date_missing} "
+              f"alive_year_missing={alive_year_missing}")
         print(diagnostic(output, 3000))
         return 1
 

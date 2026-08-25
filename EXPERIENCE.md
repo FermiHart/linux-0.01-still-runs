@@ -12,7 +12,7 @@ contracts; there is no third transitional runtime mode.
 |---|---|---|
 | Kernel source | Historical Linux 0.01 with documented patches | Same |
 | Boot path | Direct bEMU/KVM, no firmware | Same |
-| Date source | Fixed historical reference date (Wave 091) | Real CMOS date |
+| Date source | 1991-09-17 00:00:00 UTC boot epoch | Host UTC snapshot at boot |
 | Memory ceiling | Fixed 8 MiB | Fixed 8 MiB |
 | Shell | Minimal built-ins using real syscalls | Same plus quality-of-life helpers |
 | Filesystem | Real Minix v1 persistence | Same |
@@ -35,12 +35,17 @@ Implemented in Wave 089:
 - The same 8 MiB machine, Minix v1 filesystem, syscalls, process model, pipes,
   redirections, and documented shell limits as the alive runtime.
 
-Scheduled for Waves 091 and 095:
+Implemented in Wave 091:
 
-- Boot date fixed to a reference point (e.g., 1991-10-05).
+- CMOS boot date fixed to the Linux 0.01 release date, 1991-09-17 00:00:00 UTC.
+- `date` and `cal` consume the kernel clock initialized from that real CMOS
+  interface; no shell output is substituted or forged.
+- The fixed epoch advances through the normal Linux 0.01 PIT and `jiffies` path.
+
+Scheduled for Wave 095:
+
 - No anachronistic quotes, Easter eggs or Unicode art.
 - Commands fail with historically plausible error messages.
-- `date`, `uptime`, `cal` report the fixed historical time.
 
 ## alive mode
 
@@ -88,7 +93,6 @@ The following are considered regressions in either mode:
 
 ## Current gaps
 
-- `EXPERIENCE=1991` still uses the alive real-time RTC source until Wave 091.
 - Cross-boot persistence is blocked by incomplete IDE write-completion IRQ
   delivery in bEMU; `sync()` can still block.
 - `mount` reports the configured root mount because Linux 0.01 has no live

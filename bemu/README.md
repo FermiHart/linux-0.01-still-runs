@@ -33,4 +33,10 @@ reject mismatched profile/image combinations before entering KVM. Unmarked
 legacy images are accepted only by alive mode to preserve existing research
 images.
 
+The CMOS model takes one coherent UTC snapshot per boot. Historical mode always
+starts at `1991-09-17 00:00:00 UTC`, the Linux 0.01 release date; alive mode
+starts at the host's current UTC time. Linux reads the same CMOS register model
+in both modes and advances time through its PIT-driven `jiffies`; bEMU does not
+forge shell command output.
+
 The source retains the upstream BSD-3-Clause license and provenance header.

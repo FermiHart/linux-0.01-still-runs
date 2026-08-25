@@ -218,7 +218,7 @@ longer prints invented user counts or load averages.
 1991`; bEMU includes the selector in the CRC-checked BBP command line; init
 derives the shell environment only after validating that handoff. The profile
 has a concise ASCII identity and uses `/` as root's home. Its deterministic
-historical clock is not claimed before Wave 091.
+historical boot epoch is supplied by the bEMU CMOS model.
 
 **Status**: PROVEN.
 
@@ -226,6 +226,21 @@ historical clock is not claimed before Wave 091.
 directions of profile/image mismatch, verifies Make dry-run selection, guest BBP
 output, real `/etc/issue` and `/etc/motd` files, shell mode identity, and bare
 `cd` behavior.
+
+### "1991 mode starts from the Linux 0.01 release date"
+
+**Source**: README.md and `EXPERIENCE.md`.
+
+**Audit**: The bEMU CMOS model snapshots `1991-09-17 00:00:00 UTC` for the 1991
+profile. Linux 0.01 reads that model during `time_init()` and advances the epoch
+through its normal PIT, scheduler tick, `jiffies`, and `CURRENT_TIME` paths.
+Neither `date` nor `cal` contains a profile-specific output path.
+
+**Status**: PROVEN.
+
+**Evidence**: `tests/bemu/test_rtc.c` verifies exact BCD registers and coherent
+snapshots; `tests/test_experience.py` boots the historical guest and verifies
+the Tuesday 17 September 1991 `date` output and September 1991 calendar.
 
 ### "EXPERIENCE=alive is the explicit default"
 

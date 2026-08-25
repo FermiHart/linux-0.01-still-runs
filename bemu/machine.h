@@ -8,6 +8,7 @@
 #include "ide.h"
 #include "pic.h"
 #include "pit.h"
+#include "rtc.h"
 #include "uart.h"
 #include "trace_clock.h"
 #include "trace.h"
@@ -40,6 +41,7 @@ struct machine {
     struct pic_state pic;
     struct uart_state uart;
     uint8_t cmos_index, port61;
+    struct rtc_state rtc;
     struct pit_state pit;
     uint8_t seq_index, gc_index, crtc_index;
     uint8_t seq[256], gc[256], crtc[256];

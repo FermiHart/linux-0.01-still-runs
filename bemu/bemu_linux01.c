@@ -39,6 +39,7 @@
 #include "kvm.h"
 #include "pic.h"
 #include "pit.h"
+#include "rtc.h"
 #include "uart.h"
 #include "console.h"
 #include "trace_clock.h"
@@ -179,29 +180,6 @@ static void poll_signal(int sig)
 
 /* IRQ and core machine helpers moved to bemu/machine.c */
 
-static uint8_t bcd(unsigned value)
-{
-    return (uint8_t)(((value / 10) << 4) | (value % 10));
-}
-
-static uint8_t cmos_read(uint8_t index)
-{
-    time_t now = time(NULL);
-    struct tm tm;
-    gmtime_r(&now, &tm);
-    switch (index & 0x7f) {
-    case 0: return bcd((unsigned)tm.tm_sec);
-    case 2: return bcd((unsigned)tm.tm_min);
-    case 4: return bcd((unsigned)tm.tm_hour);
-    case 7: return bcd((unsigned)tm.tm_mday);
-    case 8: return bcd((unsigned)tm.tm_mon + 1);
-    case 9: return bcd((unsigned)(tm.tm_year % 100));
-    case 10: return 0;
-    case 11: return 2;
-    default: return 0;
-    }
-}
-
 /* console/UART output handling moved to bemu/console.c and bemu/uart.c */
 
 /* keyboard/scancode handling moved to bemu/keyboard.c */
@@ -265,7 +243,7 @@ static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
     case 0x60: value=m->key_ready ? m->key_data : 0; m->key_ready=0; break;
     case 0x61: value=m->port61; break;
     case 0x64: value=m->key_ready ? 1 : 0; break;
-    case 0x71: value=cmos_read(m->cmos_index); break;
+    case 0x71: value=rtc_read(&m->rtc, m->cmos_index); break;
     case 0x40: value=pit_read(&m->pit, port); break;
     case 0x20: value=pic_read(&m->pic, 0); break;
     case 0x21: value=pic_read(&m->pic, 1); break;
@@ -435,6 +413,8 @@ int main(int argc, char **argv)
     m.io_trace = opts.trace;
     m.no_timer = opts.no_timer;
     m.experience = opts.experience;
+    if (rtc_init_at(&m.rtc, opts.experience, time(NULL)) < 0)
+        fail("could not initialize RTC snapshot");
     m.script = opts.script;
     m.expect = opts.expect;
     m.trace_syscalls = opts.trace_syscalls;

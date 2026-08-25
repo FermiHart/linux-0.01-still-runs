@@ -50,10 +50,11 @@ make run EXPERIENCE=alive # explicit alive profile (the default)
 
 The 1991 profile selects `build/root-1991.img`, carries its identity through the
 validated BBP command line, uses `/` as root's home, and boots with a concise
-period-style MOTD. Its fixed historical clock is added separately in Wave 091;
-until then it uses the same RTC source as alive. The default alive profile uses
-`build/root.img`, `/home/fermihart`, the host UTC-derived CMOS view, and the
-Vesica Piscis narrative.
+period-style MOTD. Its CMOS boot epoch is fixed at the Linux 0.01 release date,
+1991-09-17 00:00:00 UTC, then advances through the kernel's normal PIT and
+`jiffies` path. The default alive profile uses `build/root.img`,
+`/home/fermihart`, one coherent host UTC snapshot, and the Vesica Piscis
+narrative.
 
 Inside the booted system:
 
@@ -102,7 +103,8 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 - **Minix v1 filesystem** built by hand at image time (`tools/mkimage.c`), with `/etc/motd`, `/etc/passwd`, `/bin/{shell,hello,update,yes,pathcheck,cat}`, `/dev/tty0`
 - **Firmware-free bEMU boot** — KVM enters `kernel.bin` at physical zero with no BIOS, UEFI, ISO, or bootloader
 - **Real BBP handoff** — bEMU publishes CRC64-checksummed RAM, kernel, root-disk, and machine identity tags at physical `0xC0000`; CRC64 detects corruption but does not authenticate the producer
-- **Real CMOS time** (Y2K rollover patched in `init/main.c` so `date` returns 2026 not 1970)
+- **Profile-aware CMOS time** (fixed 1991 release epoch in historical mode;
+  coherent host UTC snapshot and Y2K correction in alive mode)
 - **Automated validation**: build → direct KVM boot → run the full shell smoke suite
 
 ---

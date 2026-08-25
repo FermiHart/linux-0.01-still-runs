@@ -49,7 +49,7 @@ SOURCE_DATE_EPOCH=1700000000 make reproducible
 | `build/kernel.bin` | `c74256eb` |
 | `build/root.img` | `a19c9123` |
 | `build/root-1991.img` | `bff0d268` |
-| `build/bemu-linux01` | `aa8eee5e` |
+| `build/bemu-linux01` | `97fb4a31` |
 | `build/mkimage` | `2e85fe4b` |
 | `build/shell.bin` | `1c237506` |
 | `build/update.bin` | `4a0212fc` |
