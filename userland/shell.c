@@ -2529,7 +2529,7 @@ int main(int argc, char **argv, char **envp) {
 	(void)argc;
 	(void)argv;
 	shell_envp = envp;
-	experience = env_value("EXPERIENCE", "transitional");
+	experience = env_value("EXPERIENCE", "alive");
 	cwd[0] = '/';
 	cwd[1] = 0;
 	boot_time = time((long *)0);

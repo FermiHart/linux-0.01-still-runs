@@ -40,15 +40,16 @@ BUILD      ?= build
 MAKE_COMMAND := $(MAKE)
 export BUILD MAKE_COMMAND
 
-EXPERIENCE ?=
+EXPERIENCE ?= alive
 ifneq ($(strip $(EXPERIENCE)),)
-ifneq ($(strip $(EXPERIENCE)),1991)
-$(error EXPERIENCE must be empty or 1991)
+ifneq ($(filter $(strip $(EXPERIENCE)),1991 alive),$(strip $(EXPERIENCE)))
+$(error EXPERIENCE must be 1991 or alive)
 endif
 endif
 
-EXPERIENCE_ROOT = $(if $(filter 1991,$(EXPERIENCE)),$(BUILD)/root-1991.img,$(BUILD)/root.img)
-EXPERIENCE_ARGS = $(if $(filter 1991,$(EXPERIENCE)),--experience 1991,)
+SELECTED_EXPERIENCE = $(if $(strip $(EXPERIENCE)),$(strip $(EXPERIENCE)),alive)
+EXPERIENCE_ROOT = $(if $(filter 1991,$(SELECTED_EXPERIENCE)),$(BUILD)/root-1991.img,$(BUILD)/root.img)
+EXPERIENCE_ARGS = --experience $(SELECTED_EXPERIENCE)
 
 ARTIFACT_NAMES := kernel.elf kernel.bin root.img root-1991.img bemu-linux01 mkimage \
                   shell.bin update.bin hello.bin yes.bin pathcheck.bin cat.bin
@@ -201,9 +202,9 @@ endef
 .PHONY: help all clean run run-headless kernel image bemu bemu-sanitized dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact inspect-rootfs \
-        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-large-rootfs \
+        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-real test-bemu-devices test-bemu-cli test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -534,7 +535,7 @@ test: all
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 120
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 180 --interactive
-	@$(MAKE) --no-print-directory test-experience-1991
+	@$(MAKE) --no-print-directory test-experiences
 	@python3 tests/test_large_rootfs.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --mkimage $(BUILD)/mkimage \
 	  --shell $(BUILD)/shell.bin --update $(BUILD)/update.bin \
@@ -560,10 +561,26 @@ test-quick: require-artifacts
 
 test-experience-1991: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
 	$(call STEP,1991 experience mode test)
-	@python3 tests/test_experience.py --bemu $(BUILD)/bemu-linux01 \
+	@python3 tests/test_experience.py --experience 1991 --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root-1991.img \
 	  --default-img $(BUILD)/root.img \
 	  --make "$(MAKE_COMMAND)" --timeout 60
+
+test-experience-alive: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
+	$(call STEP,alive experience mode test)
+	@python3 tests/test_experience.py --experience alive \
+	  --bemu $(BUILD)/bemu-linux01 --kernel $(BUILD)/kernel.bin \
+	  --img $(BUILD)/root.img --default-img $(BUILD)/root-1991.img \
+	  --make "$(MAKE_COMMAND)" --timeout 60
+
+test-experiences: test-bemu-cli $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
+	$(call STEP,complete experience mode test)
+	@python3 tests/test_experience.py --experience 1991 --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root-1991.img \
+	  --default-img $(BUILD)/root.img --make "$(MAKE_COMMAND)" --timeout 60
+	@python3 tests/test_experience.py --experience alive --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img \
+	  --default-img $(BUILD)/root-1991.img --make "$(MAKE_COMMAND)" --timeout 60
 
 test-trace-io: require-artifacts
 	$(call STEP,trace IO/IDE event test)
@@ -799,6 +816,13 @@ $(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bemu_devices.c \
 	  bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/console.c
+
+$(BUILD)/test-bemu-cli: tests/bemu/test_bemu_cli.c bemu/cli.c bemu/cli.h bemu/experience.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibemu \
+	  -o "$@" tests/bemu/test_bemu_cli.c bemu/cli.c
+
+test-bemu-cli: $(BUILD)/test-bemu-cli
+	@$(BUILD)/test-bemu-cli
 
 $(BUILD)/test-bbp-invalid: tests/bemu/test_bbp_invalid.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
@@ -1146,6 +1170,7 @@ help:
 	@printf '\n  $(CB)$(CC1)launch$(CR)\n'
 	@printf '    $(CWH)run$(CR)            $(CY)★$(CR) build + boot directly with bEMU\n'
 	@printf '    $(CWH)run EXPERIENCE=1991$(CR) boot the explicit historical profile\n'
+	@printf '    $(CWH)run EXPERIENCE=alive$(CR) boot the alive profile (default)\n'
 	@printf '    $(CWH)boom$(CR)           $(CY)★$(CR) clean + build + run (one shot)\n'
 	@printf '    $(CWH)run-headless$(CR)   alias for the terminal-native bEMU run\n'
 	@printf '\n  $(CB)$(CM)diagnose$(CR)\n'
@@ -1165,6 +1190,7 @@ help:
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-experience-1991$(CR) historical profile integration test\n'
+	@printf '    $(CWH)test-experience-alive$(CR) alive profile integration test\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'
 	@printf '    $(CWH)test-fs-write$(CR)   write/append/truncate smoke test\n'
 	@printf '    $(CWH)test-fs-mkdir$(CR)  mkdir/rmdir smoke test\n'

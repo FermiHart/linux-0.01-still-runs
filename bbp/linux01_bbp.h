@@ -32,8 +32,7 @@ bbp_status_t bbp_linux01_init(void);
  * bbp_for_each_tag(). */
 const struct bbp_kctx *bbp_linux01_boot_ctx(void);
 
-/* Return the validated experience name, or NULL for the transitional default
- * and for an invalid handoff. */
+/* Return the validated experience name, or NULL for an invalid handoff. */
 const char *bbp_linux01_experience(void);
 
 #endif /* BBP_PORT_LINUX01_GLUE_H */

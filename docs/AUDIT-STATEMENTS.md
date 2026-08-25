@@ -102,8 +102,8 @@ updated.
 **Source**: README.md and ARCHITECTURE.md.
 
 **Audit**: verified. `kernel_mktime()` treats `tm_year < 70` as `20yy`, so CMOS
-year `26` becomes `2026` instead of `1926`. The current transitional runtime
-returns the host RTC year; the explicit alive mode is scheduled for Wave 090.
+year `26` becomes `2026` instead of `1926`. The alive runtime returns the host
+UTC-derived RTC year.
 
 **Status**: PROVEN.
 
@@ -183,7 +183,7 @@ the Finnish-keymap scancode sequence used to inject `|` and `<`.
 
 **Source**: README.md, `EXPERIENCE.md`, and shell help.
 
-**Audit**: the transitional shell runs as euid 0 and therefore uses
+**Audit**: the shell runs as euid 0 in both profiles and therefore uses
 `root@linux01:path#`. Help and README expose the effective 255-byte input,
 30-argument, 64-token, eight-stage, 64-completion-match, and 14-byte Minix name
 limits. Selected boundaries produce explicit diagnostics instead of being
@@ -226,6 +226,21 @@ historical clock is not claimed before Wave 091.
 directions of profile/image mismatch, verifies Make dry-run selection, guest BBP
 output, real `/etc/issue` and `/etc/motd` files, shell mode identity, and bare
 `cd` behavior.
+
+### "EXPERIENCE=alive is the explicit default"
+
+**Source**: README.md and `EXPERIENCE.md`.
+
+**Audit**: Empty Make selection and the bEMU CLI default resolve to `alive`, use
+the alive image, emit the exact alive BBP command line, and provide
+`HOME=/home/fermihart` plus `EXPERIENCE=alive` to the shell. The image contains
+the Vesica Piscis narrative; detailed real-time validation belongs to Wave 092.
+
+**Status**: PROVEN.
+
+**Evidence**: `make test-experiences` boots both modes back-to-back and checks
+their images, BBP identities, HOME behavior, banners, required narrative, and
+cross-profile exclusions.
 
 ### bEMU provenance
 

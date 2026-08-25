@@ -74,7 +74,8 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
     memset(info, 0, BBP_L01_HANDOFF_END - BBP_L01_HANDOFF_PHYS);
     bbp_builder_init(&b, arena, BBP_L01_HANDOFF_PHYS + sizeof(*info), capacity);
 
-    command = m->experience ? BBP_L01_1991_CMDLINE : BBP_L01_ROOT_CMDLINE;
+    command = !strcmp(m->experience, "1991") ?
+        BBP_L01_1991_CMDLINE : BBP_L01_ALIVE_CMDLINE;
     command_phys = bbp_arena_strdup(&b, command, &command_len);
 
     hhdm = bbp_alloc_tag(&b, BBP_TAG_HHDM, 1, sizeof(*hhdm));

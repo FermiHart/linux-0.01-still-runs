@@ -225,15 +225,15 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 
 ### Validated experience environment bridge
 
-- **Change**: Read the validated BBP experience selector in `init` and pass
-  `HOME=/` plus `EXPERIENCE=1991` to the shell for the historical profile.
+- **Change**: Read the validated BBP experience selector in `init` and pass the
+  matching `HOME` plus `EXPERIENCE` values to the shell.
 - **Files**: `init/main.c`
 - **Category**: Experience
 - **Evidence**: A host-only Make or bEMU selector cannot change guest-visible
   identity without one minimal environment bridge after BBP validation.
 - **Test**: `tests/test_experience.py` rejects mismatched images, boots the
-  profile, verifies its BBP command line and real image files, and checks that
-  bare `cd` returns to `/` rather than the shell's transitional fallback.
+  profiles, verifies their BBP command lines and real image files, and checks
+  that bare `cd` returns to the selected HOME rather than the shell fallback.
 - **Status**: PROVEN
 
 ## Test traceability

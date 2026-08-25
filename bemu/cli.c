@@ -10,7 +10,7 @@ void cli_usage(const char *program)
     fprintf(stderr, "usage: %s [--kernel FILE] [--root FILE] "
             "[--keys TEXT] [--expect TEXT] [--trace] [--trace-file PATH] "
             "[--trace-syscalls] [--no-timer] [--raw-console] [--max-exits N] "
-            "[--experience 1991]\n", program);
+            "[--experience 1991|alive]\n", program);
 }
 
 static int parse_max_exits(const char *text, long *value)
@@ -43,7 +43,7 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
     out->script = NULL;
     out->expect = NULL;
     out->trace_file = NULL;
-    out->experience = NULL;
+    out->experience = EXPERIENCE_ALIVE;
     out->max_exits = 50000000;
     out->trace = 0;
     out->no_timer = 0;
@@ -62,7 +62,8 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
             out->expect = argv[++i];
         } else if (!strcmp(argv[i], "--experience") && i + 1 < argc) {
             out->experience = argv[++i];
-            if (strcmp(out->experience, EXPERIENCE_1991)) {
+            if (strcmp(out->experience, EXPERIENCE_1991) &&
+                strcmp(out->experience, EXPERIENCE_ALIVE)) {
                 fprintf(stderr, "[bemu-linux01] invalid experience: %s\n",
                         out->experience);
                 return -1;
@@ -86,7 +87,7 @@ int cli_parse_args(int argc, char **argv, struct cli_options *out)
             return -1;
         }
     }
-    if (out->experience && !root_explicit)
+    if (!strcmp(out->experience, EXPERIENCE_1991) && !root_explicit)
         out->root = "build/root-1991.img";
     return 0;
 }

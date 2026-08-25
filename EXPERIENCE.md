@@ -2,8 +2,9 @@
 
 This document defines the target meaning of "fidelity" for the Vesica Piscis
 artifact. The historical mode is selected with `make run EXPERIENCE=1991`.
-The alive mode remains a specification for Wave 090; an empty `EXPERIENCE`
-continues to select the transitional default until that wave is completed.
+The alive mode is selected with `make run EXPERIENCE=alive` and is also the
+default for `make run`. Both selectors are explicit in the bEMU and guest
+contracts; there is no third transitional runtime mode.
 
 ## Dimensions of fidelity
 
@@ -11,7 +12,7 @@ continues to select the transitional default until that wave is completed.
 |---|---|---|
 | Kernel source | Historical Linux 0.01 with documented patches | Same |
 | Boot path | Direct bEMU/KVM, no firmware | Same |
-| Date source | Fixed historical reference date | Real CMOS date |
+| Date source | Fixed historical reference date (Wave 091) | Real CMOS date |
 | Memory ceiling | Fixed 8 MiB | Fixed 8 MiB |
 | Shell | Minimal built-ins using real syscalls | Same plus quality-of-life helpers |
 | Filesystem | Real Minix v1 persistence | Same |
@@ -32,7 +33,7 @@ Implemented in Wave 089:
 - Profile identity carried through the CRC-checked BBP command line.
 - `HOME=/` and `EXPERIENCE=1991` supplied by init to the real shell process.
 - The same 8 MiB machine, Minix v1 filesystem, syscalls, process model, pipes,
-  redirections, and documented shell limits as the transitional runtime.
+  redirections, and documented shell limits as the alive runtime.
 
 Scheduled for Waves 091 and 095:
 
@@ -45,6 +46,18 @@ Scheduled for Waves 091 and 095:
 
 Goal: demonstrate that the 1991 kernel is literally still running today.
 
+Implemented in Wave 090:
+
+- `alive` is the validated Make, bEMU, BBP, init, image, and shell default.
+- The alive image carries its own host-side marker and Vesica Piscis identity.
+- Profile/image mismatch is rejected before KVM entry in either direction.
+- `HOME=/home/fermihart` and `EXPERIENCE=alive` reach the shell through init.
+- Legacy unmarked images remain accepted as alive images so existing writable
+  research images are not made unusable by the profile marker.
+
+Wave 092 separately validates and documents the real-time policy and complete
+alive narrative.
+
 - Real CMOS date and time (Y2K-corrected).
 - Vesica Piscis MOTD, identity and checksum banner.
 - Modern terminal glyphs where the 8x8 font supports them.
@@ -54,8 +67,7 @@ Goal: demonstrate that the 1991 kernel is literally still running today.
 
 ## Required invariants for both modes
 
-Once the modes are implemented, the following must remain true regardless of
-mode:
+The following must remain true regardless of mode:
 
 - All filesystem operations go through real Linux 0.01 syscalls.
 - All process creation uses the real scheduler and `fork`/`execve`.
@@ -76,8 +88,7 @@ The following are considered regressions in either mode:
 
 ## Current gaps
 
-- `EXPERIENCE=alive` is not implemented yet.
-- `EXPERIENCE=1991` still uses the transitional RTC source until Wave 091.
+- `EXPERIENCE=1991` still uses the alive real-time RTC source until Wave 091.
 - Cross-boot persistence is blocked by incomplete IDE write-completion IRQ
   delivery in bEMU; `sync()` can still block.
 - `mount` reports the configured root mount because Linux 0.01 has no live

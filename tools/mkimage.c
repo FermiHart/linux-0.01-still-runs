@@ -691,9 +691,11 @@ int main(int argc, char **argv)
 	} else {
 		add_file(etc_ino, "passwd", "root:x:0:0:root:/home/fermihart:/bin/shell\n", 0644);
 		add_file(etc_ino, "issue",
-		"Linux 0.01 modern root filesystem\n"
+		"Linux 0.01 alive experience\n"
 		"Try: ls -la, cat /etc/fstab, whoami, mount, df, ps aux\n", 0644);
 		add_file(etc_ino, "motd",
+		"Vesica Piscis alive experience\n"
+		"\n"
 		"There is a specific feeling that comes from booting an operating\n"
 		"system written three and a half decades ago. It is not nostalgia\n"
 		"-- nostalgia implies distance, the safe view from behind glass.\n"
@@ -775,6 +777,9 @@ int main(int argc, char **argv)
     if (experience_1991)
         memcpy(disk + EXPERIENCE_IMAGE_MARKER_OFFSET,
                EXPERIENCE_IMAGE_MARKER_1991, EXPERIENCE_IMAGE_MARKER_LEN);
+    else
+        memcpy(disk + EXPERIENCE_IMAGE_MARKER_OFFSET,
+               EXPERIENCE_IMAGE_MARKER_ALIVE, EXPERIENCE_IMAGE_MARKER_LEN);
 
     memcpy(disk + SECTOR_SIZE, fs_img, (size_t)fs_size);
 

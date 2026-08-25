@@ -153,15 +153,17 @@ static int printf(const char *fmt, ...)
 }
 
 static char * argv[] = { "-",NULL };
-static char * default_envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", NULL };
+static char * alive_envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", "EXPERIENCE=alive", NULL };
 static char * historical_envp[] = { "HOME=/", "PATH=/bin:/usr/bin:.", "EXPERIENCE=1991", NULL };
 
 void init(void)
 {
 	int i,j;
 	char **shell_envp;
+	const char *experience;
 
-	shell_envp = bbp_linux01_experience() ? historical_envp : default_envp;
+	experience = bbp_linux01_experience();
+	shell_envp = experience && experience[0] == '1' ? historical_envp : alive_envp;
 	setup();
 /*	if (!fork())
 		_exit(execve("/bin/update",NULL,NULL));  */

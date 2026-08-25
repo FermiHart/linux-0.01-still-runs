@@ -31,7 +31,7 @@ extern int  printk(const char *fmt, ...);
 static struct bbp_kctx l01_boot_ctx;
 static int             l01_boot_ctx_valid = 0;
 static const char     *l01_experience = (const char *)0;
-static const char     *l01_command = BBP_L01_ROOT_CMDLINE;
+static const char     *l01_command = BBP_L01_ALIVE_CMDLINE;
 
 static int bytes_equal(const void *left, const void *right, unsigned length)
 {
@@ -59,7 +59,7 @@ bbp_status_t bbp_linux01_init(void)
 
     l01_boot_ctx_valid = 0;
     l01_experience = (const char *)0;
-    l01_command = BBP_L01_ROOT_CMDLINE;
+    l01_command = BBP_L01_ALIVE_CMDLINE;
     st = bbp_init_win(&l01_boot_ctx, info, 0, BBP_L01_HANDOFF_PHYS,
                       BBP_L01_HANDOFF_END);
     if (st != BBP_OK)
@@ -112,15 +112,18 @@ bbp_status_t bbp_linux01_init(void)
                          cmdline->string_crc, 0);
     command = (const char *)bbp_phys_to_virt(&l01_boot_ctx, cmdline->string);
     if (st == BBP_OK) {
-        if (command && cmdline->length == sizeof(BBP_L01_ROOT_CMDLINE) - 1 &&
-            bytes_equal(command, BBP_L01_ROOT_CMDLINE, cmdline->length)) {
-            l01_command = BBP_L01_ROOT_CMDLINE;
-        } else if (command &&
+        if (command &&
                    cmdline->length == sizeof(BBP_L01_1991_CMDLINE) - 1 &&
                    bytes_equal(command, BBP_L01_1991_CMDLINE,
                                cmdline->length)) {
             l01_command = BBP_L01_1991_CMDLINE;
             l01_experience = "1991";
+        } else if (command &&
+                   cmdline->length == sizeof(BBP_L01_ALIVE_CMDLINE) - 1 &&
+                   bytes_equal(command, BBP_L01_ALIVE_CMDLINE,
+                               cmdline->length)) {
+            l01_command = BBP_L01_ALIVE_CMDLINE;
+            l01_experience = "alive";
         } else {
             st = BBP_ERR_SIZE;
         }

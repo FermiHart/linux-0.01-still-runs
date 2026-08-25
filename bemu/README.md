@@ -20,13 +20,17 @@ Redirected stdout remains byte-for-byte guest serial output.
 ```sh
 make run
 make run EXPERIENCE=1991
+make run EXPERIENCE=alive
 build/bemu-linux01 --keys $'/bin/hello\n' --expect 'Hello from C userland'
 build/bemu-linux01 --root build/root-1991.img --experience 1991
 ```
 
-`--experience 1991` is validated by the modern CLI, defaults to
-`build/root-1991.img`, and is included in the CRC-checked BBP command line
-consumed by the guest. A marker in the otherwise unused MBR boot-code area makes
-bEMU reject mismatched profile/image combinations before entering KVM.
+`--experience` accepts `1991` or `alive`; alive is the default. The historical
+selector defaults to `build/root-1991.img`, while alive defaults to
+`build/root.img`. Both are included in the CRC-checked BBP command line consumed
+by the guest. A marker in the otherwise unused MBR boot-code area makes bEMU
+reject mismatched profile/image combinations before entering KVM. Unmarked
+legacy images are accepted only by alive mode to preserve existing research
+images.
 
 The source retains the upstream BSD-3-Clause license and provenance header.

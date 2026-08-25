@@ -45,13 +45,13 @@ SOURCE_DATE_EPOCH=1700000000 make reproducible
 
 | Artifact | Reference SHA-256 (prefix) |
 |---|---|
-| `build/kernel.elf` | `5cb6e6fd` |
-| `build/kernel.bin` | `be754669` |
-| `build/root.img` | `b1b1a197` |
-| `build/root-1991.img` | `7c2df309` |
-| `build/bemu-linux01` | `739269d8` |
-| `build/mkimage` | `f77331fa` |
-| `build/shell.bin` | `9fd7a474` |
+| `build/kernel.elf` | `44c8538c` |
+| `build/kernel.bin` | `c74256eb` |
+| `build/root.img` | `a19c9123` |
+| `build/root-1991.img` | `bff0d268` |
+| `build/bemu-linux01` | `aa8eee5e` |
+| `build/mkimage` | `2e85fe4b` |
+| `build/shell.bin` | `1c237506` |
 | `build/update.bin` | `4a0212fc` |
 | `build/hello.bin` | `7596c6b3` |
 | `build/yes.bin` | `32937906` |

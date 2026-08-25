@@ -57,15 +57,32 @@ void map_disk(struct ide_state *ide, const char *path)
 
 int ide_experience_matches(const struct ide_state *ide, const char *experience)
 {
+    unsigned i;
+    int legacy = 1;
     int historical = ide->disk_size >= EXPERIENCE_IMAGE_MARKER_OFFSET +
                       EXPERIENCE_IMAGE_MARKER_LEN &&
         memcmp(ide->disk + EXPERIENCE_IMAGE_MARKER_OFFSET,
                EXPERIENCE_IMAGE_MARKER_1991,
                EXPERIENCE_IMAGE_MARKER_LEN) == 0;
+    int alive = ide->disk_size >= EXPERIENCE_IMAGE_MARKER_OFFSET +
+                EXPERIENCE_IMAGE_MARKER_LEN &&
+        memcmp(ide->disk + EXPERIENCE_IMAGE_MARKER_OFFSET,
+               EXPERIENCE_IMAGE_MARKER_ALIVE,
+               EXPERIENCE_IMAGE_MARKER_LEN) == 0;
+
+    if (ide->disk_size < EXPERIENCE_IMAGE_MARKER_OFFSET +
+                         EXPERIENCE_IMAGE_MARKER_LEN)
+        legacy = 0;
+    else
+        for (i = 0; i < EXPERIENCE_IMAGE_MARKER_LEN; i++)
+            if (ide->disk[EXPERIENCE_IMAGE_MARKER_OFFSET + i] != 0)
+                legacy = 0;
 
     if (experience && strcmp(experience, EXPERIENCE_1991) == 0)
         return historical;
-    return !historical;
+    if (experience && strcmp(experience, EXPERIENCE_ALIVE) == 0)
+        return alive || legacy;
+    return 0;
 }
 
 static void ide_set_irq(struct machine *m)

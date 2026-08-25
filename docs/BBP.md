@@ -175,17 +175,16 @@ Memory types:
 4. Pointers in tags are physical addresses; a higher-half kernel must add the
    HHDM offset before dereferencing.
 
-The Linux 0.01 port accepts two exact command-line contracts during the Wave 089
-transition:
+The Linux 0.01 port accepts two exact command-line contracts:
 
 ```text
-root=/dev/hd1 ide=977,5,17
 root=/dev/hd1 ide=977,5,17 experience=1991
+root=/dev/hd1 ide=977,5,17 experience=alive
 ```
 
-The second form is converted by `init` into `HOME=/` and `EXPERIENCE=1991` for
-the shell. Unknown profiles invalidate the handoff rather than silently
-selecting a different experience.
+After validation, `init` converts them into the matching `HOME` and
+`EXPERIENCE` environment for the shell. Missing or unknown profiles invalidate
+the handoff rather than silently selecting a third experience.
 
 ## Authentication limits
 
