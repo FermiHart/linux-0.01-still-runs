@@ -35,6 +35,7 @@
 #include "machine.h"
 #include "ide.h"
 #include "loader.h"
+#include "memory.h"
 #include "cli.h"
 #include "kvm.h"
 #include "pic.h"
@@ -47,11 +48,6 @@
 #include "keyboard.h"
 #include "error.h"
 
-#define RAM_SIZE       (8ULL << 20)
-#define GDT_GPA        0x90000ULL
-#define VGA_GPA        0xB8000ULL
-#define KERNEL_MAX     (512U << 10)
-#define SERIAL_LOG_MAX (1U << 20)
 #define STOP_SIGNAL_COUNT 4
 
 struct host_input_state {
@@ -403,6 +399,10 @@ int main(int argc, char **argv)
 {
     struct machine m;
     struct cli_options opts;
+    enum bemu_load_status load_status;
+    enum bemu_memory_status memory_status;
+    size_t kernel_size = 0;
+    int load_errno = 0;
     long exits = 0;
     int status = 1;
     machine_create(&m);
@@ -423,10 +423,30 @@ int main(int argc, char **argv)
     if (atexit(restore_host_input_at_exit) != 0)
         fail("could not register host-state cleanup");
     m.sanitize_console = isatty(STDOUT_FILENO) && !opts.raw_console;
+    memory_status = bemu_memory_map_ram(&m, RAM_SIZE, NULL, NULL);
+    if (memory_status != BEMU_MEMORY_OK) {
+        fprintf(stderr, "[bemu-linux01] guest RAM rejected: %s\n",
+                bemu_memory_status_string(memory_status));
+        goto out;
+    }
+    load_status = bemu_load_kernel(opts.kernel, m.ram, m.ram_size,
+                                   &kernel_size, &load_errno);
+    if (load_status != BEMU_LOAD_OK) {
+        fprintf(stderr, "[bemu-linux01] kernel load rejected: %s",
+                bemu_load_status_string(load_status));
+        if (load_errno)
+            fprintf(stderr, ": %s", strerror(load_errno));
+        fputc('\n', stderr);
+        goto out;
+    }
+    if (build_bbp_handoff(&m, kernel_size) < 0) {
+        fprintf(stderr, "[bemu-linux01] BBP handoff rejected: guest RAM layout is invalid\n");
+        goto out;
+    }
     map_disk(&m.ide, opts.root);
     if (!ide_experience_matches(&m.ide, opts.experience))
         fail("root image does not match selected experience");
-    setup_kvm(&m, opts.kernel);
+    setup_kvm(&m);
     if (m.trace_syscalls) {
         struct kvm_guest_debug dbg;
         memset(&dbg, 0, sizeof dbg);
@@ -474,7 +494,7 @@ int main(int argc, char **argv)
                 uint64_t addr;
                 if (ioctl(m.vcpu, KVM_GET_REGS, &regs) == 0) {
                     addr = regs.rip;
-                    if (addr + 1 < RAM_SIZE &&
+                    if (addr < m.ram_size && m.ram_size - addr >= 2 &&
                         m.ram[addr] == 0xcd && m.ram[addr + 1] == 0x80) {
                         uint64_t args[6] = { regs.rbx, regs.rcx, regs.rdx,
                                               regs.rsi, regs.rdi, regs.rbp };

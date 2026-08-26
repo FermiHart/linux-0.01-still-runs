@@ -3,6 +3,6 @@
 
 struct machine;
 
-void setup_kvm(struct machine *m, const char *kernel);
+void setup_kvm(struct machine *m);
 
 #endif

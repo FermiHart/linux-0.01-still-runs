@@ -60,13 +60,17 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
 
 | Stage | File | Address | What happens |
 |-------|------|---------|--------------|
-| 1 | `bemu/bemu_linux01.c` | host | Load kernel at 0, disk at 977/5/17, and create KVM VM |
-| 2 | `bemu/bemu_linux01.c` | `0xC0000` | Produce CRC64-checksummed BBP RAM/kernel/root/machine tags |
+| 1 | `bemu/memory.c`, `bemu/loader.c` | host | Allocate fixed 8 MiB RAM, validate/load at 0, and reject short reads or ranges overlapping GDT/BBP before KVM setup |
+| 2 | `bemu/loader.c` | `0xC0000` | Produce CRC64-checksummed HHDM, memory-map, kernel-address, command-line and hypervisor tags |
 | 3 | `boot/head.s` | `0x000000` | Remap 8259 PIC and setup page directory/table for 8 MiB |
 | 4 | `boot/head.s` | `0x000000` | Setup IDT, GDT, enable paging, and call `main()` |
 | 5 | `bbp/linux01_bbp.c` | `0xC0000` | Validate bEMU's untrusted BBP handoff and tag chain |
 | 6 | `init/main.c` | — | Initialize devices, scheduler, and buffer cache |
 | 7 | `init/main.c` | — | `sti()`, enter user mode, and `fork()` init |
+
+The IDE root image is mapped separately by `bemu/ide.c`; it is not copied into
+guest RAM. `bemu/kvm.c` receives already validated RAM and only registers it,
+installs the bootstrap GDT, creates the VM/vCPU, and sets registers.
 
 ## Memory Layout (Physical)
 

@@ -2,6 +2,7 @@
 
 #include "console.h"
 #include "keyboard.h"
+#include "memory.h"
 #include "uart.h"
 
 #include <linux/kvm.h>
@@ -65,10 +66,7 @@ void machine_destroy(struct machine *m)
         m->run = NULL;
         m->run_size = 0;
     }
-    if (m->ram && m->ram != MAP_FAILED) {
-        munmap(m->ram, RAM_SIZE);
-        m->ram = NULL;
-    }
+    bemu_memory_unmap_ram(m);
     if (m->vcpu >= 0) {
         close(m->vcpu);
         m->vcpu = -1;

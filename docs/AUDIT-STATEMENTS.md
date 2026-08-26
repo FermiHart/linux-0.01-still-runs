@@ -128,14 +128,33 @@ binaries in the repository.
 **Source**: README.md.
 
 **Audit**: bEMU writes a structured handoff at physical `0xC0000` before
-entering the guest. The kernel validates CRC64 tags for RAM, kernel and root
-disk. CRC64 detects accidental corruption but does not authenticate the
-producer.
+entering the guest. The kernel validates the HHDM, memory-map, kernel-address,
+command-line and hypervisor tags plus their CRC64 fields. The IDE root image is
+not a BBP payload or tag. CRC64 detects accidental corruption but does not
+authenticate the producer.
 
 **Status**: PROVEN / QUALIFIED.
 
 **Evidence**: `bbp/linux01_bbp.c`, `bemu/bemu_linux01.c` BBP code paths,
 `tests/test_boot.py` BBP checks.
+
+### "Memory and kernel loading limits fail before KVM entry"
+
+**Source**: `bemu/README.md` and `ARCHITECTURE.md`.
+
+**Audit**: Guest RAM has one public size: exactly 8 MiB. Range checks use
+subtraction and reject wrapping, out-of-RAM and placements overlapping the
+bootstrap GDT or reserved BBP window. The raw kernel must be nonempty and no
+larger than 512 KiB; incomplete reads are rejected. RAM allocation, kernel
+loading and BBP construction complete before `setup_kvm()` opens `/dev/kvm`.
+
+**Status**: PROVEN.
+
+**Evidence**: `make test-bemu-loading` exercises exact boundaries, overflow,
+adjacency, GDT/BBP overlap, deterministic `ENOMEM`, injected short reads, clean
+allocation-failure state and real file loading. Its process-level cases give the
+production runner empty and 512 KiB + 1 kernels and require exit status 1, the
+structured diagnostic, and absence of direct-KVM-entry or guest-success output.
 
 ### "Automated validation: build → direct KVM boot → full shell smoke suite"
 

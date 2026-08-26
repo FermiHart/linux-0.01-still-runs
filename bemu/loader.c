@@ -1,5 +1,6 @@
 #include "loader.h"
 #include "machine.h"
+#include "memory.h"
 
 #include <bbp/bbp.h>
 #include <bbp/bbp_crc64.h>
@@ -14,36 +15,128 @@
 #include <time.h>
 #include <unistd.h>
 
-static void read_full(int fd, void *buffer, size_t size, const char *name)
+static ssize_t kernel_read(int fd, void *buffer, size_t size, void *opaque)
+{
+    (void)opaque;
+    return read(fd, buffer, size);
+}
+
+static enum bemu_load_status read_full(int fd, void *buffer, size_t size,
+                                       int *saved_errno,
+                                       bemu_kernel_reader reader,
+                                       void *reader_opaque)
 {
     uint8_t *p = buffer;
     while (size) {
-        ssize_t got = read(fd, p, size);
+        ssize_t got = reader(fd, p, size, reader_opaque);
         if (got < 0) {
             if (errno == EINTR)
                 continue;
-            die(name);
+            *saved_errno = errno;
+            return BEMU_LOAD_READ_FAILED;
         }
         if (!got)
-            fail("short input file");
+            return BEMU_LOAD_READ_FAILED;
         p += got;
         size -= (size_t)got;
     }
+    return BEMU_LOAD_OK;
 }
 
-size_t load_kernel(const char *path, uint8_t *ram)
+enum bemu_load_status bemu_validate_kernel_range(uint64_t kernel_base,
+                                                  size_t kernel_size,
+                                                  size_t ram_size)
+{
+    struct bemu_memory_range kernel = { kernel_base, kernel_size };
+    struct bemu_memory_range gdt = { GDT_GPA, 24 };
+    struct bemu_memory_range handoff = {
+        BBP_L01_HANDOFF_PHYS,
+        BBP_L01_HANDOFF_END - BBP_L01_HANDOFF_PHYS,
+    };
+
+    if (!kernel_size)
+        return BEMU_LOAD_EMPTY;
+    if (kernel_size > KERNEL_MAX)
+        return BEMU_LOAD_TOO_LARGE;
+    if (!bemu_memory_range_fits(ram_size, kernel))
+        return BEMU_LOAD_OUTSIDE_RAM;
+    if (bemu_memory_ranges_overlap(kernel, gdt) ||
+        bemu_memory_ranges_overlap(kernel, handoff))
+        return BEMU_LOAD_RESERVED_OVERLAP;
+    return BEMU_LOAD_OK;
+}
+
+enum bemu_load_status bemu_validate_kernel_load(size_t kernel_size,
+                                                 size_t ram_size)
+{
+    return bemu_validate_kernel_range(0, kernel_size, ram_size);
+}
+
+enum bemu_load_status bemu_load_kernel_with_reader(
+    const char *path, uint8_t *ram, size_t ram_size, size_t *loaded_size,
+    int *saved_errno, bemu_kernel_reader reader, void *reader_opaque)
 {
     struct stat st;
-    int fd = open(path, O_RDONLY);
-    if (fd < 0)
-        die(path);
-    if (fstat(fd, &st) < 0)
-        die("fstat kernel");
-    if (st.st_size <= 0 || st.st_size > KERNEL_MAX)
-        fail("kernel.bin has an invalid size");
-    read_full(fd, ram, (size_t)st.st_size, path);
+    enum bemu_load_status status;
+    int fd;
+
+    *loaded_size = 0;
+    *saved_errno = 0;
+    if (!reader)
+        reader = kernel_read;
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        *saved_errno = errno;
+        return BEMU_LOAD_OPEN_FAILED;
+    }
+    if (fstat(fd, &st) < 0) {
+        *saved_errno = errno;
+        close(fd);
+        return BEMU_LOAD_STAT_FAILED;
+    }
+    status = st.st_size < 0 ? BEMU_LOAD_EMPTY :
+        bemu_validate_kernel_load((size_t)st.st_size, ram_size);
+    if (status != BEMU_LOAD_OK) {
+        close(fd);
+        return status;
+    }
+    status = read_full(fd, ram, (size_t)st.st_size, saved_errno, reader,
+                       reader_opaque);
     close(fd);
-    return (size_t)st.st_size;
+    if (status == BEMU_LOAD_OK)
+        *loaded_size = (size_t)st.st_size;
+    return status;
+}
+
+enum bemu_load_status bemu_load_kernel(const char *path, uint8_t *ram,
+                                        size_t ram_size, size_t *loaded_size,
+                                        int *saved_errno)
+{
+    return bemu_load_kernel_with_reader(path, ram, ram_size, loaded_size,
+                                        saved_errno, NULL, NULL);
+}
+
+const char *bemu_load_status_string(enum bemu_load_status status)
+{
+    switch (status) {
+    case BEMU_LOAD_OK:
+        return "ok";
+    case BEMU_LOAD_OPEN_FAILED:
+        return "could not open kernel";
+    case BEMU_LOAD_STAT_FAILED:
+        return "could not stat kernel";
+    case BEMU_LOAD_EMPTY:
+        return "kernel is empty";
+    case BEMU_LOAD_TOO_LARGE:
+        return "kernel exceeds 524288-byte limit";
+    case BEMU_LOAD_OUTSIDE_RAM:
+        return "kernel does not fit guest RAM";
+    case BEMU_LOAD_RESERVED_OVERLAP:
+        return "kernel overlaps reserved guest memory";
+    case BEMU_LOAD_READ_FAILED:
+        return "kernel read was incomplete";
+    }
+    return "unknown kernel loading error";
 }
 
 static uint64_t monotonic_ns(void)
@@ -54,10 +147,14 @@ static uint64_t monotonic_ns(void)
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-void build_bbp_handoff(struct machine *m, size_t kernel_size)
+int build_bbp_handoff(struct machine *m, size_t kernel_size)
 {
-    struct bbp_info *info = (struct bbp_info *)(m->ram + BBP_L01_HANDOFF_PHYS);
-    uint8_t *arena = (uint8_t *)(info + 1);
+    struct bemu_memory_range handoff = {
+        BBP_L01_HANDOFF_PHYS,
+        BBP_L01_HANDOFF_END - BBP_L01_HANDOFF_PHYS,
+    };
+    struct bbp_info *info;
+    uint8_t *arena;
     size_t capacity = BBP_L01_HANDOFF_END - BBP_L01_HANDOFF_PHYS - sizeof(*info);
     struct bbp_builder b;
     struct bbp_tag_hhdm *hhdm;
@@ -69,8 +166,14 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
     bbp_phys_t command_phys;
     uint32_t command_len;
     const char *command;
-    uint64_t now = monotonic_ns();
+    uint64_t now;
 
+    if (!m->ram || m->ram_size != RAM_SIZE ||
+        !bemu_memory_range_fits(m->ram_size, handoff))
+        return -1;
+    now = monotonic_ns();
+    info = (struct bbp_info *)(m->ram + BBP_L01_HANDOFF_PHYS);
+    arena = (uint8_t *)(info + 1);
     memset(info, 0, BBP_L01_HANDOFF_END - BBP_L01_HANDOFF_PHYS);
     bbp_builder_init(&b, arena, BBP_L01_HANDOFF_PHYS + sizeof(*info), capacity);
 
@@ -98,7 +201,7 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
         entries[1].type = BBP_MEM_RESERVED;
         entries[1].attributes = BBP_MEM_ATTR_READABLE;
         entries[2].base = 0x100000;
-        entries[2].length = RAM_SIZE - 0x100000;
+        entries[2].length = m->ram_size - 0x100000;
         entries[2].type = BBP_MEM_USABLE;
         entries[2].attributes = BBP_MEM_ATTR_READABLE | BBP_MEM_ATTR_WRITABLE |
                                 BBP_MEM_ATTR_CACHED;
@@ -124,7 +227,7 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
     }
 
     if (!command_phys || b.overflow)
-        fail("BBP handoff exceeds its reserved window");
+        return -1;
 
     memcpy(info->bootloader_name, "bEMU-NANO", 9);
     memcpy(info->bootloader_version, "linux01-1", 9);
@@ -141,4 +244,5 @@ void build_bbp_handoff(struct machine *m, size_t kernel_size)
             "[bemu-linux01] BBP @ %#lx: %u tags, kernel=%zu bytes, %s\n",
             (unsigned long)BBP_L01_HANDOFF_PHYS, info->tag_count,
              kernel_size, command);
+    return 0;
 }

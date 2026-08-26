@@ -1,6 +1,5 @@
 #include "kvm.h"
 #include "machine.h"
-#include "loader.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -31,7 +30,7 @@ static void set_segment(struct kvm_segment *s, uint16_t selector, int code)
     s->db = 1;
 }
 
-void setup_kvm(struct machine *m, const char *kernel)
+void setup_kvm(struct machine *m)
 {
     struct kvm_userspace_memory_region region;
     struct kvm_cpuid2 *cpuid;
@@ -39,6 +38,10 @@ void setup_kvm(struct machine *m, const char *kernel)
     struct kvm_regs regs;
     uint64_t identity = 0xfffbc000ULL;
     int kvm, mmap_size;
+
+    _Static_assert(KERNEL_MAX <= GDT_GPA, "kernel limit overlaps bootstrap GDT");
+    if (!m->ram || m->ram_size != RAM_SIZE)
+        fail("guest RAM is not prepared");
 
     kvm = open("/dev/kvm", O_RDWR);
     if (kvm < 0) die("/dev/kvm");
@@ -52,17 +55,13 @@ void setup_kvm(struct machine *m, const char *kernel)
         die("KVM_SET_TSS_ADDR");
     if (ioctl(m->vm, KVM_SET_IDENTITY_MAP_ADDR, &identity) < 0)
         die("KVM_SET_IDENTITY_MAP_ADDR");
-    m->ram = mmap(NULL, RAM_SIZE, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (m->ram == MAP_FAILED) die("mmap guest RAM");
     memset(&region, 0, sizeof region);
     region.slot = 0;
     region.guest_phys_addr = 0;
-    region.memory_size = RAM_SIZE;
+    region.memory_size = m->ram_size;
     region.userspace_addr = (uint64_t)m->ram;
     if (ioctl(m->vm, KVM_SET_USER_MEMORY_REGION, &region) < 0)
         die("KVM_SET_USER_MEMORY_REGION");
-    build_bbp_handoff(m, load_kernel(kernel, m->ram));
     memcpy(m->ram + GDT_GPA, bootstrap_gdt, sizeof bootstrap_gdt);
     if (ioctl(m->vm, KVM_CREATE_IRQCHIP, 0) < 0)
         die("KVM_CREATE_IRQCHIP");

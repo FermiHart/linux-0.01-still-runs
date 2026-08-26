@@ -9,6 +9,14 @@ provides 8 MiB of RAM, and models only the hardware Linux 0.01 uses here:
 8259/PIT through KVM, COM1, CMOS, VGA register state, keyboard scancodes and a
 CHS IDE disk backed by `build/root.img` or a selected profile image.
 
+Before `/dev/kvm` is opened, the modern bridge allocates exactly 8 MiB, rejects
+an empty kernel or one larger than 512 KiB, proves every destination range fits
+without integer wrap or overlap with the bootstrap GDT and BBP window, loads the
+kernel, and builds the reserved BBP handoff. Allocation and short-read failures
+are injectable through internal host-side APIs for deterministic unit tests; no
+RAM-size or fault switch is exposed by the historical CLI. Runtime load failures
+exit with status 1 and a stable `[bemu-linux01]` diagnostic.
+
 The root image is opened read-write and mapped with `MAP_SHARED`; guest writes
 therefore target the selected image, subject to the documented IDE completion
 limitations. When stdout is a terminal,
