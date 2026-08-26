@@ -78,6 +78,11 @@ images use their exact 977/5/17 CHS byte length as the independent truncation
 oracle before the writable mapping is created.
 The IDE module also has a host-only test seam for one-shot ATA read/write errors
 at a selected LBA; it is not exposed to the guest or command-line interface.
+IDE writes are staged for one complete 512-byte sector before an atomic copy to
+the mapped virtual medium. A separate host-only seam can stop the device at an
+LBA-selected write-accept, payload-received, sector-committed or IRQ-requested
+boundary. Tests materialize only committed sectors in disposable images; this
+models bEMU's virtual-media state, not physical disk/cache durability.
 The common IRQ bridge can similarly drop or defer one duplicate edge for a
 selected IRQ. Duplicate replay waits for a completed KVM run, a low device line,
 and clear IRR/ISR state in KVM's in-kernel 8259, including the slave cascade.

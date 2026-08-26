@@ -47,6 +47,18 @@ the ANSI color, cursor and erase sequences used by the shell. Use
 `--raw-console` only when unfiltered terminal output is explicitly required.
 Redirected stdout remains byte-for-byte guest serial output.
 
+Writes use a 512-byte staging buffer and reach the `MAP_SHARED` virtual medium
+only as complete sectors. A host-only, one-shot power-cut seam selects an LBA
+and one semantic boundary: write accepted, payload received, sector committed,
+or normal unmasked completion IRQ requested. A cut discards staged bytes, lowers
+IRQ14, clears transfer state, and ignores later command/data/control PIO until
+reset. `make test-power-cut` runs
+that state machine under ASan/UBSan and on disposable copies of both root
+profiles, requiring exact 0/512/1024-byte deltas and repeatable hashes. `msync`
+only makes the already-committed test state inspectable; this is not a model or
+claim of physical-media, controller-cache, guest-handler, or filesystem recovery
+behavior. No power-cut control is exposed to the guest or CLI.
+
 The common host IRQ bridge also supports one test-only lost or duplicated edge
 for IRQ0-15. A dropped assertion suppresses its matching deassertion. A duplicate
 passes the original edge, then waits for a completed KVM run, a low device line,

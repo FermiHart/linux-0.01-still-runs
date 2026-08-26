@@ -205,7 +205,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-artifact-truncation test-ide-faults test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -516,6 +516,7 @@ test: all
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
 	@$(MAKE) --no-print-directory test-bemu-loading
 	@$(MAKE) --no-print-directory test-artifact-truncation
+	@$(MAKE) --no-print-directory test-power-cut
 	@$(MAKE) --no-print-directory bbp-conformance
 	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compare_assembly.py --make "$(MAKE_COMMAND)"
@@ -856,6 +857,26 @@ $(BUILD)/test-ide-faults: tests/bemu/test_ide_faults.c bemu/ide.c bemu/ide.h bem
 test-ide-faults: $(BUILD)/test-ide-faults
 	@$(BUILD)/test-ide-faults
 
+$(BUILD)/test-ide-power-cut: tests/bemu/test_ide_power_cut.c bemu/ide.c bemu/ide.h bemu/machine.h bemu/irq.h bemu/experience.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibemu \
+	  -o "$@" tests/bemu/test_ide_power_cut.c bemu/ide.c $(HOSTLDFLAGS)
+
+$(BUILD)/test-ide-power-cut-sanitized: tests/bemu/test_ide_power_cut.c bemu/ide.c bemu/ide.h bemu/machine.h bemu/irq.h bemu/experience.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer \
+	  -Werror -std=gnu11 -Ibemu -o "$@" tests/bemu/test_ide_power_cut.c \
+	  bemu/ide.c $(HOSTLDFLAGS) -fsanitize=address,undefined
+
+test-ide-power-cut: $(BUILD)/test-ide-power-cut $(BUILD)/test-ide-power-cut-sanitized
+	@$(BUILD)/test-ide-power-cut
+	@$(BUILD)/test-ide-power-cut-sanitized
+
+test-power-cut: $(BUILD)/test-ide-power-cut $(BUILD)/test-ide-power-cut-sanitized $(BUILD)/minix-inspect $(BUILD)/root.img $(BUILD)/root-1991.img
+	@$(BUILD)/test-ide-power-cut
+	@$(BUILD)/test-ide-power-cut-sanitized
+	@python3 tests/test_power_cut.py --driver $(BUILD)/test-ide-power-cut \
+	  --minix-inspect $(BUILD)/minix-inspect --img $(BUILD)/root.img \
+	  --img $(BUILD)/root-1991.img
+
 $(BUILD)/test-irq-faults: tests/bemu/test_irq_faults.c bemu/irq.c bemu/irq.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibemu \
 	  -o "$@" tests/bemu/test_irq_faults.c bemu/irq.c
@@ -870,10 +891,10 @@ $(BUILD)/test-keyboard-faults: tests/bemu/test_keyboard_faults.c bemu/keyboard.c
 test-keyboard-faults: $(BUILD)/test-keyboard-faults
 	@$(BUILD)/test-keyboard-faults
 
-$(BUILD)/test-irq-faults-kvm: tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/irq.h bemu/machine.c bemu/machine.h bemu/kvm.c bemu/kvm.h bemu/memory.c bemu/memory.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h bemu/keyboard.c bemu/keyboard.h bemu/trace.c bemu/trace.h bemu/trace_clock.c bemu/trace_clock.h | dirs
+$(BUILD)/test-irq-faults-kvm: tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/irq.h bemu/machine.c bemu/machine.h bemu/kvm.c bemu/kvm.h bemu/memory.c bemu/memory.h bemu/ide.c bemu/ide.h bemu/experience.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h bemu/keyboard.c bemu/keyboard.h bemu/trace.c bemu/trace.h bemu/trace_clock.c bemu/trace_clock.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/machine.c bemu/kvm.c \
-	  bemu/memory.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c \
+	  bemu/memory.c bemu/ide.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c \
 	  bemu/keyboard.c bemu/trace.c bemu/trace_clock.c
 
 test-irq-faults-kvm: $(BUILD)/test-irq-faults-kvm
@@ -1283,6 +1304,7 @@ help:
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'
+	@printf '    $(CWH)test-power-cut$(CR)  deterministic IDE write power cuts\n'
 	@printf '    $(CWH)test-irq-faults$(CR) deterministic lost/duplicated IRQ edges\n'
 	@printf '    $(CWH)test-irq-faults-kvm$(CR) KVM irqchip fault integration\n'
 	@printf '    $(CWH)test-keyboard-faults$(CR) invalid scancodes and truncated input\n'

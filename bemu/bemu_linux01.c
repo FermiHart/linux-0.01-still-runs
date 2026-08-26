@@ -416,6 +416,8 @@ int main(int argc, char **argv)
     int load_errno = 0;
     long exits = 0;
     int status = 1;
+    int boot_traced = 0;
+    const char *shutdown_reason = NULL;
     machine_create(&m);
     if (cli_parse_args(argc, argv, &opts) < 0) {
         cli_usage(argv[0]);
@@ -474,6 +476,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "[bemu-linux01] direct KVM entry: %s @ PA 0, 8 MiB, no firmware, no bootloader\n",
             opts.kernel);
     trace_event_boot(&m.trace, opts.kernel, opts.root, 8, 1);
+    boot_traced = 1;
     while (exits < opts.max_exits && !m.done) {
         if (stop_requested)
             break;
@@ -521,33 +524,48 @@ int main(int argc, char **argv)
         case KVM_EXIT_FAIL_ENTRY:
             fprintf(stderr, "[bemu-linux01] KVM fail-entry reason=%llu\n",
                     (unsigned long long)m.run->fail_entry.hardware_entry_failure_reason);
+            shutdown_reason = "error";
             goto out;
         case KVM_EXIT_INTERNAL_ERROR:
             fprintf(stderr, "[bemu-linux01] KVM internal error suberror=%u\n",
                     m.run->internal.suberror);
+            shutdown_reason = "error";
             goto out;
         default:
             fprintf(stderr, "[bemu-linux01] unexpected KVM exit %u\n", m.run->exit_reason);
+            shutdown_reason = "error";
             goto out;
         }
     }
     if (stop_requested) {
+        shutdown_reason = "signal";
         status = BEMU_EXIT_SIGNAL_BASE + stop_requested;
         fprintf(stderr, "\n[bemu-linux01] interrupted by signal %d\n", (int)stop_requested);
     } else if (!m.done) {
+        shutdown_reason = "max_exits";
         fprintf(stderr, "[bemu-linux01] gave up after %ld KVM exits\n", exits);
         status = BEMU_EXIT_RUNTIME;
     } else {
-        fprintf(stderr, "\n[bemu-linux01] RESULT: PASS after %ld KVM exits\n", exits);
+        shutdown_reason = "halt";
         status = BEMU_EXIT_OK;
     }
-    trace_event_shutdown(&m.trace,
-                         stop_requested ? "signal" :
-                         (!m.done ? "max_exits" : "halt"),
-                         (unsigned long)exits, status);
 out:
-    if (restore_host_input() < 0 && status == BEMU_EXIT_OK)
+    if (restore_host_input() < 0 && status == BEMU_EXIT_OK) {
         status = BEMU_EXIT_RUNTIME;
+        shutdown_reason = boot_traced ? "error" : NULL;
+    }
+    if (ide_unmap_disk(&m.ide) < 0) {
+        perror("[bemu-linux01] sync/unmap root image");
+        if (status == BEMU_EXIT_OK) {
+            status = BEMU_EXIT_RUNTIME;
+            shutdown_reason = boot_traced ? "error" : NULL;
+        }
+    }
+    if (status == BEMU_EXIT_OK)
+        fprintf(stderr, "\n[bemu-linux01] RESULT: PASS after %ld KVM exits\n", exits);
+    if (boot_traced)
+        trace_event_shutdown(&m.trace, shutdown_reason ? shutdown_reason : "error",
+                             (unsigned long)exits, status);
     machine_destroy(&m);
     return status;
 }

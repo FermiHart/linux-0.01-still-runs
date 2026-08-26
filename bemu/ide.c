@@ -31,6 +31,12 @@ void ide_reset(struct ide_state *ide)
     ide->irq_pending = 0;
     ide->fault_kind = IDE_FAULT_NONE;
     ide->fault_lba = 0;
+    ide->power_cut_lba = 0;
+    ide->power_cut_boundary = IDE_POWER_CUT_NONE;
+    ide->power_cut_armed = 0;
+    ide->power_cut_triggered = 0;
+    ide->powered_off = 0;
+    memset(ide->write_buffer, 0, sizeof ide->write_buffer);
 }
 
 void ide_inject_fault(struct ide_state *ide, enum ide_fault_kind kind,
@@ -38,6 +44,70 @@ void ide_inject_fault(struct ide_state *ide, enum ide_fault_kind kind,
 {
     ide->fault_kind = kind;
     ide->fault_lba = lba;
+}
+
+int ide_arm_power_cut(struct ide_state *ide,
+                      enum ide_power_cut_boundary boundary, uint32_t lba)
+{
+    if (!ide || boundary <= IDE_POWER_CUT_NONE ||
+        boundary > IDE_POWER_CUT_IRQ_REQUESTED || ide->power_cut_armed ||
+        ide->powered_off || (uint64_t)lba * IDE_SECTOR_LEN >= ide->disk_size)
+        return -1;
+    ide->power_cut_boundary = boundary;
+    ide->power_cut_lba = lba;
+    ide->power_cut_armed = 1;
+    ide->power_cut_triggered = 0;
+    return 0;
+}
+
+void ide_power_off(struct machine *m)
+{
+    struct ide_state *ide = &m->ide;
+
+    ide->power_cut_armed = 0;
+    ide->remaining = 0;
+    ide->data_pos = 0;
+    ide->writing = 0;
+    ide->status = 0;
+    ide->error = 0;
+    ide->irq_pending = 0;
+    ide->powered_off = 1;
+    memset(ide->write_buffer, 0, sizeof ide->write_buffer);
+    irq_level(m, 14, 0);
+}
+
+int ide_sync_disk(struct ide_state *ide)
+{
+    if (!ide || !ide->disk || !ide->disk_size) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!ide->disk_mapped)
+        return 0;
+    return msync(ide->disk, ide->disk_size, MS_SYNC);
+}
+
+int ide_unmap_disk(struct ide_state *ide)
+{
+    int result = 0;
+    int saved_errno = 0;
+
+    if (!ide || !ide->disk_mapped)
+        return 0;
+    if (ide_sync_disk(ide) < 0) {
+        result = -1;
+        saved_errno = errno;
+    }
+    if (munmap(ide->disk, ide->disk_size) < 0 && result == 0) {
+        result = -1;
+        saved_errno = errno;
+    }
+    ide->disk = NULL;
+    ide->disk_size = 0;
+    ide->disk_mapped = 0;
+    if (result < 0)
+        errno = saved_errno;
+    return result;
 }
 
 void map_disk(struct ide_state *ide, const char *path)
@@ -61,6 +131,7 @@ void map_disk(struct ide_state *ide, const char *path)
     if (close(fd) < 0)
         die("close root image");
     ide->disk_size = expected;
+    ide->disk_mapped = 1;
     ide_reset(ide);
 }
 
@@ -94,12 +165,17 @@ int ide_experience_matches(const struct ide_state *ide, const char *experience)
     return 0;
 }
 
-static void ide_set_irq(struct machine *m)
+static int ide_set_irq(struct machine *m)
 {
     struct ide_state *d = &m->ide;
+    if (d->powered_off)
+        return 0;
     d->irq_pending = 1;
-    if (!(d->control & 2))
+    if (!(d->control & 2)) {
         irq_level(m, 14, 1);
+        return 1;
+    }
+    return 0;
 }
 
 void ide_clear_irq(struct machine *m)
@@ -126,6 +202,7 @@ static void ide_abort(struct machine *m)
     m->ide.remaining = 0;
     m->ide.data_pos = 0;
     m->ide.writing = 0;
+    memset(m->ide.write_buffer, 0, sizeof m->ide.write_buffer);
     ide_set_irq(m);
 }
 
@@ -138,10 +215,26 @@ static int ide_fault_matches(struct ide_state *ide, enum ide_fault_kind kind,
     return 1;
 }
 
+static int ide_power_cut_matches(struct machine *m,
+                                 enum ide_power_cut_boundary boundary,
+                                 uint32_t lba)
+{
+    struct ide_state *ide = &m->ide;
+
+    if (!ide->power_cut_armed || ide->power_cut_boundary != boundary ||
+        ide->power_cut_lba != lba)
+        return 0;
+    ide->power_cut_triggered = 1;
+    ide_power_off(m);
+    return 1;
+}
+
 void ide_command(struct machine *m, uint8_t command)
 {
     struct ide_state *d = &m->ide;
     uint32_t lba;
+    if (d->powered_off)
+        return;
     ide_clear_irq(m);
     if (command == 0x20 || command == 0x30) {
         if (ide_address(d, &lba) < 0) {
@@ -159,6 +252,9 @@ void ide_command(struct machine *m, uint8_t command)
         d->writing = command == 0x30;
         d->error = 0;
         d->status = IDE_READY | IDE_SEEK | IDE_DRQ;
+        if (d->writing && ide_power_cut_matches(
+                              m, IDE_POWER_CUT_WRITE_ACCEPTED, d->lba))
+            return;
         if (!d->writing)
             ide_set_irq(m);
         return;
@@ -172,7 +268,7 @@ void ide_command(struct machine *m, uint8_t command)
     ide_abort(m);
 }
 
-static void ide_sector_done(struct machine *m)
+static int ide_sector_done(struct machine *m)
 {
     struct ide_state *d = &m->ide;
     d->data_pos = 0;
@@ -182,20 +278,24 @@ static void ide_sector_done(struct machine *m)
     if (d->remaining) {
         if ((uint64_t)d->lba * IDE_SECTOR_LEN >= d->disk_size) {
             ide_abort(m);
-            return;
+            return 0;
         }
         if (ide_fault_matches(d, d->writing ?
                               IDE_FAULT_WRITE : IDE_FAULT_READ, d->lba)) {
             ide_abort(m);
-            return;
+            return 0;
         }
         d->status = IDE_READY | IDE_SEEK | IDE_DRQ;
-        ide_set_irq(m);
+        if (d->writing && ide_power_cut_matches(
+                              m, IDE_POWER_CUT_WRITE_ACCEPTED, d->lba))
+            return 0;
+        return ide_set_irq(m);
     } else {
         d->status = IDE_READY | IDE_SEEK;
         if (d->writing)
-            ide_set_irq(m);
+            return ide_set_irq(m);
     }
+    return 0;
 }
 
 uint32_t ide_data_read(struct machine *m, unsigned size)
@@ -203,7 +303,8 @@ uint32_t ide_data_read(struct machine *m, unsigned size)
     struct ide_state *d = &m->ide;
     uint32_t value = 0;
     unsigned i;
-    if (d->writing || !(d->status & IDE_DRQ) || !d->remaining)
+    if (d->powered_off || d->writing || !(d->status & IDE_DRQ) ||
+        !d->remaining)
         return 0;
     for (i = 0; i < size; i++) {
         size_t at = (size_t)d->lba * IDE_SECTOR_LEN + d->data_pos;
@@ -221,14 +322,31 @@ void ide_data_write(struct machine *m, uint32_t value, unsigned size)
 {
     struct ide_state *d = &m->ide;
     unsigned i;
-    if (!d->writing || !(d->status & IDE_DRQ) || !d->remaining)
+    if (d->powered_off || !d->writing || !(d->status & IDE_DRQ) ||
+        !d->remaining)
         return;
     for (i = 0; i < size; i++) {
-        size_t at = (size_t)d->lba * IDE_SECTOR_LEN + d->data_pos;
-        d->disk[at] = (uint8_t)(value >> (i * 8));
+        uint32_t completed_lba;
+
+        d->write_buffer[d->data_pos] = (uint8_t)(value >> (i * 8));
         d->data_pos++;
         if (d->data_pos == IDE_SECTOR_LEN) {
-            ide_sector_done(m);
+            int completion_irq_requested;
+
+            completed_lba = d->lba;
+            if (ide_power_cut_matches(m, IDE_POWER_CUT_PAYLOAD_RECEIVED,
+                                      completed_lba))
+                return;
+            memcpy(d->disk + (size_t)completed_lba * IDE_SECTOR_LEN,
+                   d->write_buffer, IDE_SECTOR_LEN);
+            if (ide_power_cut_matches(m, IDE_POWER_CUT_SECTOR_COMMITTED,
+                                      completed_lba))
+                return;
+            completion_irq_requested = ide_sector_done(m);
+            if (completion_irq_requested &&
+                ide_power_cut_matches(m, IDE_POWER_CUT_IRQ_REQUESTED,
+                                      completed_lba))
+                return;
             break;
         }
     }
@@ -238,6 +356,8 @@ void ide_control(struct machine *m, uint8_t value)
 {
     struct ide_state *d = &m->ide;
     uint8_t old = d->control;
+    if (d->powered_off)
+        return;
     d->control = value;
     if (value & 2)
         irq_level(m, 14, 0);
@@ -245,6 +365,7 @@ void ide_control(struct machine *m, uint8_t value)
         ide_clear_irq(m);
         d->status = IDE_BUSY;
         d->remaining = d->data_pos = 0;
+        memset(d->write_buffer, 0, sizeof d->write_buffer);
     } else if (!(value & 4) && (old & 4)) {
         d->error = 1;
         d->status = IDE_READY | IDE_SEEK;

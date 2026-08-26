@@ -77,6 +77,7 @@ static void test_write_fault(void)
 {
     struct machine m;
     uint8_t disk[2 * IDE_SECTOR_LEN];
+    unsigned i;
 
     setup_ide(&m, disk, sizeof disk);
     disk[0] = 0x33;
@@ -94,8 +95,10 @@ static void test_write_fault(void)
     ide_command(&m, 0x30);
     check((m.ide.status & (IDE_ERR | IDE_DRQ)) == IDE_DRQ,
           "write fault is consumed once");
-    ide_data_write(&m, 0xaa, 1);
-    check(disk[0] == 0xaa, "write succeeds after injected fault");
+    for (i = 0; i < IDE_SECTOR_LEN / 4; i++)
+        ide_data_write(&m, 0xaaaaaaaa, 4);
+    check(disk[0] == 0xaa && disk[IDE_SECTOR_LEN - 1] == 0xaa,
+          "complete sector write succeeds after injected fault");
 }
 
 static void test_fault_scope(void)

@@ -1,7 +1,8 @@
 # Real filesystem experience
 
-This document records the real-filesystem work from Waves 026–040 and the
-offline metadata-corruption gate added in Wave 098.
+This document records the real-filesystem work from Waves 026–040, the offline
+metadata-corruption gate from Wave 098 and virtual-media power cuts from Wave
+103.
 
 ## What is now real
 
@@ -39,6 +40,12 @@ zone bitmap. The independent inspector and util-linux `fsck.minix` must reject
 every copy with the expected diagnosis. Hash and byte-offset checks prove that
 the oracles do not repair their input and that canonical images are untouched.
 
+`make test-power-cut` derives an allocated regular-file data block from each
+profile, applies LBA-selected IDE cuts only to disposable copies and checks
+exact 0/512/1024-byte commit prefixes. Both metadata oracles remain clean after
+the data-only mutation. That is evidence that filesystem structure survived,
+not that the old or new file content was recovered correctly.
+
 ## What remains sealed behind bEMU IDE writes
 
 Cross-boot persistence is prepared but not yet functional:
@@ -48,11 +55,10 @@ Cross-boot persistence is prepared but not yet functional:
 - `init/main.c` uses the external `sync()` symbol instead of an inline
 duplicate.
 
-However, calling `sync()` from userland blocks the shell because the kernel
-waits for IDE write-completion interrupts that bEMU does not yet fully
-deliver. Once the bEMU IDE module is improved (Waves 047 and 050), the same
-`sync` built-in and `MAP_SHARED` mapping will make persistence work without
-further kernel changes.
+The IDE module now completes and signals sector writes in host tests, but the
+full guest `sync`/halt/cross-boot lifecycle remains unproven and is not repaired
+by the host-only Wave 103 cut seam. `MAP_SHARED` and test-side `msync` must not be
+treated as evidence of guest flush completion or physical durability.
 
 ## Test targets added
 
@@ -64,6 +70,7 @@ make test-fs-large     # multi-line file
 make test-fs-property  # pseudo-random read/write cases
 make test-fs-inspect   # independent Minix v1 audit
 make test-fs-corruption # offline metadata fault injection
+make test-power-cut     # disposable-image IDE write cut matrix
 make test-fs-real      # touch/ls/rm on real /tmp
 make inspect-rootfs    # dump build/root.img
 make fsck-rootfs       # validate with fsck.minix

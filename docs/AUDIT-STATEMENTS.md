@@ -210,6 +210,35 @@ historical CLI exposes no fault switch.
 zero transfer, one-shot recovery, operation/LBA scoping and later sectors of
 multi-sector commands without KVM.
 
+### "IDE power cuts produce deterministic sector-prefix states"
+
+**Source**: `bemu/README.md`, `ARCHITECTURE.md` and
+`docs/FS-LIMITATIONS.md`.
+
+**Audit**: the modern IDE bridge stages 512 payload bytes before atomically
+copying one sector to its mapped virtual medium. A host-only one-shot selector
+can power the device off at write acceptance, complete payload receipt, sector
+commit or normal unmasked completion-IRQ request for one LBA. Power-off discards
+staged data, lowers IRQ14, clears transfer state and blocks later
+command/data/control PIO until reset. No guest or CLI control exists.
+
+**Status**: PROVEN / TEST-ONLY / VIRTUAL-MEDIA MODEL.
+
+**Evidence**: `make test-power-cut` links the production `bemu/ide.c`, verifies
+all first/second-sector boundaries under optimized and ASan/UBSan builds, then
+runs the same driver on disposable copies of both root profiles. Each scenario
+is repeated and must produce the exact expected 0, 512 or 1024 changed-byte
+prefix, stable SHA-256 class and IRQ count. Canonical hashes remain unchanged.
+The independently read-only Minix inspector and `fsck.minix` remain clean after
+data-only changes, showing that metadata consistency does not detect file-content
+tearing.
+
+**Limit**: `MAP_SHARED` and test-side `msync` materialize bEMU's committed
+virtual-media state; they do not simulate loss of the host page cache, a drive
+write cache, platter atomicity or physical power failure. An IRQ request does not
+prove guest-handler execution, and clean metadata oracles do not prove file-data
+recovery.
+
 ### "Lost and duplicated IRQ edges are deterministic and bounded"
 
 **Source**: `bemu/README.md` and `ARCHITECTURE.md`.

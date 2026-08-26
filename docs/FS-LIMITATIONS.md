@@ -43,9 +43,23 @@ blocks and 241 free inodes, which is enough for the tests above.
 
 ### Corruption, IDE errors and power loss
 
-Not modeled. bEMU writes directly into the mmap'd root image; there is no
-injection framework for disk errors or simulated power loss. These scenarios
-will be addressed after the IDE write IRQ path is deterministic.
+Host-only deterministic tests now cover one-shot IDE read/write errors and
+simulated power cuts at semantic write boundaries. IDE payload bytes are staged
+until a complete 512-byte sector is available; a cut before commit preserves the
+old sector, while a cut after commit preserves the complete new sector. Cuts at
+an unmasked completion-IRQ request have the same bytes as post-commit cuts and a
+distinct IRQ history.
+
+`make test-power-cut` operates only on disposable copies of both profile images.
+It selects a full regular-file data block from Minix metadata, repeats each
+scenario, and requires exact 0, 512 or 1024 changed bytes plus stable hashes.
+`minix-inspect --audit` and read-only `fsck.minix` remain clean because only file
+content changes; that demonstrates the limit of metadata checking, not recovery
+or correctness of file data.
+
+This is bEMU's virtual-medium contract. `MAP_SHARED` plus test-side `msync` does
+not reproduce controller caches, host page-cache loss, platter behavior or a
+physical power failure. The seam is unavailable to the guest and CLI.
 
 ### Multi-boot persistence
 

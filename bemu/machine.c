@@ -110,6 +110,7 @@ int machine_create(struct machine *m)
 void machine_destroy(struct machine *m)
 {
     trace_close(&m->trace);
+    (void)ide_unmap_disk(&m->ide);
     if (m->run && m->run != MAP_FAILED && m->run_size) {
         munmap(m->run, m->run_size);
         m->run = NULL;

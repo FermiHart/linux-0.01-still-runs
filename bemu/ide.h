@@ -33,20 +33,37 @@ enum ide_fault_kind {
     IDE_FAULT_WRITE,
 };
 
+enum ide_power_cut_boundary {
+    IDE_POWER_CUT_NONE,
+    IDE_POWER_CUT_WRITE_ACCEPTED,
+    IDE_POWER_CUT_PAYLOAD_RECEIVED,
+    IDE_POWER_CUT_SECTOR_COMMITTED,
+    IDE_POWER_CUT_IRQ_REQUESTED,
+};
+
 struct ide_state {
     uint8_t *disk;
     size_t disk_size;
     uint8_t error, count, sector, lcyl, hcyl, current, status, control;
     uint32_t lba;
     uint32_t fault_lba;
+    uint32_t power_cut_lba;
     unsigned remaining, data_pos;
-    int writing, irq_pending;
+    int writing, irq_pending, disk_mapped;
+    int power_cut_armed, power_cut_triggered, powered_off;
     enum ide_fault_kind fault_kind;
+    enum ide_power_cut_boundary power_cut_boundary;
+    uint8_t write_buffer[IDE_SECTOR_LEN];
 };
 
 void ide_reset(struct ide_state *ide);
 void ide_inject_fault(struct ide_state *ide, enum ide_fault_kind kind,
                       uint32_t lba);
+int ide_arm_power_cut(struct ide_state *ide,
+                      enum ide_power_cut_boundary boundary, uint32_t lba);
+void ide_power_off(struct machine *m);
+int ide_sync_disk(struct ide_state *ide);
+int ide_unmap_disk(struct ide_state *ide);
 void map_disk(struct ide_state *ide, const char *path);
 int ide_experience_matches(const struct ide_state *ide, const char *experience);
 void ide_command(struct machine *m, uint8_t command);
