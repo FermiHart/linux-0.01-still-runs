@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "../../bbp/linux01_handoff.h"
+#include "../../bemu/kernel_image.h"
 #include "../../bemu/loader.h"
 #include "../../bemu/machine.h"
 #include "../../bemu/memory.h"
@@ -59,6 +60,21 @@ static ssize_t truncated_reader(int fd, void *buffer, size_t size, void *opaque)
     if (got > 0)
         *remaining -= (size_t)got;
     return got;
+}
+
+static int finish_kernel_image(int fd, size_t payload_size)
+{
+    uint8_t size_le[8];
+    unsigned i;
+
+    if (ftruncate(fd, (off_t)(payload_size + KERNEL_IMAGE_TRAILER_SIZE)) < 0 ||
+        lseek(fd, (off_t)payload_size, SEEK_SET) != (off_t)payload_size ||
+        write(fd, KERNEL_IMAGE_MAGIC, KERNEL_IMAGE_MAGIC_SIZE) !=
+              KERNEL_IMAGE_MAGIC_SIZE)
+        return -1;
+    for (i = 0; i < sizeof(size_le); i++)
+        size_le[i] = (uint8_t)((uint64_t)payload_size >> (i * 8));
+    return write(fd, size_le, sizeof(size_le)) == (ssize_t)sizeof(size_le) ? 0 : -1;
 }
 
 static void test_ranges(void)
@@ -133,10 +149,12 @@ static void test_kernel_limits(void)
     check(fd >= 0, "kernel fixture created");
     if (fd < 0)
         return;
-    check(ftruncate(fd, KERNEL_MAX) == 0, "exact-limit kernel fixture sized");
+    check(ftruncate(fd, KERNEL_MAX) == 0, "exact-limit kernel payload sized");
     check(lseek(fd, KERNEL_MAX - 1, SEEK_SET) == KERNEL_MAX - 1,
           "kernel fixture seeks to final byte");
     check(write(fd, &tail, 1) == 1, "kernel fixture final byte written");
+    check(finish_kernel_image(fd, KERNEL_MAX) == 0,
+          "exact-limit kernel trailer written");
     close(fd);
 
     ram = malloc(RAM_SIZE);
@@ -148,11 +166,11 @@ static void test_kernel_limits(void)
     memset(ram, 0, RAM_SIZE);
     check(bemu_load_kernel(path, ram, RAM_SIZE, &loaded, &saved_errno) ==
           BEMU_LOAD_OK, "512 KiB kernel boundary is accepted");
-    check(loaded == KERNEL_MAX && ram[KERNEL_MAX - 1] == tail,
-          "kernel boundary bytes are loaded");
+    check(loaded == KERNEL_MAX && ram[KERNEL_MAX - 1] == tail &&
+          ram[KERNEL_MAX] == 0, "only kernel payload bytes are loaded");
 
     fd = open(path, O_WRONLY);
-    check(fd >= 0 && ftruncate(fd, KERNEL_MAX + 1) == 0,
+    check(fd >= 0 && finish_kernel_image(fd, KERNEL_MAX + 1) == 0,
           "over-limit kernel fixture sized");
     if (fd >= 0)
         close(fd);
@@ -175,8 +193,8 @@ static void test_kernel_limits(void)
                  "kernel overlaps reserved guest memory") == 0,
           "reserved overlap has a stable diagnostic");
 
-    fd = open(path, O_WRONLY);
-    check(fd >= 0 && ftruncate(fd, 8192) == 0,
+    fd = open(path, O_WRONLY | O_TRUNC);
+    check(fd >= 0 && finish_kernel_image(fd, 8192) == 0,
           "truncated-read kernel fixture sized");
     if (fd >= 0)
         close(fd);
@@ -194,6 +212,53 @@ static void test_kernel_limits(void)
                      "kernel read was incomplete") == 0,
               "truncated payload has a stable diagnostic");
     }
+
+    fd = open(path, O_WRONLY | O_TRUNC);
+    check(fd >= 0 && ftruncate(fd, 8192) == 0,
+          "legacy raw kernel fixture sized");
+    if (fd >= 0)
+        close(fd);
+    loaded = 123;
+    memset(ram, 0xa5, RAM_SIZE);
+    check(bemu_load_kernel(path, ram, RAM_SIZE, &loaded, &saved_errno) ==
+          BEMU_LOAD_BAD_IMAGE, "raw kernel without trailer is rejected");
+    check(loaded == 0 && ram[0] == 0xa5 && ram[8191] == 0xa5,
+          "invalid kernel trailer leaves RAM and loaded size unchanged");
+
+    fd = open(path, O_WRONLY | O_TRUNC);
+    check(fd >= 0 && finish_kernel_image(fd, 8192) == 0 &&
+          ftruncate(fd, 8192 + KERNEL_IMAGE_TRAILER_SIZE - 1) == 0,
+          "short kernel trailer fixture created");
+    if (fd >= 0)
+        close(fd);
+    memset(ram, 0xa5, RAM_SIZE);
+    check(bemu_load_kernel(path, ram, RAM_SIZE, &loaded, &saved_errno) ==
+          BEMU_LOAD_BAD_IMAGE, "one-byte-short kernel trailer is rejected");
+    check(ram[0] == 0xa5 && ram[8191] == 0xa5,
+          "short trailer rejection leaves RAM unchanged");
+
+    fd = open(path, O_RDWR | O_TRUNC);
+    check(fd >= 0 && finish_kernel_image(fd, 8192) == 0 &&
+          ftruncate(fd, 4096 + KERNEL_IMAGE_TRAILER_SIZE) == 0 &&
+          lseek(fd, 4096, SEEK_SET) == 4096 &&
+          write(fd, KERNEL_IMAGE_MAGIC, KERNEL_IMAGE_MAGIC_SIZE) ==
+              KERNEL_IMAGE_MAGIC_SIZE,
+          "kernel size-mismatch fixture created");
+    if (fd >= 0) {
+        uint8_t size_le[8];
+        unsigned i;
+        for (i = 0; i < sizeof(size_le); i++)
+            size_le[i] = (uint8_t)((uint64_t)8192 >> (i * 8));
+        check(write(fd, size_le, sizeof(size_le)) == (ssize_t)sizeof(size_le),
+              "kernel mismatch length written");
+        close(fd);
+    }
+    memset(ram, 0xa5, RAM_SIZE);
+    check(bemu_load_kernel(path, ram, RAM_SIZE, &loaded, &saved_errno) ==
+          BEMU_LOAD_SIZE_MISMATCH,
+          "kernel trailer length mismatch is rejected");
+    check(ram[0] == 0xa5 && ram[8191] == 0xa5,
+          "length mismatch rejection leaves RAM unchanged");
 
     free(ram);
     unlink(path);

@@ -204,7 +204,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-artifact-truncation test-ide-faults test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -304,8 +304,11 @@ $(BUILD)/kernel.elf: $(ALL_OBJS) boot/kernel.ld | dirs
 	@$(LD) $(LDFLAGS) -T boot/kernel.ld -o "$@" $(ALL_OBJS) 2>&1 | sed 's/^/    /'
 	$(call OK,kernel.elf ready)
 
-$(BUILD)/kernel.bin: $(BUILD)/kernel.elf
+$(BUILD)/kernel.raw: $(BUILD)/kernel.elf
 	@$(OBJCOPY) -O binary "$<" "$@"
+
+$(BUILD)/kernel.bin: $(BUILD)/kernel.raw tools/kernel_image.py
+	@python3 tools/kernel_image.py "$<" "$@"
 	@printf '  $(CC1)$(G_INF)$(CR) %-22s $(CY)%s$(CR) bytes\n' \
 	  "kernel.bin" "$$(stat -f%z $@ 2>/dev/null || stat -c%s $@)"
 
@@ -420,7 +423,7 @@ $(BUILD)/root-1991.img: $(BUILD)/mkimage $(USERLAND_BINS)
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/irq.c bemu/irq.h bemu/experience.h bemu/machine.h \
-                         bemu/machine.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
+                         bemu/machine.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/kernel_image.h bemu/cli.c bemu/cli.h \
                          bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                          bemu/rtc.c bemu/rtc.h \
                         bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
@@ -435,7 +438,7 @@ $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/irq.c bemu
 	$(call OK,bemu-linux01 ready)
 
 $(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/irq.c bemu/irq.h bemu/experience.h bemu/machine.h \
-                         bemu/machine.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
+                         bemu/machine.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/kernel_image.h bemu/cli.c bemu/cli.h \
                          bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                          bemu/rtc.c bemu/rtc.h \
                         bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h \
@@ -511,6 +514,7 @@ test: all
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
 	@$(MAKE) --no-print-directory test-bemu-loading
+	@$(MAKE) --no-print-directory test-artifact-truncation
 	@$(MAKE) --no-print-directory bbp-conformance
 	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compare_assembly.py --make "$(MAKE_COMMAND)"
@@ -813,6 +817,12 @@ test-bemu-loading: $(BUILD)/test-memory-loader $(BUILD)/bemu-linux01 $(BUILD)/ro
 	@python3 tests/test_loading_limits.py --bemu $(BUILD)/bemu-linux01 \
 	  --img $(BUILD)/root.img --timeout 10
 
+test-artifact-truncation: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img $(BUILD)/root-1991.img
+	$(call STEP,deterministic kernel and root truncation test)
+	@python3 tests/test_artifact_truncation.py --bemu $(BUILD)/bemu-linux01 \
+	  --kernel $(BUILD)/kernel.bin --root $(BUILD)/root.img \
+	  --root-1991 $(BUILD)/root-1991.img --timeout 10
+
 $(BUILD)/test-trace-producer: tests/bemu/test_trace_producer.c bemu/trace.c bemu/trace.h bemu/trace_clock.c bemu/trace_clock.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 \
 	  -o "$@" tests/bemu/test_trace_producer.c bemu/trace.c bemu/trace_clock.c
@@ -868,7 +878,7 @@ $(BUILD)/test-irq-faults-kvm: tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/i
 test-irq-faults-kvm: $(BUILD)/test-irq-faults-kvm
 	@$(BUILD)/test-irq-faults-kvm
 
-$(BUILD)/test-memory-loader: tests/bemu/test_memory_loader.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/machine.h bemu/irq.h bbp/bbp_build.c bbp/bbp_build.h bbp/linux01_handoff.h | dirs
+$(BUILD)/test-memory-loader: tests/bemu/test_memory_loader.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/kernel_image.h bemu/machine.h bemu/irq.h bbp/bbp_build.c bbp/bbp_build.h bbp/linux01_handoff.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_memory_loader.c bemu/memory.c bemu/loader.c bbp/bbp_build.c
 
@@ -1256,6 +1266,7 @@ help:
 	@printf '    $(CWH)test-irq-faults$(CR) deterministic lost/duplicated IRQ edges\n'
 	@printf '    $(CWH)test-irq-faults-kvm$(CR) KVM irqchip fault integration\n'
 	@printf '    $(CWH)test-keyboard-faults$(CR) invalid scancodes and truncated input\n'
+	@printf '    $(CWH)test-artifact-truncation$(CR) truncated kernel/root rejection\n'
 	@printf '    $(CWH)test-experience-1991$(CR) historical profile integration test\n'
 	@printf '    $(CWH)test-experience-alive$(CR) alive profile integration test\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'

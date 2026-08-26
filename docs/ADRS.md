@@ -107,3 +107,24 @@ must be coherent and bisectable. The private roadmap files stay out of Git.
 - History tells the story of the project.
 - Bisect and blame remain useful.
 - Commit discipline is required from all agents.
+
+## ADR-007: Self-describing kernel artifact length
+
+**Status**: accepted
+
+**Context**: a headerless flat binary has no external end marker. Once a file
+has been truncated, `fstat()` cannot distinguish it from an intentionally
+shorter valid kernel, so suffix truncation could reach KVM.
+
+**Decision**: Keep the PA0 payload unchanged and append a versioned 16-byte
+`L01KIMG1` trailer containing its little-endian length. bEMU requires exact
+agreement, loads only payload bytes, and rejects unwrapped legacy kernels.
+
+**Consequences**:
+
+- Tested prefix, interior and suffix cutoffs of the canonical artifact are
+  rejected before KVM entry.
+- The historical kernel and BBP-visible kernel size are unchanged.
+- Released consumers that need only the flat payload must validate and strip
+  the final 16 bytes; `build/kernel.raw` is an internal build intermediate.
+- Length validation does not replace a content-integrity checksum.

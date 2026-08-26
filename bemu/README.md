@@ -4,18 +4,28 @@
 `OS/Nanokernel.org/BasmOS/bemu`. It runs this repository's kernel directly
 through `/dev/kvm`: no BIOS, firmware, ISO parser or bootloader is involved.
 
-The machine contract loads `build/kernel.bin` at physical address zero,
+The machine contract validates `build/kernel.bin` and loads its payload at
+physical address zero,
 provides 8 MiB of RAM, and models only the hardware Linux 0.01 uses here:
 8259/PIT through KVM, COM1, CMOS, VGA register state, keyboard scancodes and a
 CHS IDE disk backed by `build/root.img` or a selected profile image.
 
-Before `/dev/kvm` is opened, the modern bridge allocates exactly 8 MiB, rejects
-an empty kernel or one larger than 512 KiB, proves every destination range fits
+Before `/dev/kvm` is opened, the modern bridge allocates exactly 8 MiB, requires
+the versioned `L01KIMG1` trailer, rejects an empty payload or one larger than
+512 KiB, proves every destination range fits
 without integer wrap or overlap with the bootstrap GDT and BBP window, loads the
 kernel, and builds the reserved BBP handoff. Allocation and short-read failures
 are injectable through internal host-side APIs for deterministic unit tests; no
 RAM-size or fault switch is exposed by the historical CLI. Runtime load failures
 exit with status 1 and a stable `[bemu-linux01]` diagnostic.
+
+The 16-byte kernel trailer contains `L01KIMG1` and the little-endian payload
+length. It remains host-side and is never copied into guest RAM or reported in
+the BBP kernel size. Missing, truncated, or length-mismatched trailers are
+rejected. Legacy raw kernels are intentionally not accepted because their
+actual length cannot be distinguished from suffix truncation. Released
+consumers that require a flat payload must validate and remove the final 16
+bytes; `build/kernel.raw` is only an internal build intermediate.
 
 The root image is opened read-write and mapped with `MAP_SHARED`; guest writes
 therefore target the selected image, subject to the documented IDE completion

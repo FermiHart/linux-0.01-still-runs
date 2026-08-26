@@ -19,6 +19,7 @@ SHA-256 of upstream tarball:
 | Bear Boot Protocol (BBP) | `bbp/` | BSD-3-Clause / Unlicense | Firmware-free boot handoff with CRC-checked tags |
 | bEMU KVM runner | `bemu/bemu_linux01.c` | BSD-3-Clause / Unlicense | Minimal emulator that loads the kernel directly into KVM |
 | Minix v1 image forge | `tools/mkimage.c` | BSD-3-Clause / Unlicense | Build the bootable root filesystem by hand |
+| Kernel image wrapper | `tools/kernel_image.py` | BSD-3-Clause / Unlicense | Add the deterministic host-side payload-length trailer |
 | Interactive shell | `userland/shell.c` | BSD-3-Clause / Unlicense | Userland smoke-test shell |
 | C runtime | `userland/crt0.S` | BSD-3-Clause / Unlicense | Userland entry point and syscall wrappers |
 | Hello demo | `userland/programs/hello.c` | BSD-3-Clause / Unlicense | Minimal C userland program |

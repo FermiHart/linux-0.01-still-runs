@@ -144,8 +144,8 @@ authenticate the producer.
 
 **Audit**: Guest RAM has one public size: exactly 8 MiB. Range checks use
 subtraction and reject wrapping, out-of-RAM and placements overlapping the
-bootstrap GDT or reserved BBP window. The raw kernel must be nonempty and no
-larger than 512 KiB; incomplete reads are rejected. RAM allocation, kernel
+bootstrap GDT or reserved BBP window. The enveloped kernel payload must be
+nonempty and no larger than 512 KiB; incomplete reads are rejected. RAM allocation, kernel
 loading and BBP construction complete before `setup_kvm()` opens `/dev/kvm`.
 
 **Status**: PROVEN.
@@ -153,8 +153,34 @@ loading and BBP construction complete before `setup_kvm()` opens `/dev/kvm`.
 **Evidence**: `make test-bemu-loading` exercises exact boundaries, overflow,
 adjacency, GDT/BBP overlap, deterministic `ENOMEM`, injected short reads, clean
 allocation-failure state and real file loading. Its process-level cases give the
-production runner empty and 512 KiB + 1 kernels and require exit status 1, the
+production runner empty and 512 KiB + 1 payloads and require exit status 1, the
 structured diagnostic, and absence of direct-KVM-entry or guest-success output.
+
+### "Canonical truncated kernel and root artifacts fail before KVM"
+
+**Source**: `bemu/README.md` and `ARCHITECTURE.md`.
+
+**Audit**: `kernel.bin` carries a 16-byte `L01KIMG1` trailer declaring the PA0
+payload length. bEMU requires exact agreement between that value and file size,
+loads only payload bytes, and rejects legacy raw images. Root images must equal
+the fixed 977/5/17 CHS byte length; the production size check precedes `mmap`.
+
+**Status**: PROVEN for the tested canonical artifacts.
+
+**Evidence**: `make test-artifact-truncation` creates disposable prefix,
+interior and suffix cutoffs of the canonical kernel and both root profiles,
+plus an interior kernel deletion retaining the original trailer. Every case
+exits 1 before direct KVM entry; source hashes remain unchanged. Code inspection
+confirms the root size branch precedes the writable mapping. Loader unit
+tests cover exact 512 KiB payloads, trailer exclusion from RAM, invalid/truncated
+trailers, explicit length mismatch and injected short reads.
+
+**Limit**: the length trailer detects truncation, not same-size payload
+corruption. Same-size root corruption is separately scoped by filesystem fault
+tests. Released raw-kernel consumers must validate and strip the final 16 bytes;
+`build/kernel.raw` is an internal build intermediate. The length-only framing
+does not claim to recognize every adversarial cutoff of every possible payload
+containing trailer-like bytes.
 
 ### "IDE read and write failures are deterministic and bounded"
 

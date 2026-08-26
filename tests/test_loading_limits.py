@@ -10,6 +10,7 @@ import tempfile
 from harness_utils import diagnostic, sanitize_terminal
 
 KERNEL_MAX = 512 << 10
+KERNEL_TRAILER_SIZE = 16
 
 
 def main():
@@ -27,7 +28,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="bemu-loading-") as temp_dir:
         cases = (
             ("empty", 0, "kernel is empty"),
-            ("oversized", KERNEL_MAX + 1, "kernel exceeds 524288-byte limit"),
+            ("oversized", KERNEL_MAX + KERNEL_TRAILER_SIZE + 1,
+             "kernel exceeds 524288-byte limit"),
         )
         for name, size, message in cases:
             kernel = os.path.join(temp_dir, f"{name}-kernel.bin")

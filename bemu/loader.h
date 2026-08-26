@@ -16,6 +16,8 @@ enum bemu_load_status {
     BEMU_LOAD_OUTSIDE_RAM,
     BEMU_LOAD_RESERVED_OVERLAP,
     BEMU_LOAD_READ_FAILED,
+    BEMU_LOAD_BAD_IMAGE,
+    BEMU_LOAD_SIZE_MISMATCH,
 };
 
 typedef ssize_t (*bemu_kernel_reader)(int fd, void *buffer, size_t size,

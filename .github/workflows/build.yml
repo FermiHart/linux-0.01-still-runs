@@ -39,7 +39,7 @@ jobs:
           NO_COLOR: 1
 
       - name: Test deterministic host faults
-        run: make test-fs-corruption test-irq-faults test-keyboard-faults build/test-irq-faults-kvm
+        run: make test-fs-corruption test-artifact-truncation test-irq-faults test-keyboard-faults build/test-irq-faults-kvm
         env:
           NO_COLOR: 1
 
@@ -190,7 +190,7 @@ jobs:
             ### Artifacts
             - `root.img`: Minix v1 root filesystem
             - `kernel.elf`: kernel ELF with debug symbols
-            - `kernel.bin`: raw kernel binary
+            - `kernel.bin`: PA0 kernel payload with a host-side length trailer
             - `bemu-linux01`: statically linked Linux x86-64 KVM runner
             - `LICENSE`: historical Linux, BSD-3-Clause, and modern-project terms
             - `SHA256SUMS`: release artifact checksums

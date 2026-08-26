@@ -46,10 +46,10 @@ SOURCE_DATE_EPOCH=1700000000 make reproducible
 | Artifact | Reference SHA-256 (prefix) |
 |---|---|
 | `build/kernel.elf` | `44c8538c` |
-| `build/kernel.bin` | `c74256eb` |
+| `build/kernel.bin` | `9291a46d` |
 | `build/root.img` | `d9c47086` |
 | `build/root-1991.img` | `4ff943e2` |
-| `build/bemu-linux01` | `d1d9f7d4` |
+| `build/bemu-linux01` | `a17ea46a` |
 | `build/mkimage` | `c6f441e5` |
 | `build/shell.bin` | `4296fc4a` |
 | `build/update.bin` | `4a0212fc` |
@@ -67,4 +67,5 @@ checksums.
 the same host with the same toolchain, but different distributions or linker
 versions may produce different host binary bytes. The kernel (`build/kernel.bin`)
 and root images (`build/root.img` and `build/root-1991.img`) are fully
-deterministic.
+deterministic. `kernel.bin` is the deterministic flat PA0 payload followed by
+the deterministic 16-byte `L01KIMG1` length trailer.

@@ -32,6 +32,7 @@ blocked until the conflict is resolved.
 | Corrupt Minix metadata damages canonical images or is silently accepted | Non-reproducible artifacts or false integrity claims | Mutate disposable copies only; require two read-only oracles, exact byte deltas and stable hashes | 098 |
 | Lost or duplicated IRQ edges wedge or reenter historical drivers | Input/IDE hangs, stale callbacks, panic or filesystem damage | Host-only one-shot bridge, deferred PIC-quiescent replay, no unsafe guest recovery claim | 099 |
 | Invalid scancodes or truncated terminal escapes poison later input | Lost keys, stale decoder state or misleading recovery claims | Validate only Set-1 error bytes, finalize EOF explicitly, test latch/IRQ1 and host-side recovery without claiming guest handling | 100 |
+| Truncated kernel/root artifacts are accepted as shorter valid inputs | Partial kernel execution, host faults or writable use of incomplete media | Versioned kernel length trailer, exact CHS root size, disposable pre-KVM rejection tests and stable source hashes | 101 |
 | Toolchain ages or disappears | Builds no longer reproducible | Pin versions, archive tarballs, container digests | 016–025 |
 | Over-ambitious scope creep | 120 waves become unfinishable | Reject features not in roadmap; use discovery waves sparingly | Programa todo |
 | Loss of local roadmap files | Project context disappears | Backup `.local/` separately, checksums, agent protocol | Continuo |

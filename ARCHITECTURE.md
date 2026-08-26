@@ -60,7 +60,7 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
 
 | Stage | File | Address | What happens |
 |-------|------|---------|--------------|
-| 1 | `bemu/memory.c`, `bemu/loader.c` | host | Allocate fixed 8 MiB RAM, validate/load at 0, and reject short reads or ranges overlapping GDT/BBP before KVM setup |
+| 1 | `bemu/memory.c`, `bemu/loader.c` | host | Allocate fixed 8 MiB RAM, validate the `L01KIMG1` length trailer, load only its payload at 0, and reject truncation, short reads or GDT/BBP overlap before KVM setup |
 | 2 | `bemu/loader.c` | `0xC0000` | Produce CRC64-checksummed HHDM, memory-map, kernel-address, command-line and hypervisor tags |
 | 3 | `boot/head.s` | `0x000000` | Remap 8259 PIC and setup page directory/table for 8 MiB |
 | 4 | `boot/head.s` | `0x000000` | Setup IDT, GDT, enable paging, and call `main()` |
@@ -71,6 +71,11 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
 The IDE root image is mapped separately by `bemu/ide.c`; it is not copied into
 guest RAM. `bemu/kvm.c` receives already validated RAM and only registers it,
 installs the bootstrap GDT, creates the VM/vCPU, and sets registers.
+`kernel.bin` ends with an eight-byte `L01KIMG1` magic and an eight-byte
+little-endian payload length. The trailer is a host artifact envelope, not part
+of Linux memory; bEMU reports and loads only the preceding PA0 payload. Root
+images use their exact 977/5/17 CHS byte length as the independent truncation
+oracle before the writable mapping is created.
 The IDE module also has a host-only test seam for one-shot ATA read/write errors
 at a selected LBA; it is not exposed to the guest or command-line interface.
 The common IRQ bridge can similarly drop or defer one duplicate edge for a

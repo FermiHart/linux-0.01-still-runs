@@ -101,7 +101,7 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 - **Colored interactive shell** (`userland/shell.c`) with emacs line editing, tab completion, history, `$PATH`, kernel pipes, and `<`, `>`, `>>` redirection
 - **Small Unix-style command suite**: `date`, `cal`, `uptime`, `fortune`, `yes`, `true`, `false`, plus a documentary `linus` command that prints the original comp.os.minix announcement
 - **Minix v1 filesystem** built by hand at image time (`tools/mkimage.c`), with `/etc/motd`, `/etc/passwd`, `/bin/{shell,hello,update,yes,pathcheck,cat}`, `/dev/tty0`
-- **Firmware-free bEMU boot** — KVM enters `kernel.bin` at physical zero with no BIOS, UEFI, ISO, or bootloader
+- **Firmware-free bEMU boot** — KVM enters the validated `kernel.bin` payload at physical zero with no BIOS, UEFI, ISO, or bootloader
 - **Real BBP handoff** — bEMU publishes CRC64-checksummed HHDM, memory-map, kernel-address, command-line, and hypervisor tags at physical `0xC0000`; CRC64 detects corruption but does not authenticate the producer
 - **Profile-aware CMOS time** (fixed 1991 release epoch in historical mode;
   coherent host UTC snapshot and Y2K correction in alive mode)
@@ -113,7 +113,7 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 
 | Stage | Component | What it does |
 |-------|-----------|--------------|
-| 1 | `bemu/bemu_linux01.c` | Loads `kernel.bin` at phys 0, creates the BBP handoff, and provides the legacy devices through KVM |
+| 1 | `bemu/bemu_linux01.c` | Validates the `kernel.bin` length trailer, loads its payload at phys 0, creates BBP, and provides legacy devices through KVM |
 | 2 | `boot/head.s` | Reprograms the PIC, initializes IDT/GDT and paging, zeros BSS, calls `main()` |
 | 3 | `bbp/linux01_bbp.c` | Validates bEMU identity, memory-map, kernel-address, command-line, and hypervisor tags |
 | 4 | `init/main.c` | VGA 80×50 mode set → time → tty → traps → sched → buffer → fork-init |
@@ -136,6 +136,7 @@ make test            # boot + full shell, editor, trace, and large-rootfs tests
 make test-ide-faults # host-only deterministic IDE read/write failures
 make test-irq-faults # host-only lost/duplicated IRQ edges
 make test-keyboard-faults # invalid scancodes and truncated host input
+make test-artifact-truncation # canonical kernel/root truncation before KVM
 make test-fs-corruption # offline Minix superblock/inode/bitmap faults
 make doctor          # toolchain health check
 make sizes           # kernel section sizes

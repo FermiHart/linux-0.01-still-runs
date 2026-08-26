@@ -1,4 +1,5 @@
 #include "loader.h"
+#include "kernel_image.h"
 #include "machine.h"
 #include "memory.h"
 
@@ -43,6 +44,16 @@ static enum bemu_load_status read_full(int fd, void *buffer, size_t size,
     return BEMU_LOAD_OK;
 }
 
+static uint64_t decode_le64(const uint8_t value[8])
+{
+    uint64_t result = 0;
+    unsigned i;
+
+    for (i = 0; i < 8; i++)
+        result |= (uint64_t)value[i] << (i * 8);
+    return result;
+}
+
 enum bemu_load_status bemu_validate_kernel_range(uint64_t kernel_base,
                                                   size_t kernel_size,
                                                   size_t ram_size)
@@ -77,6 +88,9 @@ enum bemu_load_status bemu_load_kernel_with_reader(
     int *saved_errno, bemu_kernel_reader reader, void *reader_opaque)
 {
     struct stat st;
+    uint8_t trailer[KERNEL_IMAGE_TRAILER_SIZE];
+    uint64_t declared_size;
+    size_t file_size, payload_size;
     enum bemu_load_status status;
     int fd;
 
@@ -94,17 +108,52 @@ enum bemu_load_status bemu_load_kernel_with_reader(
         close(fd);
         return BEMU_LOAD_STAT_FAILED;
     }
-    status = st.st_size < 0 ? BEMU_LOAD_EMPTY :
-        bemu_validate_kernel_load((size_t)st.st_size, ram_size);
+    if (st.st_size <= 0) {
+        close(fd);
+        return BEMU_LOAD_EMPTY;
+    }
+    file_size = (size_t)st.st_size;
+    if (file_size > KERNEL_MAX + KERNEL_IMAGE_TRAILER_SIZE) {
+        close(fd);
+        return BEMU_LOAD_TOO_LARGE;
+    }
+    if (file_size < KERNEL_IMAGE_TRAILER_SIZE ||
+        lseek(fd, (off_t)(file_size - KERNEL_IMAGE_TRAILER_SIZE), SEEK_SET) < 0) {
+        close(fd);
+        return BEMU_LOAD_BAD_IMAGE;
+    }
+    status = read_full(fd, trailer, sizeof(trailer), saved_errno,
+                       kernel_read, NULL);
     if (status != BEMU_LOAD_OK) {
         close(fd);
         return status;
     }
-    status = read_full(fd, ram, (size_t)st.st_size, saved_errno, reader,
+    if (memcmp(trailer, KERNEL_IMAGE_MAGIC, KERNEL_IMAGE_MAGIC_SIZE) != 0) {
+        close(fd);
+        return BEMU_LOAD_BAD_IMAGE;
+    }
+    declared_size = decode_le64(trailer + KERNEL_IMAGE_MAGIC_SIZE);
+    if (declared_size > SIZE_MAX ||
+        declared_size + KERNEL_IMAGE_TRAILER_SIZE != file_size) {
+        close(fd);
+        return BEMU_LOAD_SIZE_MISMATCH;
+    }
+    payload_size = (size_t)declared_size;
+    status = bemu_validate_kernel_load(payload_size, ram_size);
+    if (status != BEMU_LOAD_OK) {
+        close(fd);
+        return status;
+    }
+    if (lseek(fd, 0, SEEK_SET) < 0) {
+        *saved_errno = errno;
+        close(fd);
+        return BEMU_LOAD_READ_FAILED;
+    }
+    status = read_full(fd, ram, payload_size, saved_errno, reader,
                        reader_opaque);
     close(fd);
     if (status == BEMU_LOAD_OK)
-        *loaded_size = (size_t)st.st_size;
+        *loaded_size = payload_size;
     return status;
 }
 
@@ -135,6 +184,10 @@ const char *bemu_load_status_string(enum bemu_load_status status)
         return "kernel overlaps reserved guest memory";
     case BEMU_LOAD_READ_FAILED:
         return "kernel read was incomplete";
+    case BEMU_LOAD_BAD_IMAGE:
+        return "kernel image has no valid L01KIMG1 trailer";
+    case BEMU_LOAD_SIZE_MISMATCH:
+        return "kernel image size does not match its trailer";
     }
     return "unknown kernel loading error";
 }

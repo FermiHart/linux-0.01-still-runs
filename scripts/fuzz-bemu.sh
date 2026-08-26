@@ -77,7 +77,7 @@ for i in 1 2 3; do
     run_case "root corruption $i" "$BEMU" --kernel "$KERNEL" --root "$TMPDIR/root-$i.img" --max-exits 1000
 done
 
-# BBP region truncation: keep kernel, truncate file at various points
+# Kernel artifact truncation at several payload points
 for trunc in 1 512 4096 8192; do
     head -c "$trunc" "$KERNEL" > "$TMPDIR/kernel-trunc-$trunc.bin"
     run_case "kernel truncated at $trunc" "$BEMU" --kernel "$TMPDIR/kernel-trunc-$trunc.bin" --root "$ROOT" --max-exits 1000
