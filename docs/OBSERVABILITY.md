@@ -74,7 +74,9 @@ Emitted for `KVM_EXIT_IO` exits.
 
 ### `irq`
 
-Emitted when an IRQ is raised, lowered or acknowledged.
+Emitted for host IRQ line transitions and test-only fault decisions. These
+events do not prove that KVM's in-kernel PIC delivered a vector or that the guest
+handler completed.
 
 ```json
 {
@@ -82,12 +84,13 @@ Emitted when an IRQ is raised, lowered or acknowledged.
   "type": "irq",
   "data": {
     "irq": 1,
-    "action": "pulse"
+    "action": "raise"
   }
 }
 ```
 
-Valid actions: `raise`, `lower`, `pulse`, `eoi`.
+Valid actions currently emitted: `raise`, `lower`, `fault_drop`,
+`fault_duplicate_queued`, and `fault_duplicate_replayed`.
 
 ### `timer`
 

@@ -38,15 +38,15 @@ jobs:
         env:
           NO_COLOR: 1
 
-      - name: Test deterministic filesystem corruption
-        run: make test-fs-corruption
+      - name: Test deterministic host faults
+        run: make test-fs-corruption test-irq-faults build/test-irq-faults-kvm
         env:
           NO_COLOR: 1
 
       - name: Set modes and create checksums
         run: |
           install -m 0644 LICENSE build/LICENSE
-          chmod 0755 build/bemu-linux01 build/mkimage
+          chmod 0755 build/bemu-linux01 build/mkimage build/test-irq-faults-kvm
           chmod 0644 \
             build/hello.bin \
             build/kernel.bin \
@@ -58,6 +58,7 @@ jobs:
           sha256sum LICENSE root.img kernel.elf kernel.bin bemu-linux01 > SHA256SUMS
           sha256sum \
             LICENSE bemu-linux01 hello.bin kernel.bin kernel.elf mkimage root.img \
+            test-irq-faults-kvm \
             shell.bin update.bin > CI_SHA256SUMS
           chmod 0644 SHA256SUMS CI_SHA256SUMS
           sha256sum --check SHA256SUMS
@@ -72,6 +73,7 @@ jobs:
             build/CI_SHA256SUMS
             build/LICENSE
             build/root.img
+            build/test-irq-faults-kvm
             build/kernel.elf
             build/kernel.bin
             build/bemu-linux01
@@ -103,7 +105,7 @@ jobs:
           cd build
           sha256sum --check SHA256SUMS
           sha256sum --check CI_SHA256SUMS
-          chmod 0755 bemu-linux01 mkimage
+          chmod 0755 bemu-linux01 mkimage test-irq-faults-kvm
           chmod 0644 \
             CI_SHA256SUMS LICENSE SHA256SUMS hello.bin kernel.bin kernel.elf root.img \
             shell.bin update.bin
@@ -121,6 +123,9 @@ jobs:
             printf '::error::/dev/kvm exists but is not usable by the runner.\n'
             exit 1
           fi
+
+      - name: Test KVM irqchip fault integration
+        run: build/test-irq-faults-kvm
 
       - name: Run normal boot and shell tests
         run: |

@@ -480,6 +480,7 @@ int main(int argc, char **argv)
                 continue;
             die("KVM_RUN");
         }
+        irq_run_completed(&m);
         switch (m.run->exit_reason) {
         case KVM_EXIT_IO:
             handle_io(&m);

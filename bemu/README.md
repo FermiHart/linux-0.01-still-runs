@@ -28,6 +28,14 @@ the ANSI color, cursor and erase sequences used by the shell. Use
 `--raw-console` only when unfiltered terminal output is explicitly required.
 Redirected stdout remains byte-for-byte guest serial output.
 
+The common host IRQ bridge also supports one test-only lost or duplicated edge
+for IRQ0-15. A dropped assertion suppresses its matching deassertion. A duplicate
+passes the original edge, then waits for a completed KVM run, a low device line,
+and quiescent IRR/ISR state before replaying one pulse. For slave IRQs, both the
+selected slave bit and the master cascade must be clear. This proves host line
+policy, not that Linux handles every duplicate or recovers from unsafe IRQ1/IRQ14
+faults. No IRQ fault switch is exposed to the guest or CLI.
+
 ```sh
 make run
 make run EXPERIENCE=1991

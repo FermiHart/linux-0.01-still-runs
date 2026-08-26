@@ -204,7 +204,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-irq-faults test-irq-faults-kvm test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -419,7 +419,7 @@ $(BUILD)/root-1991.img: $(BUILD)/mkimage $(USERLAND_BINS)
 # ║                                bEMU                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-$(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/experience.h bemu/machine.h \
+$(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/irq.c bemu/irq.h bemu/experience.h bemu/machine.h \
                          bemu/machine.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
                          bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                          bemu/rtc.c bemu/rtc.h \
@@ -431,10 +431,10 @@ $(BUILD)/bemu-linux01: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/experience
                         bbp/include/bbp/bbp_crc64.h | dirs
 	$(call STAGE,8/10,building firmware-free bEMU KVM runner)
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
-	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/memory.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/rtc.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bemu/trace.c bbp/bbp_build.c $(BEMU_LDFLAGS)
+	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/irq.c bemu/machine.c bemu/memory.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/rtc.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bemu/trace.c bbp/bbp_build.c $(BEMU_LDFLAGS)
 	$(call OK,bemu-linux01 ready)
 
-$(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/experience.h bemu/machine.h \
+$(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/irq.c bemu/irq.h bemu/experience.h bemu/machine.h \
                          bemu/machine.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/cli.c bemu/cli.h \
                          bemu/kvm.c bemu/kvm.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h \
                          bemu/rtc.c bemu/rtc.h \
@@ -446,7 +446,7 @@ $(BUILD)/bemu-linux01-sanitized: bemu/bemu_linux01.c bemu/ide.c bemu/ide.h bemu/
                         bbp/include/bbp/bbp_crc64.h | dirs
 	$(call STAGE,8/10,building bEMU with ASan/UBSan)
 	@$(HOSTCC) $(HOSTCFLAGS) $(BEMU_SANFLAGS) -Werror -std=gnu11 -Ibbp/include \
-	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/machine.c bemu/memory.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/rtc.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bemu/trace.c bbp/bbp_build.c $(BEMU_LDFLAGS) $(BEMU_SANFLAGS) -lm
+	  -o "$@" bemu/bemu_linux01.c bemu/ide.c bemu/irq.c bemu/machine.c bemu/memory.c bemu/loader.c bemu/cli.c bemu/kvm.c bemu/pic.c bemu/pit.c bemu/rtc.c bemu/uart.c bemu/console.c bemu/keyboard.c bemu/trace_clock.c bemu/trace.c bbp/bbp_build.c $(BEMU_LDFLAGS) $(BEMU_SANFLAGS) -lm
 	$(call OK,bemu-linux01-sanitized ready)
 
 bemu-sanitized: $(BUILD)/bemu-linux01-sanitized
@@ -509,6 +509,7 @@ test: all
 	$(call STAGE,9/10,running bEMU boot test suite)
 	@python3 tests/test_harness_utils.py
 	@$(MAKE) --no-print-directory test-bemu-devices
+	@$(MAKE) --no-print-directory test-irq-faults-kvm
 	@$(MAKE) --no-print-directory test-bemu-loading
 	@$(MAKE) --no-print-directory bbp-conformance
 	@python3 tests/test_compiler_cases.py --make "$(MAKE_COMMAND)"
@@ -794,10 +795,11 @@ test-compiler-dataset:
 	$(call STEP,compiler dataset package check)
 	@python3 tests/test_compiler_dataset.py --make "$(MAKE_COMMAND)"
 
-test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-rtc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
+test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/test-irq-faults $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-rtc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)
 	@$(BUILD)/test-bemu-devices
 	@$(BUILD)/test-ide-faults
+	@$(BUILD)/test-irq-faults
 	@$(BUILD)/test-bbp-invalid
 	@$(BUILD)/test-bbp-trunc
 	@$(BUILD)/test-rtc
@@ -830,19 +832,35 @@ fuzz: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STAGE,9/10,running bEMU fault injection fuzz)
 	@bash "$(REPO_ROOT)/scripts/fuzz-bemu.sh"
 
-$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/console.c bemu/pic.h bemu/pit.h bemu/rtc.h bemu/uart.h bemu/keyboard.h bemu/console.h bemu/machine.h | dirs
+$(BUILD)/test-bemu-devices: tests/bemu/test_bemu_devices.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/console.c bemu/pic.h bemu/pit.h bemu/rtc.h bemu/uart.h bemu/keyboard.h bemu/console.h bemu/machine.h bemu/irq.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bemu_devices.c \
 	  bemu/pic.c bemu/pit.c bemu/uart.c bemu/keyboard.c bemu/console.c
 
-$(BUILD)/test-ide-faults: tests/bemu/test_ide_faults.c bemu/ide.c bemu/ide.h bemu/machine.h bemu/experience.h | dirs
+$(BUILD)/test-ide-faults: tests/bemu/test_ide_faults.c bemu/ide.c bemu/ide.h bemu/machine.h bemu/irq.h bemu/experience.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibemu \
 	  -o "$@" tests/bemu/test_ide_faults.c bemu/ide.c
 
 test-ide-faults: $(BUILD)/test-ide-faults
 	@$(BUILD)/test-ide-faults
 
-$(BUILD)/test-memory-loader: tests/bemu/test_memory_loader.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/machine.h bbp/bbp_build.c bbp/bbp_build.h bbp/linux01_handoff.h | dirs
+$(BUILD)/test-irq-faults: tests/bemu/test_irq_faults.c bemu/irq.c bemu/irq.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibemu \
+	  -o "$@" tests/bemu/test_irq_faults.c bemu/irq.c
+
+test-irq-faults: $(BUILD)/test-irq-faults
+	@$(BUILD)/test-irq-faults
+
+$(BUILD)/test-irq-faults-kvm: tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/irq.h bemu/machine.c bemu/machine.h bemu/kvm.c bemu/kvm.h bemu/memory.c bemu/memory.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h bemu/keyboard.c bemu/keyboard.h bemu/trace.c bemu/trace.h bemu/trace_clock.c bemu/trace_clock.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
+	  -o "$@" tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/machine.c bemu/kvm.c \
+	  bemu/memory.c bemu/pic.c bemu/pit.c bemu/uart.c bemu/console.c \
+	  bemu/keyboard.c bemu/trace.c bemu/trace_clock.c
+
+test-irq-faults-kvm: $(BUILD)/test-irq-faults-kvm
+	@$(BUILD)/test-irq-faults-kvm
+
+$(BUILD)/test-memory-loader: tests/bemu/test_memory_loader.c bemu/memory.c bemu/memory.h bemu/loader.c bemu/loader.h bemu/machine.h bemu/irq.h bbp/bbp_build.c bbp/bbp_build.h bbp/linux01_handoff.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_memory_loader.c bemu/memory.c bemu/loader.c bbp/bbp_build.c
 
@@ -1227,6 +1245,8 @@ help:
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'
+	@printf '    $(CWH)test-irq-faults$(CR) deterministic lost/duplicated IRQ edges\n'
+	@printf '    $(CWH)test-irq-faults-kvm$(CR) KVM irqchip fault integration\n'
 	@printf '    $(CWH)test-experience-1991$(CR) historical profile integration test\n'
 	@printf '    $(CWH)test-experience-alive$(CR) alive profile integration test\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'

@@ -172,6 +172,28 @@ historical CLI exposes no fault switch.
 zero transfer, one-shot recovery, operation/LBA scoping and later sectors of
 multi-sector commands without KVM.
 
+### "Lost and duplicated IRQ edges are deterministic and bounded"
+
+**Source**: `bemu/README.md` and `ARCHITECTURE.md`.
+
+**Audit**: the common modern IRQ bridge can arm one host-side drop or duplicate
+for IRQ0-15. The next rising edge on that IRQ consumes it; unrelated IRQs and
+redundant high levels do not. Drops suppress the matching deassertion. Duplicate
+replay waits for at least one completed KVM run, a low device line, and clear
+selected IRR/ISR state, including the master cascade for slave IRQs. No CLI or
+guest fault control exists.
+
+**Status**: PROVEN / TEST-ONLY.
+
+**Evidence**: `make test-irq-faults` uses a callback transport to verify exact
+edge order, scope, one-shot consumption, deferral, PIC/cascade quiescence, reset,
+re-arm and recovery without KVM. `make test-irq-faults-kvm` uses the production
+VM setup and irqchip ioctls to prove drop/replay against IRR across completed
+single-step `KVM_RUN` calls. Default-path boot remains a separate regression.
+
+**Limit**: line traces and callback edges do not prove guest handler entry.
+Recovery from dropped or duplicated keyboard/IDE interrupts is not claimed.
+
 ### "Minix metadata corruption is deterministic and isolated"
 
 **Source**: `docs/FS-EXPERIENCE.md` and `ARCHITECTURE.md`.

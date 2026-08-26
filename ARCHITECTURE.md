@@ -73,6 +73,9 @@ guest RAM. `bemu/kvm.c` receives already validated RAM and only registers it,
 installs the bootstrap GDT, creates the VM/vCPU, and sets registers.
 The IDE module also has a host-only test seam for one-shot ATA read/write errors
 at a selected LBA; it is not exposed to the guest or command-line interface.
+The common IRQ bridge can similarly drop or defer one duplicate edge for a
+selected IRQ. Duplicate replay waits for a completed KVM run, a low device line,
+and clear IRR/ISR state in KVM's in-kernel 8259, including the slave cascade.
 Minix metadata fault tests operate offline on disposable image copies. They
 never give a corrupt filesystem to the writable IDE mapping.
 

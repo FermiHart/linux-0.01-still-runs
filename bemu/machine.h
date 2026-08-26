@@ -6,6 +6,7 @@
 #include <stddef.h>
 
 #include "ide.h"
+#include "irq.h"
 #include "pic.h"
 #include "pit.h"
 #include "rtc.h"
@@ -38,6 +39,7 @@ struct machine {
     struct kvm_run *run;
     struct trace_clock clock;
     struct trace trace;
+    struct bemu_irq_bridge irq;
     struct ide_state ide;
     struct pic_state pic;
     struct uart_state uart;
@@ -69,6 +71,9 @@ struct machine {
 
 void irq_level(struct machine *m, unsigned irq, int level);
 void irq_pulse(struct machine *m, unsigned irq);
+int irq_inject_fault(struct machine *m, enum bemu_irq_fault_kind kind,
+                     unsigned irq);
+void irq_run_completed(struct machine *m);
 void die(const char *what);
 void fail(const char *what);
 int machine_create(struct machine *m);
