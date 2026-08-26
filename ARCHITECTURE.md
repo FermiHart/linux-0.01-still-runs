@@ -85,6 +85,12 @@ The keyboard module exposes only a host-test seam for Set-1 error bytes `0x00`
 and `0xff`. Its terminal decoder carries escape state across polling boundaries;
 non-TTY EOF emits a lone Escape key but discards incomplete CSI/SS3 input before
 returning to the idle decoder state.
+BBP corruption tests map a disposable copy of the exact 64 KiB handoff window
+at `0xC0000` and call the production `bbp_linux01_init()` consumer. They repair
+CRC64 after semantic mutations, leave it broken for integrity mutations, and
+require bounded rejection of malformed headers, ranges, links, duplicate or
+missing tags, and Linux 0.01-specific tag contents. No corrupt handoff enters
+KVM or changes a canonical artifact.
 Minix metadata fault tests operate offline on disposable image copies. They
 never give a corrupt filesystem to the writable IDE mapping.
 

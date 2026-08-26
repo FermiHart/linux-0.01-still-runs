@@ -135,8 +135,20 @@ authenticate the producer.
 
 **Status**: PROVEN / QUALIFIED.
 
-**Evidence**: `bbp/linux01_bbp.c`, `bemu/bemu_linux01.c` BBP code paths,
-`tests/test_boot.py` BBP checks.
+**Evidence**: `bbp/linux01_bbp.c`, `bbp/bbp_kernel.c` and
+`bemu/bemu_linux01.c` BBP code paths; `tests/test_boot.py` checks the normal
+guest path. `make test-bbp-corruption` links the exact production parser and
+Linux 0.01 consumer into a host harness, maps a disposable handoff window at
+`0xC0000`, and verifies both accepted profiles plus deterministic rejection of
+bad magic, versions, CRC64 values, sizes, alignment, out-of-window and interior
+pointers, cyclic/count-mismatched chains, duplicate or missing tags, malformed
+blob data and CRC-valid semantic forgeries. Every failed initialization must
+clear the exported boot context and report the matching `BBP_ERR_*` status.
+
+**Limit**: this proves bounded validation for the enumerated mutations and exact
+bEMU/Linux 0.01 contract. CRC64 is not authentication, the fixed-address host
+harness is not guest execution, and exhaustive resistance to arbitrary hostile
+byte streams is not claimed.
 
 ### "Memory and kernel loading limits fail before KVM entry"
 

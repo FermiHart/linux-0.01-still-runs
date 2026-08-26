@@ -19,6 +19,15 @@ are injectable through internal host-side APIs for deterministic unit tests; no
 RAM-size or fault switch is exposed by the historical CLI. Runtime load failures
 exit with status 1 and a stable `[bemu-linux01]` diagnostic.
 
+The guest-side production consumer treats that handoff as untrusted. It bounds
+all pointers to `0xC0000..0xD0000`, validates header and tag CRC64 values before
+using bodies, limits and terminates the linked tag walk, rejects duplicate or
+missing required tags, then verifies bEMU's exact architecture, identity, HHDM,
+memory map, kernel address, hypervisor evidence, and experience command line.
+`make test-bbp-corruption` proves these failures in a disposable host mapping by
+linking the exact `bbp_linux01_init()` and `bbp_init_win()` production sources;
+it does not enter KVM or mutate boot artifacts.
+
 The 16-byte kernel trailer contains `L01KIMG1` and the little-endian payload
 length. It remains host-side and is never copied into guest RAM or reported in
 the BBP kernel size. Missing, truncated, or length-mismatched trailers are

@@ -136,6 +136,7 @@ make test            # boot + full shell, editor, trace, and large-rootfs tests
 make test-ide-faults # host-only deterministic IDE read/write failures
 make test-irq-faults # host-only lost/duplicated IRQ edges
 make test-keyboard-faults # invalid scancodes and truncated host input
+make test-bbp-corruption # production BBP parser/semantic corruption matrix
 make test-artifact-truncation # canonical kernel/root truncation before KVM
 make test-fs-corruption # offline Minix superblock/inode/bitmap faults
 make doctor          # toolchain health check

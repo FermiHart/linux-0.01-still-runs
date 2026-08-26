@@ -91,11 +91,11 @@ Tags form a singly-linked list. Each tag begins with a common header:
 ```c
 struct bbp_tag_header {
     uint64_t tag_id;     /* BBP_TAG_* */
-    uint16_t flags;
-    uint16_t reserved0;
-    uint32_t body_size;  /* bytes following this header */
+    uint32_t tag_size;   /* header plus body and trailing array */
+    uint16_t tag_version;
+    uint16_t flags;      /* BBP_TF_* */
     bbp_phys_t next_tag; /* 0 = end of list */
-    uint64_t checksum;   /* CRC64/XZ of body, 0 if no body */
+    uint64_t checksum;   /* CRC64/XZ of the complete tag */
 } __attribute__((packed));
 ```
 
@@ -126,16 +126,15 @@ are the ID within the category.
 
 | Limit | Value | Rationale |
 |---|---|---|
-| Maximum `bbp_info.info_size` | 64 KiB | Keeps the handoff inside a single low page on x86 |
-| Maximum tag count | 256 | Fast array scan; avoids unbounded walks |
-| Maximum cmdline length | 4 KiB | Fits in a page; keeps parsing simple |
-| Maximum memory-map entries | 128 | Typical x86/ACPI systems fit comfortably |
-| Maximum module count | 32 | Matches the small static kernel model |
-| Bootloader name/version | 31/15 bytes | Space inside `bbp_info` |
-| Kernel name | 63 bytes | Space inside `bbp_header` |
+| Maximum generic `bbp_info.info_size` | 64 MiB | Bounds parser-controlled total size |
+| Maximum individual tag | 16 MiB | Prevents overflow and resource exhaustion |
+| Maximum tag count | 1024 | Bounds linked-list traversal |
+| Tag alignment | 8 bytes | Required for every tag pointer |
+| Bootloader name/version | 31/15 bytes | Space inside `bbp_info` plus NUL |
 
-These limits are advisory minimums for a compliant producer. A defensive parser
-must still reject out-of-range values even if a producer ignores them.
+The Linux 0.01 profile is deliberately narrower than the generic limits: the
+entire info structure, linked tags, array bodies and command blob must fit in the
+fixed 64 KiB physical window `0xC0000..0xD0000`.
 
 ## Memory map entry
 
@@ -160,9 +159,8 @@ Memory types:
 
 - Header checksum covers the entire `bbp_header` with `checksum` set to 0.
 - Info checksum covers the entire `bbp_info` with `checksum` set to 0.
-- Tag checksum covers only the tag body (not the header) with `checksum` set
-  to 0. Out-of-line data referenced by a tag must carry its own per-reference
-  CRC (v1.1).
+- Tag checksum covers the complete `tag_size` bytes with `checksum` set to 0.
+  Out-of-line command-line data carries its own per-reference CRC64 (v1.1).
 
 ## Producer-consumer contract
 
@@ -186,23 +184,36 @@ After validation, `init` converts them into the matching `HOME` and
 `EXPERIENCE` environment for the shell. Missing or unknown profiles invalidate
 the handoff rather than silently selecting a third experience.
 
+### Production corruption proof
+
+`make test-bbp-corruption` constructs the same five-tag handoff as bEMU in a
+disposable mapping at `0xC0000`, then invokes `bbp_linux01_init()` and
+`bbp_init_win()` from the production sources. The matrix covers info-header
+magic, version and CRC64; info/tag sizes and alignment; out-of-window, interior
+and cyclic links; count mismatches; duplicate and missing required tags; body/blob
+CRC64; and Linux 0.01 architecture, producer, HHDM, memory-map, kernel,
+hypervisor and command-line semantics. Semantic mutations are resealed so they
+cannot pass merely because a checksum failed first. Every failure requires
+the specific `BBP_ERR_*` diagnostic and no published boot context.
+
+The harness does not enter KVM and never modifies canonical kernel or root
+artifacts. It proves the enumerated bounded rejection behavior, not CRC64
+authenticity or exhaustive safety for every possible hostile byte sequence.
+
 ## Authentication limits
 
 CRC-64/XZ is used throughout BBP for data integrity:
 
 - `bbp_header.checksum` covers the header with the checksum field zeroed.
 - `bbp_info.checksum` covers the info structure with the checksum field zeroed.
-- `bbp_tag_header.checksum` covers the tag body (after the header) with the
+- `bbp_tag_header.checksum` covers the complete `tag_size` bytes with the
   checksum field zeroed.
-- Out-of-line data pointed to by tags carries its own per-reference CRC when
-  possible (v1.1).
+- Out-of-line command-line data carries its own per-reference CRC64.
 
 CRC64 detects accidental bit flips, torn writes, and some classes of benign
 corruption. It is **not** a cryptographic authenticator. The checksum length is
-64 bits, so a motivated attacker can forge a valid CRC for an arbitrary payload
-with approximately 2^64 operations; on modern hardware this is within practical
-reach for a well-funded adversary. More importantly, CRC has no keying material:
-anyone who can write the handoff region can also compute the matching checksum.
+64 bits, but CRC has no keying material: anyone who can write the handoff region
+can directly compute the matching checksum for altered data.
 
 BBP therefore assumes the producer is part of the trusted computing base. The
 CRC is a data-integrity guard, not a security boundary. If authentication is

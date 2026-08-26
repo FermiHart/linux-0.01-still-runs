@@ -99,6 +99,7 @@ HOSTCFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wformat-security \
 HOSTLDFLAGS ?= -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
 BEMU_LDFLAGS ?= -static-pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
 BEMU_SANFLAGS ?= -fsanitize=undefined -fno-omit-frame-pointer
+BBP_SANFLAGS ?= -fsanitize=address,undefined -fno-omit-frame-pointer
 
 # ──────────────────────────────────────────────── object lists ──────────────
 KERNEL_OBJS := \
@@ -204,7 +205,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-artifact-truncation test-ide-faults test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-artifact-truncation test-ide-faults test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -904,17 +905,36 @@ $(BUILD)/test-bbp-trunc: tests/bemu/test_bbp_trunc.c bbp/include/bbp/bbp.h bbp/i
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
 	  -o "$@" tests/bemu/test_bbp_trunc.c
 
+$(BUILD)/test-bbp-corruption: tests/bemu/test_bbp_corruption.c bbp/bbp_build.c bbp/bbp_build.h bbp/bbp_kernel.c bbp/bbp_kernel.h bbp/linux01_bbp.c bbp/linux01_bbp.h bbp/linux01_handoff.h bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include -Ibbp \
+	  -o "$@" tests/bemu/test_bbp_corruption.c bbp/bbp_build.c \
+	  bbp/bbp_kernel.c bbp/linux01_bbp.c $(HOSTLDFLAGS)
+
+test-bbp-corruption: $(BUILD)/test-bbp-corruption
+	@$(BUILD)/test-bbp-corruption
+
+$(BUILD)/test-bbp-corruption-sanitized: tests/bemu/test_bbp_corruption.c bbp/bbp_build.c bbp/bbp_build.h bbp/bbp_kernel.c bbp/bbp_kernel.h bbp/linux01_bbp.c bbp/linux01_bbp.h bbp/linux01_handoff.h bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) $(BBP_SANFLAGS) -Werror -std=gnu11 \
+	  -Ibbp/include -Ibbp -o "$@" tests/bemu/test_bbp_corruption.c \
+	  bbp/bbp_build.c bbp/bbp_kernel.c bbp/linux01_bbp.c \
+	  $(HOSTLDFLAGS) $(BBP_SANFLAGS)
+
+test-bbp-corruption-sanitized: $(BUILD)/test-bbp-corruption-sanitized
+	@$(BUILD)/test-bbp-corruption-sanitized
+
 bbp-golden-vectors: $(BUILD)/bbp-tool | dirs
 	@$(BUILD)/bbp-tool encode tests/bemu/golden/bbp-minimal.bin
 	$(call OK,wrote tests/bemu/golden/bbp-minimal.bin)
 
-bbp-conformance: $(BUILD)/bbp-tool $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-bbp-golden | dirs
+bbp-conformance: $(BUILD)/bbp-tool $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-bbp-corruption $(BUILD)/test-bbp-corruption-sanitized $(BUILD)/test-bbp-golden | dirs
 	$(call STAGE,9/10,running BBP conformance tests)
 	@rm -f /tmp/bbp-conformance.bin
 	@$(BUILD)/bbp-tool encode /tmp/bbp-conformance.bin
 	@$(BUILD)/bbp-tool decode /tmp/bbp-conformance.bin
 	@$(BUILD)/test-bbp-invalid
 	@$(BUILD)/test-bbp-trunc
+	@$(BUILD)/test-bbp-corruption
+	@$(BUILD)/test-bbp-corruption-sanitized
 	@$(BUILD)/test-bbp-golden tests/bemu/golden/bbp-minimal.bin
 	$(call OK,BBP conformance tests passed)
 $(BUILD)/test-bbp-golden: tests/bemu/test_bbp_golden.c bbp/include/bbp/bbp.h bbp/include/bbp/bbp_crc64.h | dirs
@@ -1266,6 +1286,8 @@ help:
 	@printf '    $(CWH)test-irq-faults$(CR) deterministic lost/duplicated IRQ edges\n'
 	@printf '    $(CWH)test-irq-faults-kvm$(CR) KVM irqchip fault integration\n'
 	@printf '    $(CWH)test-keyboard-faults$(CR) invalid scancodes and truncated input\n'
+	@printf '    $(CWH)test-bbp-corruption$(CR) production BBP corruption rejection\n'
+	@printf '    $(CWH)test-bbp-corruption-sanitized$(CR) BBP faults under ASan/UBSan\n'
 	@printf '    $(CWH)test-artifact-truncation$(CR) truncated kernel/root rejection\n'
 	@printf '    $(CWH)test-experience-1991$(CR) historical profile integration test\n'
 	@printf '    $(CWH)test-experience-alive$(CR) alive profile integration test\n'
