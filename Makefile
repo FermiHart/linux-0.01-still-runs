@@ -204,7 +204,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-irq-faults test-irq-faults-kvm test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -795,11 +795,12 @@ test-compiler-dataset:
 	$(call STEP,compiler dataset package check)
 	@python3 tests/test_compiler_dataset.py --make "$(MAKE_COMMAND)"
 
-test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/test-irq-faults $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-rtc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
+test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/test-irq-faults $(BUILD)/test-keyboard-faults $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-rtc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)
 	@$(BUILD)/test-bemu-devices
 	@$(BUILD)/test-ide-faults
 	@$(BUILD)/test-irq-faults
+	@$(BUILD)/test-keyboard-faults
 	@$(BUILD)/test-bbp-invalid
 	@$(BUILD)/test-bbp-trunc
 	@$(BUILD)/test-rtc
@@ -850,6 +851,13 @@ $(BUILD)/test-irq-faults: tests/bemu/test_irq_faults.c bemu/irq.c bemu/irq.h | d
 
 test-irq-faults: $(BUILD)/test-irq-faults
 	@$(BUILD)/test-irq-faults
+
+$(BUILD)/test-keyboard-faults: tests/bemu/test_keyboard_faults.c bemu/keyboard.c bemu/keyboard.h bemu/machine.h bemu/irq.h | dirs
+	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibemu \
+	  -o "$@" tests/bemu/test_keyboard_faults.c bemu/keyboard.c
+
+test-keyboard-faults: $(BUILD)/test-keyboard-faults
+	@$(BUILD)/test-keyboard-faults
 
 $(BUILD)/test-irq-faults-kvm: tests/bemu/test_irq_faults_kvm.c bemu/irq.c bemu/irq.h bemu/machine.c bemu/machine.h bemu/kvm.c bemu/kvm.h bemu/memory.c bemu/memory.h bemu/pic.c bemu/pic.h bemu/pit.c bemu/pit.h bemu/uart.c bemu/uart.h bemu/console.c bemu/console.h bemu/keyboard.c bemu/keyboard.h bemu/trace.c bemu/trace.h bemu/trace_clock.c bemu/trace_clock.h | dirs
 	@$(HOSTCC) $(HOSTCFLAGS) -Werror -std=gnu11 -Ibbp/include \
@@ -1247,6 +1255,7 @@ help:
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'
 	@printf '    $(CWH)test-irq-faults$(CR) deterministic lost/duplicated IRQ edges\n'
 	@printf '    $(CWH)test-irq-faults-kvm$(CR) KVM irqchip fault integration\n'
+	@printf '    $(CWH)test-keyboard-faults$(CR) invalid scancodes and truncated input\n'
 	@printf '    $(CWH)test-experience-1991$(CR) historical profile integration test\n'
 	@printf '    $(CWH)test-experience-alive$(CR) alive profile integration test\n'
 	@printf '    $(CWH)test-large-rootfs$(CR) oversized shell/rootfs smoke test\n'

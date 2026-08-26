@@ -194,6 +194,29 @@ single-step `KVM_RUN` calls. Default-path boot remains a separate regression.
 **Limit**: line traces and callback edges do not prove guest handler entry.
 Recovery from dropped or duplicated keyboard/IDE interrupts is not claimed.
 
+### "Invalid scancodes and truncated host input are bounded"
+
+**Source**: `bemu/README.md` and `ARCHITECTURE.md`.
+
+**Audit**: the modern keyboard test seam accepts only the Set-1 error/overrun
+bytes `0x00` and `0xff`; other make, break and prefix bytes are rejected without
+changing the queue. Host terminal escape state survives input polling boundaries.
+At declared non-TTY EOF, a lone Escape is emitted normally while an incomplete
+CSI or SS3 sequence is discarded and the decoder returns to idle. No CLI or
+guest fault control exists.
+
+**Status**: PROVEN / TEST-ONLY.
+
+**Evidence**: `make test-keyboard-faults` verifies injection scope and order,
+single IRQ1 requests through the controller latch, occupied-latch backpressure,
+normal-input recovery, split navigation input, EOF finalization, truncation of
+CSI/SS3 parameter sequences, idempotence and complete-but-unsupported escapes.
+Normal boot tests separately exercise the production keyboard path.
+
+**Limit**: host queue and IRQ1 requests do not prove guest handler entry. Guest
+recovery from arbitrary malformed prefix streams or stuck modifiers is not
+claimed, and a full keyboard queue remains fatal rather than truncating input.
+
 ### "Minix metadata corruption is deterministic and isolated"
 
 **Source**: `docs/FS-EXPERIENCE.md` and `ARCHITECTURE.md`.

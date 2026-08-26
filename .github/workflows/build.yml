@@ -39,7 +39,7 @@ jobs:
           NO_COLOR: 1
 
       - name: Test deterministic host faults
-        run: make test-fs-corruption test-irq-faults build/test-irq-faults-kvm
+        run: make test-fs-corruption test-irq-faults test-keyboard-faults build/test-irq-faults-kvm
         env:
           NO_COLOR: 1
 
@@ -131,6 +131,9 @@ jobs:
         run: |
           python3 tests/test_harness_utils.py
           python3 tests/test_boot.py \
+            --bemu build/bemu-linux01 --kernel build/kernel.bin \
+            --img build/root.img --timeout 30
+          python3 tests/test_trace_input.py \
             --bemu build/bemu-linux01 --kernel build/kernel.bin \
             --img build/root.img --timeout 30
           PYTHONUNBUFFERED=1 python3 tests/test_shell.py \

@@ -138,14 +138,36 @@ void keyboard_queue_input_byte(struct machine *m, unsigned char ch, int *state)
     }
 }
 
+int keyboard_inject_invalid_scancode(struct machine *m, uint8_t code)
+{
+    if (code != 0x00 && code != 0xff)
+        return -1;
+    key_push(m, code);
+    return 0;
+}
+
+enum keyboard_input_end_status keyboard_finish_input(struct machine *m,
+                                                      int *state)
+{
+    int old_state = *state;
+
+    *state = 0;
+    if (old_state == 1) {
+        queue_character(m, 0x1b);
+        return KEYBOARD_INPUT_END_OK;
+    }
+    if (old_state == 2)
+        return KEYBOARD_INPUT_END_TRUNCATED;
+    return KEYBOARD_INPUT_END_OK;
+}
+
 void keyboard_queue_text(struct machine *m, const char *text)
 {
     int state = 0;
 
     while (*text)
         keyboard_queue_input_byte(m, (unsigned char)*text++, &state);
-    if (state == 1)
-        queue_character(m, 0x1b);
+    (void)keyboard_finish_input(m, &state);
 }
 
 void keyboard_reset(struct machine *m)

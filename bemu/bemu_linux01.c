@@ -52,6 +52,7 @@
 
 struct host_input_state {
     int stdin_flags, flags_saved;
+    int stdin_is_tty, stdin_eof;
     struct termios tio;
     int tio_changed;
     struct sigaction old_alarm;
@@ -196,7 +197,7 @@ static void pump_input(struct machine *m)
         m->script_queued = 1;
         trace_event_input(&m->trace, (const uint8_t *)m->script, script_len, "script");
     }
-    if (m->prompt_count) {
+    if (m->prompt_count && !host_input.stdin_eof) {
         uint8_t input[128];
         ssize_t got;
         size_t stdin_bytes = 0;
@@ -210,6 +211,15 @@ static void pump_input(struct machine *m)
             for (i = 0; i < stdin_bytes; i++)
                 keyboard_queue_input_byte(m, input[i], &m->host_escape_state);
             trace_event_input(&m->trace, input, stdin_bytes, "stdin");
+        }
+        if (got == 0 && !host_input.stdin_is_tty) {
+            if (keyboard_finish_input(m, &m->host_escape_state) ==
+                KEYBOARD_INPUT_END_TRUNCATED)
+                fprintf(stderr, "[bemu-linux01] discarded truncated stdin escape sequence\n");
+            host_input.stdin_eof = 1;
+        } else if (got < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
+                   errno != EINTR) {
+            die("read stdin");
         }
     }
     keyboard_pump(m);
@@ -349,7 +359,8 @@ static int setup_host_input(void)
         perror("fcntl stdin F_SETFL");
         return -1;
     }
-    if (isatty(STDIN_FILENO)) {
+    host_input.stdin_is_tty = isatty(STDIN_FILENO);
+    if (host_input.stdin_is_tty) {
         struct termios raw;
         if (tcgetattr(STDIN_FILENO, &host_input.tio) < 0) {
             perror("tcgetattr");

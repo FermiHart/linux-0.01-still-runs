@@ -135,6 +135,7 @@ make boom            # clean + build + run — cinematic one-shot demo
 make test            # boot + full shell, editor, trace, and large-rootfs tests
 make test-ide-faults # host-only deterministic IDE read/write failures
 make test-irq-faults # host-only lost/duplicated IRQ edges
+make test-keyboard-faults # invalid scancodes and truncated host input
 make test-fs-corruption # offline Minix superblock/inode/bitmap faults
 make doctor          # toolchain health check
 make sizes           # kernel section sizes

@@ -36,6 +36,15 @@ selected slave bit and the master cascade must be clear. This proves host line
 policy, not that Linux handles every duplicate or recovers from unsafe IRQ1/IRQ14
 faults. No IRQ fault switch is exposed to the guest or CLI.
 
+The host keyboard boundary has a test-only seam for the unambiguous Set-1 error
+bytes `0x00` and `0xff`. It validates that each injected byte reaches the
+controller latch and requests IRQ1 exactly once before normal input resumes.
+Terminal escape decoding persists across short reads and 128-byte poll
+boundaries. At non-terminal EOF, a lone `ESC` becomes an Escape keystroke while
+an incomplete CSI or SS3 sequence is discarded with a stable diagnostic. This
+host-side evidence does not claim guest handler entry or recovery from arbitrary
+malformed multi-byte scancode streams, and no keyboard fault switch is exposed.
+
 ```sh
 make run
 make run EXPERIENCE=1991

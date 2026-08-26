@@ -75,6 +75,43 @@ def main():
         (saw_script_input, "script input event emitted"),
     ]
 
+    eof_diagnostic = b"[bemu-linux01] discarded truncated stdin escape sequence\n"
+    eof_cases = [
+        ("EOF_ESC_MARK", b"\x1b", False),
+        ("EOF_TRUNC_MARK", b"\x1b[", True),
+    ]
+    for marker, suffix, should_diagnose in eof_cases:
+        command = [
+            args.bemu,
+            "--kernel", args.kernel,
+            "--root", args.img,
+            "--expect", marker,
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                input=b"echo " + marker.encode("ascii") + b"\n" + suffix,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=args.timeout,
+                check=False,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            checks.append((False, f"{marker} EOF production path completes"))
+            continue
+        checks.extend([
+            (
+                result.returncode == 0
+                and marker.encode("ascii") in result.stdout
+                and b"[bemu-linux01] RESULT: PASS" in result.stderr,
+                f"{marker} EOF production path completes",
+            ),
+            (
+                result.stderr.count(eof_diagnostic) == int(should_diagnose),
+                f"{marker} EOF diagnostic policy",
+            ),
+        ])
+
     failed = False
     for ok, description in checks:
         print(f"  {'ok' if ok else 'FAIL'}  {description}")
