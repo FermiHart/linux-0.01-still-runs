@@ -1,8 +1,9 @@
 # Porting Ledger
 
-This ledger records every deliberate change to the historical Linux 0.01 core
-(`init/`, `kernel/`, `mm/`, `fs/`, `lib/`, `include/`) and explains why it was
-necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
+This ledger groups interpreted adaptations to the historical Linux 0.01 core
+(`init/`, `kernel/`, `mm/`, `fs/`, `lib/`, `include/`) and explains their stated
+purpose. The complete path-level delta, including unmatched ledger joins, is in
+`datasets/patches/`. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 `24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d`.
 
 ## Legend
@@ -11,10 +12,10 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 |---|---|
 | **Change** | What was modified |
 | **Files** | Affected source files |
-| **Category** | Hardware, Compiler, UndefinedBehavior, Time, Boot, Usability, Experience, HistoricalBug |
+| **Category** | Hardware, Compiler, UndefinedBehavior, Time, Boot, Usability, Experience, HistoricalBug, HistoricalHypothesis |
 | **Evidence** | How we know the change is needed |
 | **Test** | Test that exercises or validates the change |
-| **Status** | PROVEN, QUALIFIED or UNDER_INVESTIGATION |
+| **Status** | PROVEN, QUALIFIED, CORRECTED or UNDER_INVESTIGATION |
 
 ## Entries
 
@@ -247,33 +248,35 @@ necessary. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 | `tests/test_large_rootfs.py` | fs/buffer workaround, filesystem patches |
 | `make sizes` | VGA 80×50 mode (kernel.elf sections) |
 
-Every ledger entry above explicitly names the test that exercises it. Entries
-marked UNDER_INVESTIGATION will receive additional targeted tests during the
-compiler investigation waves.
+Every ledger entry above has a test field, but some fields are historical
+descriptions rather than executable references. `datasets/patches/evidence_links.csv`
+preserves that distinction and does not treat test source as retained run output.
 
 ## Classification summary
 
 | Category | Count | Motivation |
 |---|---|---|
-| Compiler | 7 | Modern GCC rejects or mis-optimizes 1991 constructs |
-| UndefinedBehavior | 2 | Code relies on behavior not guaranteed by the standard |
-| Hardware | 4 | bEMU/KVM devices differ from 1991 PC assumptions |
+| Compiler | 10 | Modern GCC rejects or exposes contracts in 1991 constructs |
+| UndefinedBehavior | 1 | Code relies on behavior not guaranteed by the source/asm contract |
+| Hardware | 6 | bEMU/KVM devices differ from 1991 PC assumptions |
 | Time | 1 | CMOS century rollover |
-| Usability | 2 | Without these the shell becomes unresponsive or unusable |
-| Experience | 3 | Profile and presentation choices that preserve or enhance feel |
+| Usability | 3 | Without these the shell becomes unresponsive or unusable |
+| Experience | 5 | Profile and presentation choices that preserve or enhance feel |
 | HistoricalBug | 0 | Intentional fixes of original Linux 0.01 bugs |
+| HistoricalHypothesis | 2 | Historical compiler explanations not reproduced in current reductions |
 
-Counts are based on the ledger entries above. Entries marked QUALIFIED or
-UNDER_INVESTIGATION may be reclassified after Waves 075–083.
+Counts are direct category memberships in the ledger entries above; one entry
+may contribute to multiple categories.
 
 ## Pending entries
 
-The following areas still need detailed ledger entries:
+The Wave 108 path-level dataset exposes nine deltas without a ledger join:
 
-- Exact changes in `kernel/exit.c`, `kernel/fork.c`, `kernel/sys.c` for modern
-  GCC and BBP.
-- Exact changes in `fs/super.c` for root device and mount handling.
+- Exact changes in `kernel/exit.c`, `kernel/fork.c`, `kernel/panic.c`,
+  `kernel/printk.c`, `kernel/sched.c`, `kernel/sys.c`, and `kernel/traps.c`.
+- Exact changes in `lib/_exit.c` and the added `lib/sync.c`.
+- Semantic attribution within broad `fs/*.c`, `kernel/*.s`, and
+  `include/**/*.h` declarations.
 - Detailed provenance of `userland/shell.c`, `userland/crt0.S` and
-  `userland/programs/hello.c` relative to any 1991 userland examples.
-
-These will be filled in during Waves 012–015.
+  `userland/programs/hello.c` relative to any 1991 userland examples remains
+  outside the historical-core dataset.

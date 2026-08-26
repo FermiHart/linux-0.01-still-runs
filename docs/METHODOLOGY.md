@@ -73,7 +73,9 @@ assumption/adaptation pair. `make provenance` and `make audit` compare the
 current historical core to the pinned upstream source; `make doctor` probes the
 current host; `make test` exercises the fully adapted state. The durable
 interpretation is in `docs/PORTING_LEDGER.md`, while `tests/test_boot.py` defines
-the principal boot milestones.
+the principal boot milestones. Wave 108 newly retains 53 source-path deltas,
+their hashes/modes, 19 stable adaptation IDs and nine unresolved ledger joins in
+`datasets/patches/MANIFEST.json` and `datasets/patches/file_deltas.csv`.
 
 Implemented controls include the upstream hash, current flags, fixed bEMU
 machine contract, required boot markers, zero process status, and rejection of
@@ -95,8 +97,10 @@ qualified, under investigation, or not reproduced.
 **Current status: `PARTIAL` for sufficiency and `PROPOSED` for minimality.**
 The current unit is one complete configuration or one malformed input against
 that fixed configuration. `make test-quick`, `make test-bemu-loading`,
-`make test-artifact-truncation`, and `make bbp-conformance` establish one sufficient observed configuration and its loading/BBP boundaries. They do not
-vary adaptation membership.
+`make test-artifact-truncation`, and `make bbp-conformance` establish one
+sufficient observed configuration and its loading/BBP boundaries. The stable
+adaptation IDs in `datasets/patches/adaptations.csv` describe historical ledger
+groups, not a predeclared candidate universe, and do not vary membership.
 
 No candidate universe, dependency graph, subset generator, configuration ID,
 ablation matrix, or per-configuration cost record exists. The historical ledger
@@ -156,8 +160,8 @@ dataset remains Wave 110, outside Waves 108-109.
 Experience sessions use unique transcript boundaries, required and forbidden
 observations, profile mismatch controls, fixed historical RTC input, and a
 bounded alive UTC window. Transcript control sequences and echoed marker
-commands are normalized by `tests/test_experience.py` before comparison. The external `fsck.minix` and the
-repository's independent Minix inspector strengthen filesystem observations,
+commands are normalized by `tests/test_experience.py` before comparison. The
+external `fsck.minix` and the repository's independent Minix inspector strengthen filesystem observations,
 but ordinary successful session transcripts and post-session filesystem states
 are not retained.
 
@@ -216,17 +220,21 @@ underlying mechanism without focused trace or independent evidence.
 ## Evidence retention
 
 Currently versioned evidence includes source, tests, specifications, golden
-traces, fault catalog, compiler reductions, and interpretive classifications.
+traces, fault catalog, compiler reductions, interpretive classifications, and
+the Wave 108 source-delta dataset. That dataset newly retains its patch, hashes,
+modes and joins, but records zero paired RQ1 observations and zero RQ2 ablation
+configurations.
 Generated `build/` reports, successful transcripts, temporary images, replay
 traces, power-cut hashes, sanitizer logs, and double-build artifacts are usually
 overwritten or deleted.
 
 `PROPOSED`: the common run envelope retains immutable raw and normalized outputs
 plus manifests. Publication waves then curate stable subsets without rewriting
-the raw record: Wave 108 publishes patch/incompatibility data, Wave 109 publishes
-golden traces, and Wave 110 publishes compiler-case data. Waves 108-110 must
-distinguish newly retained observations from historical summaries that lack raw
-logs. The common run envelope is therefore `PROPOSED`, not implemented.
+the raw record: Wave 108 now publishes bounded patch/incompatibility data, while
+Wave 109 publishes golden traces and Wave 110 publishes compiler-case data.
+Waves 108-110 must distinguish newly retained observations from historical
+summaries that lack raw logs. The common run envelope is therefore `PROPOSED`,
+not implemented.
 
 ## Analysis and reporting rules
 

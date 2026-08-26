@@ -5,8 +5,9 @@ Downloaded: 2026-08-22
 SHA-256: 24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d
 
 This tarball is the canonical historical source used as the archaeological
-reference for the Vesica Piscis artifact. The `PORTING_LEDGER.md` records every
-divergence from this reference.
+reference for the Vesica Piscis artifact. `datasets/patches/` records every
+source-path divergence in the declared historical core; `docs/PORTING_LEDGER.md`
+groups the available historical interpretations.
 
 ## Layout inside the tarball
 
@@ -43,7 +44,7 @@ linux/
 ## Verification
 
 ```bash
-sha256sum -c upstream/SHA256SUMS
+(cd upstream && sha256sum -c SHA256SUMS)
 ```
 
 ## License

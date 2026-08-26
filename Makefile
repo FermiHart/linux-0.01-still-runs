@@ -211,7 +211,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology patch-dataset test-patch-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -521,6 +521,7 @@ test: all
 	@$(MAKE) --no-print-directory test-fault-catalog
 	@$(MAKE) --no-print-directory test-research-questions
 	@$(MAKE) --no-print-directory test-methodology
+	@$(MAKE) --no-print-directory test-patch-dataset
 	@python3 tests/test_fault_test.py --make "$(MAKE_COMMAND)"
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
@@ -834,6 +835,14 @@ test-research-questions:
 test-methodology:
 	$(call STEP,experimental methodology consistency check)
 	@python3 tests/test_methodology.py
+
+patch-dataset:
+	$(call STEP,publishing historical-core patch dataset)
+	@python3 scripts/build-patch-dataset.py
+
+test-patch-dataset:
+	$(call STEP,historical-core patch dataset consistency check)
+	@python3 tests/test_patch_dataset.py
 
 fault-test: test-fault-catalog
 	$(call STAGE,9/10,running all deterministic fault scenarios)
@@ -1334,6 +1343,8 @@ help:
 	@printf '    $(CWH)test-fault-catalog$(CR) validate fault catalog references\n'
 	@printf '    $(CWH)test-research-questions$(CR) validate research scopes and evidence\n'
 	@printf '    $(CWH)test-methodology$(CR) validate experimental methodology\n'
+	@printf '    $(CWH)patch-dataset$(CR)  regenerate the published patch dataset\n'
+	@printf '    $(CWH)test-patch-dataset$(CR) validate the published patch dataset\n'
 	@printf '    $(CWH)fault-test$(CR)     run all deterministic fault scenarios\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'

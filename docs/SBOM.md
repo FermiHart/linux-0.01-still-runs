@@ -28,8 +28,10 @@ SHA-256 of upstream tarball:
 
 ## Modified historical files
 
-All changes to the original Linux 0.01 core are cataloged in
-`docs/PORTING_LEDGER.md`. The historical core directories are:
+All source-path changes to the original Linux 0.01 core are enumerated and
+hashed in `datasets/patches/`; interpreted adaptation groups and unresolved
+joins are documented there and in `docs/PORTING_LEDGER.md`. The historical core
+directories are:
 
 - `init/`
 - `kernel/`

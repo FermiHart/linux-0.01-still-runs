@@ -34,6 +34,9 @@ REQUIRED_PATHS = (
     "tests/compare_trace.py",
     "tests/test_power_cut.py",
     "scripts/verify-reproducibility.sh",
+    "datasets/patches/MANIFEST.json",
+    "datasets/patches/file_deltas.csv",
+    "datasets/patches/adaptations.csv",
 )
 
 REQUIRED_SECTION_ANCHORS = {
@@ -47,10 +50,13 @@ REQUIRED_SECTION_ANCHORS = {
         "Current status: `PARTIAL`",
         "do not bind a ledger",
         "proven invalidation only when the baseline",
+        "53 source-path deltas",
+        "nine unresolved ledger joins",
     ),
     "RQ2 - Adaptation-set minimality": (
         "`PARTIAL` for sufficiency and `PROPOSED` for minimality",
         "one sufficient observed configuration",
+        "not a predeclared candidate universe",
         "No candidate universe, dependency graph, subset generator",
     ),
     "RQ3 - Compiler experiments": (
@@ -85,6 +91,7 @@ REQUIRED_SECTION_ANCHORS = {
     ),
     "Evidence retention": (
         "usually overwritten or deleted",
+        "zero paired RQ1 observations and zero RQ2 ablation configurations",
         "The common run envelope is therefore `PROPOSED`, not implemented",
         "Waves 108-110",
     ),

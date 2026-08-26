@@ -156,6 +156,9 @@ The five academic questions and their operational evidence boundaries are in
 [docs/RESEARCH-QUESTIONS.md](docs/RESEARCH-QUESTIONS.md).
 The experimental controls, repetition counts, oracle classes, retention policy,
 and analysis rules are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
+The versioned historical-core patch, per-path hashes, stable adaptation IDs,
+ledger joins, and explicit evidence gaps are in
+[datasets/patches/](datasets/patches/).
 
 Quick targeted shell test (≈ 30s per run):
 

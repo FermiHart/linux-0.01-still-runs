@@ -25,7 +25,7 @@ Three boundaries apply to every question:
 - **Question:** Which Linux 0.01 assumptions fail in the documented modern execution environment?
 - **Scope:** Classify assumptions about the GCC/ABI contract, firmware-provided state, memory layout, legacy devices, time representation, and host I/O only for named Linux x86-64/KVM host instances using the documented GCC 13.3, binutils 2.42, and bEMU configuration.
 - **Run:** `make provenance`, `make audit`, `make doctor`, `make test`
-- **Evidence:** `docs/PORTING_LEDGER.md`, `docs/AUDIT-STATEMENTS.md`, `docs/TOOLCHAIN.md`, `tests/test_boot.py`
+- **Evidence:** `datasets/patches/MANIFEST.json`, `datasets/patches/file_deltas.csv`, `datasets/patches/adaptations.csv`, `docs/PORTING_LEDGER.md`, `docs/AUDIT-STATEMENTS.md`, `docs/TOOLCHAIN.md`, `tests/test_boot.py`
 - **Measures:** Record toolchain and host identity, build/boot exit status, exact failure diagnostics, affected source and category, the adaptation applied, and the boot milestones or focused regression that distinguish the failing and adapted states.
 - **Answer criterion:** Count an assumption as invalidated only when a documented baseline failure and a controlled adaptation are connected to reproducible evidence; classify observations without a controlled cause as qualified or under investigation.
 - **Limits:** The result is bounded to the stated virtual machine, named host, and toolchain, not arbitrary modern hardware, bare metal, or all compilers; current reports do not retain complete host identity, and bEMU recreates legacy interfaces rather than proving direct compatibility with contemporary physical peripherals.
@@ -35,7 +35,7 @@ Three boundaries apply to every question:
 - **Question:** What minimum adaptation set is necessary and sufficient to reach the declared execution boundary?
 - **Scope:** Define execution as validated kernel framing and BBP, direct KVM entry, partition and Minix counters visible, shell prompt reached, and clean bEMU completion; predeclare a candidate universe that separates historical-core compatibility, bridge components, and experience-only changes before evaluating necessity.
 - **Run:** `make test-quick`, `make test-bemu-loading`, `make test-artifact-truncation`, `make bbp-conformance`
-- **Evidence:** `docs/PORTING_LEDGER.md`, `tests/test_boot.py`, `ARCHITECTURE.md`, `bemu/README.md`
+- **Evidence:** `datasets/patches/MANIFEST.json`, `datasets/patches/adaptation_files.csv`, `docs/PORTING_LEDGER.md`, `tests/test_boot.py`, `ARCHITECTURE.md`, `bemu/README.md`
 - **Measures:** Inventory the predeclared candidate universe, record each evaluated configuration, file/hunk and artifact-size costs, and measure the same declared boot outcomes for every configuration selected by the Wave 107 methodology.
 - **Answer criterion:** A set is sufficient when all declared execution outcomes pass; call it minimum within the candidate universe only after exhaustive subset evidence or a justified dependency proof excludes every smaller set, otherwise report only an inclusion-minimal set or the smallest observed among evaluated configurations.
 - **Limits:** The repository currently proves a sufficient configuration but has no complete ablation matrix, so it does not yet answer the minimum claim; the candidate universe may omit alternative bridge designs, and BBP, direct KVM loading, VGA presentation, or shell conveniences cannot be called uniquely necessary without comparative evidence.
@@ -73,7 +73,8 @@ Three boundaries apply to every question:
 ## Relationship to later waves
 
 `docs/METHODOLOGY.md` defines sampling, controls, execution order, evidence
-retention, and analysis procedures for these questions. Wave 108 will publish the patch and
-incompatibility dataset needed by RQ1/RQ2, while Waves 109-110 publish trace and
-compiler-case evidence. Questions may be refined only by preserving their IDs,
-recording the reason, and updating this document's validation gate.
+retention, and analysis procedures for these questions. Wave 108 publishes the
+bounded patch and incompatibility dataset in `datasets/patches/`; Waves 109-110
+publish trace and compiler-case evidence. Questions may be refined only by
+preserving their IDs, recording the reason, and updating this document's
+validation gate.

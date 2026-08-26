@@ -28,8 +28,19 @@ EXPECTED_TARGETS = {
 }
 
 REQUIRED_EVIDENCE = {
-    "RQ1": {"docs/PORTING_LEDGER.md", "docs/AUDIT-STATEMENTS.md"},
-    "RQ2": {"docs/PORTING_LEDGER.md", "tests/test_boot.py"},
+    "RQ1": {
+        "datasets/patches/MANIFEST.json",
+        "datasets/patches/file_deltas.csv",
+        "datasets/patches/adaptations.csv",
+        "docs/PORTING_LEDGER.md",
+        "docs/AUDIT-STATEMENTS.md",
+    },
+    "RQ2": {
+        "datasets/patches/MANIFEST.json",
+        "datasets/patches/adaptation_files.csv",
+        "docs/PORTING_LEDGER.md",
+        "tests/test_boot.py",
+    },
     "RQ3": {"tests/compiler-cases/README.md", "tests/compiler-cases/CLASSIFICATION.md"},
     "RQ4": {"EXPERIENCE.md", "tests/test_experience.py", "docs/FAULT-CATALOG.md"},
     "RQ5": {"docs/REPRODUCIBILITY.md", "tests/compare_trace.py", "tests/test_power_cut.py"},

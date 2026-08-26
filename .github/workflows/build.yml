@@ -52,6 +52,9 @@ jobs:
       - name: Test experimental methodology
         run: python3 tests/test_methodology.py
 
+      - name: Test historical-core patch dataset
+        run: python3 tests/test_patch_dataset.py
+
       - name: Set modes and create checksums
         run: |
           install -m 0644 LICENSE build/LICENSE

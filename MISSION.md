@@ -77,3 +77,5 @@ The operational scopes, measures, answer criteria and non-claims for these five
 questions are defined in `docs/RESEARCH-QUESTIONS.md`.
 The implemented, partial and proposed procedures are distinguished in
 `docs/METHODOLOGY.md`.
+The RQ1/RQ2 source deltas and bounded historical interpretations are published
+in `datasets/patches/`.
