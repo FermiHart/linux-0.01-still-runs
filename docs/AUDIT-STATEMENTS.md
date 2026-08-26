@@ -172,6 +172,21 @@ historical CLI exposes no fault switch.
 zero transfer, one-shot recovery, operation/LBA scoping and later sectors of
 multi-sector commands without KVM.
 
+### "Minix metadata corruption is deterministic and isolated"
+
+**Source**: `docs/FS-EXPERIENCE.md` and `ARCHITECTURE.md`.
+
+**Audit**: fixed filesystem-relative offsets, located from the MBR partition
+entry in disposable copies of both profile images, alter only the Minix v1
+superblock magic, root inode mode, or root-zone allocation bit.
+Each fault must be rejected by both the repository's read-only independent
+inspector and util-linux `fsck.minix`. Corrupt files are never booted.
+
+**Status**: PROVEN / TEST-ONLY.
+
+**Evidence**: `make test-fs-corruption` checks clean controls, exact changed
+bytes, expected diagnostics, oracle non-mutation and canonical-image hashes.
+
 ### "Automated validation: build → direct KVM boot → full shell smoke suite"
 
 **Source**: README.md.

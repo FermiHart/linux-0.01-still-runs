@@ -76,7 +76,8 @@ struct mbr_part {
 
 static uint8_t *image;
 static size_t image_size;
-static uint32_t part_start;
+static size_t partition_offset;
+static size_t partition_size;
 static int audit_mode = 0;
 static int errors = 0;
 static uint8_t *inode_used;
@@ -105,8 +106,13 @@ static void die(const char *msg)
 
 static uint8_t *block(unsigned n)
 {
-    size_t off = SECTOR_SIZE + (size_t)n * BLOCK_SIZE;
-    if (off + BLOCK_SIZE > image_size) die("block out of range");
+    size_t block_offset = (size_t)n * BLOCK_SIZE;
+    size_t off;
+
+    if (block_offset > partition_size ||
+        partition_size - block_offset < BLOCK_SIZE)
+        die("block out of partition range");
+    off = partition_offset + block_offset;
     return image + off;
 }
 
@@ -135,6 +141,8 @@ static void note_error(const char *fmt, ...)
 
 static void dump_super(const struct minix_super *sb)
 {
+    uint16_t magic = get_le16p(&sb->s_magic);
+
     printf("superblock:\n");
     printf("  s_ninodes       %u\n", get_le16p(&sb->s_ninodes));
     printf("  s_nzones        %u\n", get_le16p(&sb->s_nzones));
@@ -144,8 +152,10 @@ static void dump_super(const struct minix_super *sb)
     printf("  s_log_zone_size %u\n", get_le16p(&sb->s_log_zone_size));
     printf("  s_max_size      %u\n", get_le32p(&sb->s_max_size));
     printf("  s_magic         0x%04X%s\n",
-           get_le16p(&sb->s_magic),
-           get_le16p(&sb->s_magic) == SUPER_MAGIC ? " (v1)" : " (BAD)");
+           magic, magic == SUPER_MAGIC ? " (v1)" : " (BAD)");
+    if (audit_mode && magic != SUPER_MAGIC)
+        note_error("superblock magic 0x%04X does not match 0x%04X",
+                   magic, SUPER_MAGIC);
 }
 
 static void dump_inode(int nr, const struct minix_inode *in)
@@ -384,12 +394,20 @@ int main(int argc, char **argv)
 
     if (image_size < SECTOR_SIZE) die("image too small for MBR");
     struct mbr_part *ptbl = (struct mbr_part *)(image + 0x1BE);
-    part_start = get_le32p(&ptbl[0].start_sect) / 2; /* sectors -> blocks */
-    if (part_start * BLOCK_SIZE + BLOCK_SIZE > image_size)
-        die("partition start out of range");
+    uint32_t start_sector = get_le32p(&ptbl[0].start_sect);
+    uint32_t sector_count = get_le32p(&ptbl[0].nr_sects);
+    uint64_t offset = (uint64_t)start_sector * SECTOR_SIZE;
+    uint64_t size = (uint64_t)sector_count * SECTOR_SIZE;
+    if (image[510] != 0x55 || image[511] != 0xAA)
+        die("bad MBR signature");
+    if (!start_sector || !sector_count || offset > image_size ||
+        size > image_size - offset)
+        die("partition 0 out of range");
+    partition_offset = (size_t)offset;
+    partition_size = (size_t)size;
 
-    printf("MBR partition 0 start_sect=%u (block %u)\n",
-           get_le32p(&ptbl[0].start_sect), part_start);
+    printf("MBR partition 0 start_sect=%u (%zu-byte offset)\n",
+           start_sector, partition_offset);
 
     struct minix_super *sb = (struct minix_super *)block(1);
     dump_super(sb);

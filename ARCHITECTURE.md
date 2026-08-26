@@ -73,6 +73,8 @@ guest RAM. `bemu/kvm.c` receives already validated RAM and only registers it,
 installs the bootstrap GDT, creates the VM/vCPU, and sets registers.
 The IDE module also has a host-only test seam for one-shot ATA read/write errors
 at a selected LBA; it is not exposed to the guest or command-line interface.
+Minix metadata fault tests operate offline on disposable image copies. They
+never give a corrupt filesystem to the writable IDE mapping.
 
 ## Memory Layout (Physical)
 

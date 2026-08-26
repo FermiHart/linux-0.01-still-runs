@@ -1,6 +1,7 @@
 # Real filesystem experience
 
-This document seals the state of the real-filesystem work for Waves 026–040.
+This document records the real-filesystem work from Waves 026–040 and the
+offline metadata-corruption gate added in Wave 098.
 
 ## What is now real
 
@@ -32,6 +33,12 @@ partition of `build/root.img` and:
 `make test-fs-inspect` runs `minix-inspect --audit` against the freshly
 forged `build/root.img`.
 
+`make test-fs-corruption` copies both profile images to a temporary directory
+and deterministically corrupts the superblock magic, root inode mode, or root
+zone bitmap. The independent inspector and util-linux `fsck.minix` must reject
+every copy with the expected diagnosis. Hash and byte-offset checks prove that
+the oracles do not repair their input and that canonical images are untouched.
+
 ## What remains sealed behind bEMU IDE writes
 
 Cross-boot persistence is prepared but not yet functional:
@@ -56,6 +63,7 @@ make test-fs-link      # ln/rm/mv
 make test-fs-large     # multi-line file
 make test-fs-property  # pseudo-random read/write cases
 make test-fs-inspect   # independent Minix v1 audit
+make test-fs-corruption # offline metadata fault injection
 make test-fs-real      # touch/ls/rm on real /tmp
 make inspect-rootfs    # dump build/root.img
 make fsck-rootfs       # validate with fsck.minix

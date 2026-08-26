@@ -30,10 +30,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential \
             nasm \
-            python3
+            python3 \
+            util-linux
 
       - name: Build kernel, root image, and bEMU
         run: make all
+        env:
+          NO_COLOR: 1
+
+      - name: Test deterministic filesystem corruption
+        run: make test-fs-corruption
         env:
           NO_COLOR: 1
 

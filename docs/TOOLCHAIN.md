@@ -15,6 +15,7 @@ reproducibility.
 | GNU Make | 4.3 | Build orchestration |
 | Python | 3.12.3 | Test harness (`tests/*.py`) |
 | Bash | 5.x | Shell scripts |
+| util-linux | 2.39.3 | Independent Minix v1 `fsck.minix` oracle |
 | Linux kernel headers | 6.x | KVM interface for bEMU |
 
 ## Cross-compiler alternative

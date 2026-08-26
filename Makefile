@@ -204,7 +204,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-ide-faults test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -539,6 +539,7 @@ test: all
 	@PYTHONUNBUFFERED=1 python3 tests/test_shell.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 180 --interactive
 	@$(MAKE) --no-print-directory test-experiences
+	@$(MAKE) --no-print-directory test-fs-corruption
 	@python3 tests/test_large_rootfs.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --mkimage $(BUILD)/mkimage \
 	  --shell $(BUILD)/shell.bin --update $(BUILD)/update.bin \
@@ -636,6 +637,12 @@ test-fs-inspect: $(BUILD)/root.img $(BUILD)/minix-inspect
 	$(call STEP,independent fs inspector consistency test)
 	@python3 tests/test_fs_inspect.py --minix-inspect $(BUILD)/minix-inspect \
 	  --img $(BUILD)/root.img
+
+test-fs-corruption: $(BUILD)/root.img $(BUILD)/root-1991.img $(BUILD)/minix-inspect
+	$(call STEP,deterministic Minix metadata corruption test)
+	@python3 tests/test_fs_corruption.py --minix-inspect $(BUILD)/minix-inspect \
+	  --fsck fsck.minix --img $(BUILD)/root.img \
+	  --img $(BUILD)/root-1991.img
 
 test-fs-real: all
 	$(call STEP,real filesystem verification)
@@ -1229,6 +1236,7 @@ help:
 	@printf '    $(CWH)test-fs-large$(CR)  multi-line file smoke test\n'
 	@printf '    $(CWH)test-fs-property$(CR) property-style fs test\n'
 	@printf '    $(CWH)test-fs-inspect$(CR) independent fs inspector check\n'
+	@printf '    $(CWH)test-fs-corruption$(CR) deterministic Minix metadata faults\n'
 	@printf '    $(CWH)test-fs-real$(CR)   real filesystem verification\n'
 	@printf '\n  $(CB)$(CP)trace$(CR)\n'
 	@printf '    $(CWH)golden-trace$(CR)  capture console boot trace to tests/golden/\n'
