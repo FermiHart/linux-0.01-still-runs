@@ -90,8 +90,10 @@ def main():
             fail(f"MISSION.md lost canonical question {anchor!r}")
     if "docs/RESEARCH-QUESTIONS.md" not in mission:
         fail("MISSION.md does not link the operational research questions")
-    if "Wave 107 will consolidate the experimental" not in document:
-        fail("the Wave 107 methodology boundary is missing")
+    if "`docs/METHODOLOGY.md`" not in document:
+        fail("the consolidated methodology link is missing")
+    if not os.path.isfile(os.path.join(REPO_ROOT, "docs", "METHODOLOGY.md")):
+        fail("the consolidated methodology document is missing")
 
     headings = list(re.finditer(r"^## (RQ\d+)\b.*$", document, re.MULTILINE))
     ids = [heading.group(1) for heading in headings]

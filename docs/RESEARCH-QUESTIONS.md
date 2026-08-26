@@ -2,8 +2,9 @@
 
 This document turns the five questions in `MISSION.md` into bounded research
 questions that can be answered with the artifact. It defines observations and
-decision criteria, not conclusions. Wave 107 will consolidate the experimental
-methodology; later delivery waves will publish the datasets and paper.
+decision criteria, not conclusions. The implemented, partial, and proposed
+procedures are consolidated in `docs/METHODOLOGY.md`; later delivery waves will
+publish the datasets and paper.
 
 The supported environment is Linux/x86-64/KVM with the reference toolchain
 versions in `docs/TOOLCHAIN.md`. The host kernel, CPU/KVM identity, and other
@@ -71,8 +72,8 @@ Three boundaries apply to every question:
 
 ## Relationship to later waves
 
-Wave 107 will define sampling, controls, execution order, evidence retention, and
-analysis procedures for these questions. Wave 108 will publish the patch and
+`docs/METHODOLOGY.md` defines sampling, controls, execution order, evidence
+retention, and analysis procedures for these questions. Wave 108 will publish the patch and
 incompatibility dataset needed by RQ1/RQ2, while Waves 109-110 publish trace and
 compiler-case evidence. Questions may be refined only by preserving their IDs,
 recording the reason, and updating this document's validation gate.

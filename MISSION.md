@@ -75,3 +75,5 @@ This project exists to ask and answer concrete research questions:
 All findings, failures and fixes are published as part of the artifact.
 The operational scopes, measures, answer criteria and non-claims for these five
 questions are defined in `docs/RESEARCH-QUESTIONS.md`.
+The implemented, partial and proposed procedures are distinguished in
+`docs/METHODOLOGY.md`.
