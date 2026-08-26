@@ -152,6 +152,8 @@ make hash            # SHA-256 of all artifacts
 The expected and observed responses, execution layers, requirements, evidence,
 and non-claims for every deterministic fault are in
 [docs/FAULT-CATALOG.md](docs/FAULT-CATALOG.md).
+The five academic questions and their operational evidence boundaries are in
+[docs/RESEARCH-QUESTIONS.md](docs/RESEARCH-QUESTIONS.md).
 
 Quick targeted shell test (≈ 30s per run):
 

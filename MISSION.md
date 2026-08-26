@@ -3,8 +3,8 @@
 ## What this project is
 
 An executable archaeology experiment: Linus Torvalds' first kernel (Linux 0.01,
-September 1991) booting and running on modern silicon through the thinnest
-possible modern bridge.
+September 1991) booting and running on modern silicon through a deliberately
+bounded modern bridge.
 
 The goal is not to preserve every byte of the original source, nor to build a
 modern distribution. The goal is to make the 1991 experience observable,
@@ -37,7 +37,8 @@ The bridge supplies only what 1991 hardware and toolchains no longer provide:
 - A cross/native toolchain that speaks modern GCC while respecting 1991 ABI.
 - Automated tests, traces and reproducible builds.
 
-Every bridge component is documented, tested and reproducible.
+Bridge claims are scoped to their documented tests, host requirements and
+reproducibility limits.
 
 ## What we deliberately do not do
 
@@ -48,7 +49,10 @@ Every bridge component is documented, tested and reproducible.
 - No aggressive modernization of the historical core.
 - No hidden limitations or unproven claims.
 
-## Success criteria
+## Long-term success criteria
+
+These are completion criteria for the full artifact, not claims that every item
+already works:
 
 1. `make -j8 ci` passes from a clean clone on a supported Linux/KVM host.
 2. The kernel boots, reaches a shell and passes the full smoke suite.
@@ -64,8 +68,10 @@ This project exists to ask and answer concrete research questions:
 
 - Which assumptions in Linux 0.01 became invalid on modern hardware and compilers?
 - What is the minimum set of adaptations required to execute it today?
-- How do modern compiler optimizations interact with pre-standardization C?
+- How do modern compiler optimizations interact with GNU89-era C and inline assembly?
 - How can we measure behavioral fidelity in software archaeology?
 - Can a historical operating-system experience be reproduced deterministically?
 
 All findings, failures and fixes are published as part of the artifact.
+The operational scopes, measures, answer criteria and non-claims for these five
+questions are defined in `docs/RESEARCH-QUESTIONS.md`.

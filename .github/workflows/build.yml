@@ -46,6 +46,9 @@ jobs:
       - name: Test fault aggregate orchestration
         run: python3 tests/test_fault_test.py
 
+      - name: Test research-question evidence map
+        run: python3 tests/test_research_questions.py
+
       - name: Set modes and create checksums
         run: |
           install -m 0644 LICENSE build/LICENSE
