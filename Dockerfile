@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates=20240203 \
     libc6-dev=2.39-0ubuntu8.5 \
     linux-headers-generic=6.8.0-51.52 \
+    util-linux=2.39.3-9ubuntu6.5 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 \

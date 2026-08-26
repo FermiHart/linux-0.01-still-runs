@@ -205,7 +205,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -512,6 +512,7 @@ endef
 test: all
 	$(call STAGE,9/10,running bEMU boot test suite)
 	@python3 tests/test_harness_utils.py
+	@$(MAKE) --no-print-directory test-fault-catalog
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
 	@$(MAKE) --no-print-directory test-bemu-loading
@@ -813,6 +814,10 @@ test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/
 	@$(BUILD)/test-trace-clock
 	@$(BUILD)/test-trace-producer
 
+test-fault-catalog:
+	$(call STEP,deterministic fault catalog consistency check)
+	@python3 tests/test_fault_catalog.py
+
 test-bemu-loading: $(BUILD)/test-memory-loader $(BUILD)/bemu-linux01 $(BUILD)/root.img
 	$(call STAGE,9/10,running bEMU memory and loading-limit tests)
 	@$(BUILD)/test-memory-loader
@@ -971,7 +976,7 @@ doctor:
 	@printf '\n  $(CB)$(CWH)toolchain health check$(CR)\n\n'
 	@status=0; \
 	  for tool in $(CC) $(AS) $(LD) $(NM) $(OBJCOPY) $(OBJDUMP) $(NASM) \
-	              $(HOSTCC) python3 make awk sed find sort git mktemp stat cut \
+	              $(HOSTCC) python3 make awk sed find sort git mktemp stat cut fsck.minix \
 	              diff tr xargs wc seq clear; do \
 	    if command -v "$$tool" >/dev/null 2>&1; then \
 	      printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)%s$(CR)\n" "$$tool" "$$(command -v "$$tool")"; \
@@ -1302,6 +1307,7 @@ help:
 	@printf '    $(CWH)test$(CR)           build + full boot test in bEMU\n'
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
+	@printf '    $(CWH)test-fault-catalog$(CR) validate fault catalog references\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'
 	@printf '    $(CWH)test-power-cut$(CR)  deterministic IDE write power cuts\n'

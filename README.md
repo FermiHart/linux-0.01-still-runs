@@ -113,7 +113,7 @@ This is therefore best described as **Linux 0.01 that runs today**, not a byte-f
 
 | Stage | Component | What it does |
 |-------|-----------|--------------|
-| 1 | `bemu/bemu_linux01.c` | Validates the `kernel.bin` length trailer, loads its payload at phys 0, creates BBP, and provides legacy devices through KVM |
+| 1 | `bemu/{memory,loader,bemu_linux01}.c` | Validates and loads the `kernel.bin` payload, creates BBP, and provides legacy devices through KVM |
 | 2 | `boot/head.s` | Reprograms the PIC, initializes IDT/GDT and paging, zeros BSS, calls `main()` |
 | 3 | `bbp/linux01_bbp.c` | Validates bEMU identity, memory-map, kernel-address, command-line, and hypervisor tags |
 | 4 | `init/main.c` | VGA 80×50 mode set → time → tty → traps → sched → buffer → fork-init |
@@ -127,15 +127,18 @@ Deep dive: [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Build / run / test
 
 ```bash
-make help            # show every target with a one-line description
+make help            # show the main public targets with one-line descriptions
 make all             # full build (kernel + root.img + bEMU), -Werror clean
 make run             # build + direct KVM boot in the terminal
 make run-headless    # alias for make run; bEMU is terminal-native
 make boom            # clean + build + run — cinematic one-shot demo
 make test            # boot + full shell, editor, trace, and large-rootfs tests
+make test-fault-catalog # validate the Waves 096-103 evidence catalog
+make test-bemu-loading # guest RAM and kernel loading limits before KVM
 make test-ide-faults # host-only deterministic IDE read/write failures
-make test-power-cut  # sector-boundary power cuts on disposable root copies
+make test-power-cut  # semantic IDE write cuts on disposable root copies
 make test-irq-faults # host-only lost/duplicated IRQ edges
+make test-irq-faults-kvm # real KVM irqchip fault integration
 make test-keyboard-faults # invalid scancodes and truncated host input
 make test-bbp-corruption # production BBP parser/semantic corruption matrix
 make test-artifact-truncation # canonical kernel/root truncation before KVM
@@ -144,6 +147,10 @@ make doctor          # toolchain health check
 make sizes           # kernel section sizes
 make hash            # SHA-256 of all artifacts
 ```
+
+The expected and observed responses, execution layers, requirements, evidence,
+and non-claims for every deterministic fault are in
+[docs/FAULT-CATALOG.md](docs/FAULT-CATALOG.md).
 
 Quick targeted shell test (≈ 30s per run):
 

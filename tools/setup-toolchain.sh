@@ -66,7 +66,7 @@ step "Step 1/3: Checking host prerequisites for ${UNAME_S}..."
 
 required_host_tools=(nasm python3 git make gcc g++ as ld objcopy objdump nm patch tar xz)
 if [ "${UNAME_S}" != "Darwin" ]; then
-    required_host_tools+=(bison flex makeinfo sha256sum)
+    required_host_tools+=(bison flex makeinfo sha256sum fsck.minix)
 fi
 missing_host_tools=()
 for tool in "${required_host_tools[@]}"; do
@@ -101,11 +101,12 @@ if [ "${need_packages}" -eq 1 ]; then
         "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get update
         "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential bison flex libgmp-dev libmpfr-dev libmpc-dev \
-            texinfo zlib1g-dev wget git nasm python3 mtools xz-utils ca-certificates
+            texinfo zlib1g-dev wget git nasm python3 mtools xz-utils ca-certificates \
+            util-linux
     elif command -v pacman >/dev/null 2>&1; then
         step "Installing Arch Linux prerequisites..."
         "${SUDO[@]}" pacman -Sy --noconfirm base-devel bison flex gmp mpfr mpc \
-            texinfo zlib wget git nasm python3 mtools xz ca-certificates
+            texinfo zlib wget git nasm python3 mtools xz ca-certificates util-linux
     elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
         step "Installing Fedora-family prerequisites..."
         if command -v dnf >/dev/null 2>&1; then
@@ -115,7 +116,7 @@ if [ "${need_packages}" -eq 1 ]; then
         fi
         "${SUDO[@]}" "${package_manager}" install -y gcc gcc-c++ make bison flex \
             gmp-devel mpfr-devel libmpc-devel texinfo zlib-devel wget git nasm \
-            python3 mtools xz ca-certificates
+            python3 mtools xz ca-certificates util-linux
     else
         fail "Unsupported package manager; install: ${missing_host_tools[*]} GMP MPFR MPC zlib development files"
     fi
