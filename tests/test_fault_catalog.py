@@ -18,7 +18,7 @@ EXPECTED_TARGETS = {
     "100": {"test-keyboard-faults", "test-trace-input"},
     "101": {"test-artifact-truncation"},
     "102": {"test-bbp-corruption", "test-bbp-corruption-sanitized"},
-    "103": {"test-ide-power-cut", "test-power-cut"},
+    "103": {"test-power-cut"},
 }
 
 EXPECTED_LAYERS = {

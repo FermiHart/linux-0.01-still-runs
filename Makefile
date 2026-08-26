@@ -38,6 +38,12 @@ UNAME_S    := $(shell uname -s)
 REPO_ROOT  := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 BUILD      ?= build
 MAKE_COMMAND := $(MAKE)
+FAULT_TEST_COMMAND ?= $(MAKE) --no-print-directory
+FAULT_TEST_TARGETS := test-bemu-loading test-ide-faults test-fs-corruption \
+                      test-irq-faults test-irq-faults-kvm \
+                      test-keyboard-faults test-trace-input \
+                      test-artifact-truncation test-bbp-corruption \
+                      test-bbp-corruption-sanitized test-power-cut
 export BUILD MAKE_COMMAND
 
 EXPERIENCE ?= alive
@@ -205,7 +211,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -513,6 +519,7 @@ test: all
 	$(call STAGE,9/10,running bEMU boot test suite)
 	@python3 tests/test_harness_utils.py
 	@$(MAKE) --no-print-directory test-fault-catalog
+	@python3 tests/test_fault_test.py --make "$(MAKE_COMMAND)"
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
 	@$(MAKE) --no-print-directory test-bemu-loading
@@ -817,6 +824,13 @@ test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/
 test-fault-catalog:
 	$(call STEP,deterministic fault catalog consistency check)
 	@python3 tests/test_fault_catalog.py
+
+fault-test: test-fault-catalog
+	$(call STAGE,9/10,running all deterministic fault scenarios)
+	+@for target in $(FAULT_TEST_TARGETS); do \
+	  printf '  $(CGY)$(G_DOT)$(CR) %s\n' "$$target"; \
+	  $(FAULT_TEST_COMMAND) "$$target"; \
+	done
 
 test-bemu-loading: $(BUILD)/test-memory-loader $(BUILD)/bemu-linux01 $(BUILD)/root.img
 	$(call STAGE,9/10,running bEMU memory and loading-limit tests)
@@ -1308,6 +1322,7 @@ help:
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
 	@printf '    $(CWH)test-fault-catalog$(CR) validate fault catalog references\n'
+	@printf '    $(CWH)fault-test$(CR)     run all deterministic fault scenarios\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'
 	@printf '    $(CWH)test-power-cut$(CR)  deterministic IDE write power cuts\n'

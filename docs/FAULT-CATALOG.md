@@ -19,8 +19,8 @@ The layers are deliberately distinct:
 All fault controls are test-only host interfaces. None is exposed through the
 historical guest or the public bEMU CLI. `make test-fault-catalog` checks that
 all eight entries, their Make targets, layer labels, and evidence files remain
-present. Wave 105 will provide the separate command that executes every fault
-scenario.
+present. `make fault-test` executes every canonical fault target in order and
+stops at the first failure.
 
 | Wave | Subject | Completion commit |
 |---:|---|---|
@@ -120,7 +120,7 @@ scenario.
 ## Wave 103 - Deterministic IDE power cuts
 
 - **Fault:** Power off one selected LBA at write acceptance, complete payload receipt, atomic 512-byte sector commit, or normal unmasked completion-IRQ request, across first/second-sector writes.
-- **Run:** `make test-ide-power-cut`, `make test-power-cut`
+- **Run:** `make test-power-cut` (includes the lower-level `test-ide-power-cut` matrix under optimized and sanitized builds).
 - **Layer:** `host-only` optimized/sanitized IDE model plus `offline filesystem` inspection of disposable profile copies.
 - **Expected response:** Cuts expose only exact 0, 512, or 1024-byte committed prefixes and the boundary-specific IRQ count; power-off discards staging, lowers IRQ14, clears transfer state, and blocks PIO until reset.
 - **Observed response:** Device and image harnesses exit 0, the latter with `deterministic IDE power-cut image test passed`; repeated scenarios have stable SHA-256 classes, while inspector and `fsck.minix` both remain metadata-clean.

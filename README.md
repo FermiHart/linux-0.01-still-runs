@@ -133,6 +133,7 @@ make run             # build + direct KVM boot in the terminal
 make run-headless    # alias for make run; bEMU is terminal-native
 make boom            # clean + build + run — cinematic one-shot demo
 make test            # boot + full shell, editor, trace, and large-rootfs tests
+make fault-test      # run all Waves 096-103 deterministic fault scenarios
 make test-fault-catalog # validate the Waves 096-103 evidence catalog
 make test-bemu-loading # guest RAM and kernel loading limits before KVM
 make test-ide-faults # host-only deterministic IDE read/write failures
