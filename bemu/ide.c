@@ -29,6 +29,15 @@ void ide_reset(struct ide_state *ide)
     ide->data_pos = 0;
     ide->writing = 0;
     ide->irq_pending = 0;
+    ide->fault_kind = IDE_FAULT_NONE;
+    ide->fault_lba = 0;
+}
+
+void ide_inject_fault(struct ide_state *ide, enum ide_fault_kind kind,
+                      uint32_t lba)
+{
+    ide->fault_kind = kind;
+    ide->fault_lba = lba;
 }
 
 void map_disk(struct ide_state *ide, const char *path)
@@ -116,7 +125,17 @@ static void ide_abort(struct machine *m)
     m->ide.status = IDE_READY | IDE_SEEK | IDE_ERR;
     m->ide.remaining = 0;
     m->ide.data_pos = 0;
+    m->ide.writing = 0;
     ide_set_irq(m);
+}
+
+static int ide_fault_matches(struct ide_state *ide, enum ide_fault_kind kind,
+                             uint32_t lba)
+{
+    if (ide->fault_kind != kind || ide->fault_lba != lba)
+        return 0;
+    ide->fault_kind = IDE_FAULT_NONE;
+    return 1;
 }
 
 void ide_command(struct machine *m, uint8_t command)
@@ -126,6 +145,11 @@ void ide_command(struct machine *m, uint8_t command)
     ide_clear_irq(m);
     if (command == 0x20 || command == 0x30) {
         if (ide_address(d, &lba) < 0) {
+            ide_abort(m);
+            return;
+        }
+        if (ide_fault_matches(d, command == 0x20 ?
+                              IDE_FAULT_READ : IDE_FAULT_WRITE, lba)) {
             ide_abort(m);
             return;
         }
@@ -157,6 +181,11 @@ static void ide_sector_done(struct machine *m)
         d->remaining--;
     if (d->remaining) {
         if ((uint64_t)d->lba * IDE_SECTOR_LEN >= d->disk_size) {
+            ide_abort(m);
+            return;
+        }
+        if (ide_fault_matches(d, d->writing ?
+                              IDE_FAULT_WRITE : IDE_FAULT_READ, d->lba)) {
             ide_abort(m);
             return;
         }

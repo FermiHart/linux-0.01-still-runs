@@ -19,7 +19,10 @@ exit with status 1 and a stable `[bemu-linux01]` diagnostic.
 
 The root image is opened read-write and mapped with `MAP_SHARED`; guest writes
 therefore target the selected image, subject to the documented IDE completion
-limitations. When stdout is a terminal,
+limitations. The host-side IDE test API can arm one read or write failure at a
+selected LBA. A matching command reports ATA abort/`ERR`, raises IRQ14 before
+transferring that sector, and consumes the fault once. This proof seam is not a
+guest capability or CLI option. When stdout is a terminal,
 bEMU also filters guest OSC/DCS and unsafe control sequences while retaining
 the ANSI color, cursor and erase sequences used by the shell. Use
 `--raw-console` only when unfiltered terminal output is explicitly required.

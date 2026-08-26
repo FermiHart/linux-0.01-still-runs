@@ -27,16 +27,26 @@
 
 struct machine;
 
+enum ide_fault_kind {
+    IDE_FAULT_NONE,
+    IDE_FAULT_READ,
+    IDE_FAULT_WRITE,
+};
+
 struct ide_state {
     uint8_t *disk;
     size_t disk_size;
     uint8_t error, count, sector, lcyl, hcyl, current, status, control;
     uint32_t lba;
+    uint32_t fault_lba;
     unsigned remaining, data_pos;
     int writing, irq_pending;
+    enum ide_fault_kind fault_kind;
 };
 
 void ide_reset(struct ide_state *ide);
+void ide_inject_fault(struct ide_state *ide, enum ide_fault_kind kind,
+                      uint32_t lba);
 void map_disk(struct ide_state *ide, const char *path);
 int ide_experience_matches(const struct ide_state *ide, const char *experience);
 void ide_command(struct machine *m, uint8_t command);

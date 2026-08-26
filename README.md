@@ -133,6 +133,7 @@ make run             # build + direct KVM boot in the terminal
 make run-headless    # alias for make run; bEMU is terminal-native
 make boom            # clean + build + run — cinematic one-shot demo
 make test            # boot + full shell, editor, trace, and large-rootfs tests
+make test-ide-faults # host-only deterministic IDE read/write failures
 make doctor          # toolchain health check
 make sizes           # kernel section sizes
 make hash            # SHA-256 of all artifacts

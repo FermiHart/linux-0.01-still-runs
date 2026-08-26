@@ -156,6 +156,22 @@ allocation-failure state and real file loading. Its process-level cases give the
 production runner empty and 512 KiB + 1 kernels and require exit status 1, the
 structured diagnostic, and absence of direct-KVM-entry or guest-success output.
 
+### "IDE read and write failures are deterministic and bounded"
+
+**Source**: `bemu/README.md` and `ARCHITECTURE.md`.
+
+**Audit**: the modern IDE bridge can arm one host-side read or write failure for
+a selected LBA. A matching single- or multi-sector command consumes the fault,
+sets ATA abort/`ERR`, raises IRQ14, clears transfer state and does not read or
+modify the failing sector. Other operations and LBAs remain unaffected. The
+historical CLI exposes no fault switch.
+
+**Status**: PROVEN / TEST-ONLY.
+
+**Evidence**: `make test-ide-faults` exercises read and write errors, IRQ14,
+zero transfer, one-shot recovery, operation/LBA scoping and later sectors of
+multi-sector commands without KVM.
+
 ### "Automated validation: build → direct KVM boot → full shell smoke suite"
 
 **Source**: README.md.

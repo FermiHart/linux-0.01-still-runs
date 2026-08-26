@@ -28,6 +28,7 @@ blocked until the conflict is resolved.
 | KVM behavior differs across host CPUs/kernels | Non-reproducible boot or tests | Document reference host, test matrix, record/replay | 024, 063–074 |
 | bEMU monolith is hard to test | Bugs in device emulation | Modularize and add unit tests | 041–054 |
 | Guest RAM or kernel placement exceeds a host mapping | Host crash or corrupted handoff before boot | Checked half-open ranges, fixed allocation and pre-KVM loader tests | 096 |
+| IDE media errors mutate the failing sector or leave a transfer stuck | Filesystem corruption or guest hang | One-shot read/write faults abort before the selected sector and test IRQ/recovery | 097 |
 | Toolchain ages or disappears | Builds no longer reproducible | Pin versions, archive tarballs, container digests | 016–025 |
 | Over-ambitious scope creep | 120 waves become unfinishable | Reject features not in roadmap; use discovery waves sparingly | Programa todo |
 | Loss of local roadmap files | Project context disappears | Backup `.local/` separately, checksums, agent protocol | Continuo |

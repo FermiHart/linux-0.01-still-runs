@@ -71,6 +71,8 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
 The IDE root image is mapped separately by `bemu/ide.c`; it is not copied into
 guest RAM. `bemu/kvm.c` receives already validated RAM and only registers it,
 installs the bootstrap GDT, creates the VM/vCPU, and sets registers.
+The IDE module also has a host-only test seam for one-shot ATA read/write errors
+at a selected LBA; it is not exposed to the guest or command-line interface.
 
 ## Memory Layout (Physical)
 
