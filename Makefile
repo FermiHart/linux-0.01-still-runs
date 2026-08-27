@@ -213,7 +213,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology test-paper patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology test-paper test-reproduction-appendix patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain \
         compiler-cases compare-assembly compiler-audit compiler-summary compiler-classify compiler-bugreport compiler-matrix compiler-dataset test-compiler-cases test-compare-assembly test-compiler-audit test-compiler-summary test-compiler-classification test-compiler-bugreport test-compiler-matrix test-compiler-dataset test-compiler-case-dataset
 
@@ -523,6 +523,7 @@ test: all
 	@$(MAKE) --no-print-directory test-research-questions
 	@$(MAKE) --no-print-directory test-methodology
 	@$(MAKE) --no-print-directory test-paper
+	@$(MAKE) --no-print-directory test-reproduction-appendix
 	@$(MAKE) --no-print-directory test-patch-dataset
 	@$(MAKE) --no-print-directory test-golden-trace-dataset
 	@$(MAKE) --no-print-directory test-compiler-case-dataset
@@ -853,6 +854,10 @@ test-paper:
 	$(call STEP,technical paper evidence and integration check)
 	@python3 tests/test_paper.py
 
+test-reproduction-appendix:
+	$(call STEP,operational reproduction appendix check)
+	@python3 tests/test_reproduction_appendix.py
+
 patch-dataset:
 	$(call STEP,publishing historical-core patch dataset)
 	@python3 scripts/build-patch-dataset.py
@@ -1030,8 +1035,8 @@ doctor:
 	@printf '\n  $(CB)$(CWH)toolchain health check$(CR)\n\n'
 	@status=0; \
 	  for tool in $(CC) $(AS) $(LD) $(NM) $(OBJCOPY) $(OBJDUMP) $(NASM) \
-	              $(HOSTCC) python3 make awk sed find sort git mktemp stat cut fsck.minix \
-	              diff tr xargs wc seq clear; do \
+	              $(HOSTCC) gcc python3 make awk sed find sort git mktemp stat cut fsck.minix \
+	              diff tr xargs wc seq clear tar gzip readelf dd sha256sum; do \
 	    if command -v "$$tool" >/dev/null 2>&1; then \
 	      printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)%s$(CR)\n" "$$tool" "$$(command -v "$$tool")"; \
 	    else \
@@ -1039,18 +1044,21 @@ doctor:
 	      status=1; \
 	    fi; \
 	  done; \
-	  if command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1; then \
-	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)available$(CR)\n" "SHA-256 tool"; \
-	  else \
-	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)MISSING$(CR)\n" "SHA-256 tool"; \
-	    status=1; \
-	  fi; \
 	  tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/linux001-doctor.XXXXXXXX"); \
 	  trap 'rm -rf -- "$$tmp"' EXIT; \
 	  if printf 'void f(void) {}\n' | $(CC) $(COMMON_FLAGS) -x c -c -o "$$tmp/kernel.o" - >/dev/null 2>&1; then \
 	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)i386 freestanding$(CR)\n" "compiler probe"; \
 	  else \
 	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)i386 flags rejected$(CR)\n" "compiler probe"; \
+	    status=1; \
+	  fi; \
+	  if printf '%s\n' '#include <stdio.h>' '#include <stdlib.h>' '#include <string.h>' \
+	       'int main(void) { const char *s = "i386"; if (strcmp(s, "i386")) return EXIT_FAILURE; puts(s); return EXIT_SUCCESS; }' | \
+	     gcc -m32 -no-pie -x c -o "$$tmp/host-i386" - >/dev/null 2>&1 && \
+	     "$$tmp/host-i386" >/dev/null 2>&1; then \
+	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)hosted i386 link/run$(CR)\n" "multilib probe"; \
+	  else \
+	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)hosted i386 unavailable$(CR)\n" "multilib probe"; \
 	    status=1; \
 	  fi; \
 	  if printf 'int main(void) { return 0; }\n' | $(HOSTCC) $(HOSTCFLAGS) -x c -o "$$tmp/host" - $(BEMU_LDFLAGS) >/dev/null 2>&1; then \
@@ -1365,6 +1373,7 @@ help:
 	@printf '    $(CWH)test-research-questions$(CR) validate research scopes and evidence\n'
 	@printf '    $(CWH)test-methodology$(CR) validate experimental methodology\n'
 	@printf '    $(CWH)test-paper$(CR)      validate the technical paper and evidence links\n'
+	@printf '    $(CWH)test-reproduction-appendix$(CR) validate the operational reproduction guide\n'
 	@printf '    $(CWH)patch-dataset$(CR)  regenerate the published patch dataset\n'
 	@printf '    $(CWH)test-patch-dataset$(CR) validate the published patch dataset\n'
 	@printf '    $(CWH)test-golden-trace-dataset$(CR) validate published golden traces\n'

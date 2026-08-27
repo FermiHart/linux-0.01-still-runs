@@ -158,6 +158,9 @@ The experimental controls, repetition counts, oracle classes, retention policy,
 and analysis rules are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 The complete technical paper, including results and threats to validity for all
 five questions, is [docs/PAPER.md](docs/PAPER.md).
+The clean-clone, one-command artifact procedure, expected outputs, validation
+steps, timing guidance and troubleshooting are in
+[docs/REPRODUCTION.md](docs/REPRODUCTION.md).
 The versioned historical-core patch, per-path hashes, stable adaptation IDs,
 ledger joins, and explicit evidence gaps are in
 [datasets/patches/](datasets/patches/).

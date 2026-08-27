@@ -32,7 +32,7 @@ tar -czf "${ARTIFACT}" \
     LICENSE \
     README.md \
     2>/dev/null || {
-        printf 'Artifact creation failed. Ensure make all && make checksums have been run.\n' >&2
+        printf 'Artifact creation failed. Run SOURCE_DATE_EPOCH=1700000000 make reproducible artifact.\n' >&2
         exit 1
     }
 

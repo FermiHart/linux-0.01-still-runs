@@ -56,6 +56,9 @@ jobs:
       - name: Test technical paper
         run: make test-paper
 
+      - name: Test reproduction appendix
+        run: make test-reproduction-appendix
+
       - name: Test historical-core patch dataset
         run: python3 tests/test_patch_dataset.py
 

@@ -80,9 +80,9 @@ persistence, or independent reproduction.
 
 The paper is deliberately an evidence synthesis rather than a replacement for
 the repository. Internal citations name versioned files and executable oracles so
-that a claim can be traced to its actual boundary. Detailed reproduction commands
-are reserved for the artifact appendix; this paper describes what the current
-procedures mean and where they stop.
+that a claim can be traced to its actual boundary. Detailed clean-clone commands,
+outputs and troubleshooting are in `docs/REPRODUCTION.md`; this paper describes
+what the current procedures mean and where they stop.
 
 ## 2. Related work
 
@@ -560,12 +560,12 @@ verify the virtual-medium model, not physical storage. Dataset validators verify
 manifest, payload, source, identity, and checksum consistency without recreating
 missing historical provenance.
 
-This paper intentionally stops short of a command-by-command artifact appendix.
-The repository exposes named Make targets alongside each research question and
-dataset; the separate appendix will specify clean-clone setup, environment
-capture, expected durations and outputs, and troubleshooting. Keeping that
-operational layer separate avoids presenting future publication, archival, or
-external-evaluation steps as completed observations.
+This paper intentionally keeps command-by-command operation in
+`docs/REPRODUCTION.md`. The appendix specifies clean-clone setup, prerequisites,
+expected durations and outputs, checksum verification, troubleshooting, and the
+distinct meanings of artifact construction, behavioral CI, and two-build
+comparison. Keeping that operational layer separate avoids presenting future
+packaging, archival, or external-evaluation steps as completed observations.
 
 ## 11. Conclusion
 

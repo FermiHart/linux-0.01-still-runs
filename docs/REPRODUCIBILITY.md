@@ -1,7 +1,8 @@
 # Reproducibility
 
-This document explains how to obtain bit-for-bit identical artifacts from a
-clean checkout of `linux-0.01-still-runs`.
+This document defines the current build-byte boundary. The operational clean-clone
+procedure, prerequisites, artifact command and troubleshooting are in
+`docs/REPRODUCTION.md`.
 
 ## Deterministic sources
 
@@ -17,13 +18,13 @@ The following non-deterministic inputs have been eliminated or controlled:
 
 ## Bit-for-bit verification
 
-Run the reproducible target:
+Run the one-build reproducible target:
 
 ```bash
 make reproducible
 ```
 
-This:
+This performs one build and:
 
 1. Cleans the build tree.
 2. Exports a fixed `SOURCE_DATE_EPOCH` (or honors an externally supplied one).
@@ -31,9 +32,12 @@ This:
 4. Writes `build/SHA256SUMS`.
 5. Copies it to `build/REPRODUCIBLE.sha256` for later comparison.
 
-Two consecutive runs on the same machine with the same toolchain produce the
-same `build/SHA256SUMS`. The kernel and userland binaries contain no timestamps
-or host paths, so they are identical even when `SOURCE_DATE_EPOCH` changes.
+The separate `make verify-reproducible` target copies the current working tree to
+two temporary directories, runs this target in each, and compares the resulting
+manifests. It proves two copied-tree builds on one host and toolchain, not two
+clean network clones or arbitrary-host identity. The kernel and userland binaries
+contain no timestamps or host paths, so they are identical when the declared
+inputs remain fixed.
 
 ## Reference hashes
 
