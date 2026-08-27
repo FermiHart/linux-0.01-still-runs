@@ -197,6 +197,7 @@ global deterministic-runtime claim.
 | Initial RTC conversion | `IMPLEMENTED` unit contract, `PARTIAL` runtime claim | `make test-rtc`; one conversion per controlled profile/input | exact BCD register values |
 | Observable trace | `PARTIAL` | `make compare-trace`; one golden-versus-replay comparison | positional equality after declared normalization/filtering |
 | Fault outcomes | `IMPLEMENTED` fixed vectors, mostly `PARTIAL` repetition | `make fault-test`; Wave 103 has two repeats per profile/scenario | exact statuses/state, bytes, IRQ counts and hashes |
+| Orderly filesystem persistence | `IMPLEMENTED` for bEMU's virtual medium | `make test-fs-persistence`; one two-process lifecycle per profile | post-sync marker, normal terminal halt, changed copy, clean independent oracles, exact fresh-process bytes, unchanged canonical images |
 
 The double-build procedure is implemented by
 `scripts/verify-reproducibility.sh`; its two temporary trees share one host and
@@ -216,6 +217,15 @@ fault path with identical scenario repetition: each of eight scenarios for each
 profile runs twice and must preserve its expected 0/512/1024-byte prefix, IRQ
 count, and state hash. Sanitized versus optimized execution is a configuration
 comparison, not a repeat.
+
+The persistence procedure in `tests/test_fs_persistence.py` creates a unique
+payload in a disposable image, returns from guest `sync`, emits an explicit power
+request, terminates on a KVM halted state with IF=0, and starts a new
+bEMU/KVM/RAM instance over that image.
+`minix-inspect --audit` must resolve the exact path and bytes, read-only
+`fsck.minix` must independently accept the metadata, and the second guest must
+read the same payload. This is one lifecycle per profile, not repeated-trial or
+physical-media evidence.
 
 ## Oracle independence
 
@@ -286,6 +296,6 @@ logs and the traces are inherited. The common run envelope is therefore
 - **Reproducibility:** Wave 110 retains one immutable compiler reference run,
   but the common environment envelope and most other raw outputs are not yet
   retained as immutable run bundles.
-- **Completeness:** RQ2 ablation, the compiler cross-product, cross-boot
-  persistence, complete machine replay, and third-party reproduction remain
-  absent and must be reported as such.
+- **Completeness:** RQ2 ablation, the compiler cross-product, in-process reset,
+  complete machine replay, physical-media durability, and third-party
+  reproduction remain absent and must be reported as such.

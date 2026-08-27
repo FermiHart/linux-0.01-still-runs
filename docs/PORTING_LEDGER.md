@@ -2,8 +2,10 @@
 
 This ledger groups interpreted adaptations to the historical Linux 0.01 core
 (`init/`, `kernel/`, `mm/`, `fs/`, `lib/`, `include/`) and explains their stated
-purpose. The complete path-level delta, including unmatched ledger joins, is in
-`datasets/patches/`. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
+purpose. The complete path-level delta for the pinned Wave 107 snapshot,
+including unmatched ledger joins, is in `datasets/patches/`; the D01 power
+request below is post-v1 evidence and is not retroactively inserted into that
+snapshot. The upstream reference is `upstream/linux-0.01.tar.gz` with SHA-256
 `24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d`.
 
 ## Legend
@@ -237,6 +239,18 @@ purpose. The complete path-level delta, including unmatched ledger joins, is in
   that bare `cd` returns to the selected HOME rather than the shell fallback.
 - **Status**: PROVEN
 
+### Explicit bEMU power request
+
+- **Change**: Emit a one-byte halt/reboot intent on a private bEMU port immediately
+  before the terminal `hlt` loop in `sys_phys()`.
+- **Files**: `kernel/sys.c`, `include/linux/bemu.h`
+- **Category**: Hardware
+- **Evidence**: KVM reports both orderly shutdown and `panic()` as a halted vCPU
+  with IF=0, so CPU state alone cannot distinguish success from a kernel fault.
+- **Test**: `tests/test_fs_persistence.py` requires normal halt in both profiles
+  and rejects a corrupt-root kernel panic as an unrequested halt without PASS.
+- **Status**: PROVEN
+
 ## Test traceability
 
 | Test | Ledger entries covered |
@@ -245,6 +259,7 @@ purpose. The complete path-level delta, including unmatched ledger joins, is in
 | `tests/test_boot.py` | CMOS Y2K, serial UART, console duplication, ATA PIO, fs/buffer -O1 workaround, fs/bitmap -O1 workaround, filesystem Minix v1 patches, sys_ioctl volatile, pipe macro |
 | `tests/test_shell.py` | CMOS Y2K, serial UART, console duplication, CP437 glyphs, fs/buffer workaround, filesystem patches, vsprintf %s workaround |
 | `tests/test_experience.py` | Validated experience environment bridge |
+| `tests/test_fs_persistence.py` | Explicit bEMU power request, syscall wrappers, filesystem Minix v1 patches |
 | `tests/test_large_rootfs.py` | fs/buffer workaround, filesystem patches |
 | `make sizes` | VGA 80×50 mode (kernel.elf sections) |
 
@@ -258,7 +273,7 @@ preserves that distinction and does not treat test source as retained run output
 |---|---|---|
 | Compiler | 10 | Modern GCC rejects or exposes contracts in 1991 constructs |
 | UndefinedBehavior | 1 | Code relies on behavior not guaranteed by the source/asm contract |
-| Hardware | 6 | bEMU/KVM devices differ from 1991 PC assumptions |
+| Hardware | 7 | bEMU/KVM devices differ from 1991 PC assumptions |
 | Time | 1 | CMOS century rollover |
 | Usability | 3 | Without these the shell becomes unresponsive or unusable |
 | Experience | 5 | Profile and presentation choices that preserve or enhance feel |

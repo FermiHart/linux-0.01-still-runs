@@ -1,8 +1,8 @@
 # Real filesystem experience
 
 This document records the real-filesystem work from Waves 026–040, the offline
-metadata-corruption gate from Wave 098 and virtual-media power cuts from Wave
-103.
+metadata-corruption gate from Wave 098, virtual-media power cuts from Wave 103,
+and the orderly cross-process lifecycle proved by Discovery Wave D01.
 
 ## What is now real
 
@@ -46,19 +46,23 @@ exact 0/512/1024-byte commit prefixes. Both metadata oracles remain clean after
 the data-only mutation. That is evidence that filesystem structure survived,
 not that the old or new file content was recovered correctly.
 
-## What remains sealed behind bEMU IDE writes
+## What persists across bEMU processes
 
-Cross-boot persistence is prepared but not yet functional:
+`make test-fs-persistence` runs the following proof for both profile images:
 
-- bEMU now maps the root image with `MAP_SHARED`.
-- The shell has a `sync` built-in backed by `lib/sync.c`.
-- `init/main.c` uses the external `sync()` symbol instead of an inline
-duplicate.
+- copy the canonical image and record both hashes;
+- create `/tmp/d01p/proof`, return from the real `sync()` path, and halt;
+- terminate bEMU only after an explicit power request and KVM halted state with
+  IF=0; reject the same CPU state without a request as an error;
+- require a changed copy and unchanged canonical image;
+- resolve the path and exact file bytes with `minix-inspect --audit` and require
+  a clean read-only `fsck.minix` result;
+- boot a second bEMU process with fresh KVM/RAM state and read the exact payload.
 
-The IDE module now completes and signals sector writes in host tests, but the
-full guest `sync`/halt/cross-boot lifecycle remains unproven and is not repaired
-by the host-only Wave 103 cut seam. `MAP_SHARED` and test-side `msync` must not be
-treated as evidence of guest flush completion or physical durability.
+This proves orderly persistence on bEMU's virtual medium, not an in-process reset
+or physical-media durability. `reboot` ends the current process after sync because
+the keyboard-controller reset command is not modeled; a fresh invocation creates
+the next boot.
 
 ## Test targets added
 
@@ -68,6 +72,7 @@ make test-fs-mkdir     # mkdir/rmdir
 make test-fs-link      # ln/rm/mv
 make test-fs-large     # multi-line file
 make test-fs-property  # pseudo-random read/write cases
+make test-fs-persistence # sync/halt and exact read in a fresh bEMU process
 make test-fs-inspect   # independent Minix v1 audit
 make test-fs-corruption # offline metadata fault injection
 make test-power-cut     # disposable-image IDE write cut matrix

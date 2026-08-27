@@ -64,12 +64,12 @@ Three boundaries apply to every question:
 ## RQ5 - Reproducible historical experience
 
 - **Question:** Which parts of the historical operating-system experience are reproducible under controlled inputs?
-- **Scope:** Separate byte-for-byte build reproduction, deterministic initial profile/RTC state, normalized record/replay equivalence, and repeated fault outcomes from wall-clock scheduling, complete machine-state replay, cross-boot persistence, and physical-media behavior.
-- **Run:** `make verify-reproducible`, `make test-rtc`, `make compare-trace`, `make fault-test`
-- **Evidence:** `datasets/golden-traces/v1/MANIFEST.json`, `datasets/golden-traces/v1/alive-boot-machine.jsonl`, `docs/REPRODUCIBILITY.md`, `tests/compare_trace.py`, `tests/test_power_cut.py`, `docs/OBSERVABILITY.md`
-- **Measures:** Repeat controlled builds and runs; compare SHA-256 manifests, RTC register values, normalized event count/order/type/payload, exact replayed input bytes, fault exit statuses, media byte prefixes, IRQ counts, and repeated state hashes.
+- **Scope:** Separate byte-for-byte build reproduction, deterministic initial profile/RTC state, normalized record/replay equivalence, repeated fault outcomes, and orderly cross-process filesystem persistence from wall-clock scheduling, complete machine-state replay, in-process reset, and physical-media behavior.
+- **Run:** `make verify-reproducible`, `make test-rtc`, `make compare-trace`, `make fault-test`, `make test-fs-persistence`
+- **Evidence:** `datasets/golden-traces/v1/MANIFEST.json`, `datasets/golden-traces/v1/alive-boot-machine.jsonl`, `docs/REPRODUCIBILITY.md`, `tests/compare_trace.py`, `tests/test_power_cut.py`, `tests/test_fs_persistence.py`, `docs/OBSERVABILITY.md`
+- **Measures:** Repeat controlled builds and runs; compare SHA-256 manifests, RTC register values, normalized event count/order/type/payload, exact replayed input bytes, fault exit statuses, media byte prefixes, IRQ counts, repeated state hashes, post-sync image hashes, independent filesystem oracles, and exact fresh-process payload bytes.
 - **Answer criterion:** Call a layer reproducible only when repeated trials under named controls produce its predeclared identical outcome; list every normalization or ignored field and report layers that intentionally consume host time or remain scheduling-dependent separately.
-- **Limits:** Current evidence does not prove full event-by-event runtime determinism, bit identity across arbitrary distributions, cross-boot filesystem persistence, guest recovery from host faults, physical power-loss durability, or independent third-party reproduction.
+- **Limits:** Current evidence does not prove full event-by-event runtime determinism, bit identity across arbitrary distributions, in-process reset, guest recovery from host faults, physical power-loss durability, or independent third-party reproduction.
 
 ## Relationship to later waves
 

@@ -32,6 +32,7 @@
 #include <bbp/bbp_crc64.h>
 #include "../bbp/bbp_build.h"
 #include "../bbp/linux01_handoff.h"
+#include "../include/linux/bemu.h"
 #include "machine.h"
 #include "ide.h"
 #include "loader.h"
@@ -49,6 +50,7 @@
 #include "error.h"
 
 #define STOP_SIGNAL_COUNT 4
+#define GUEST_RFLAGS_IF (1ULL << 9)
 
 struct host_input_state {
     int stdin_flags, flags_saved;
@@ -61,6 +63,12 @@ struct host_input_state {
     int stop_handler_changed[STOP_SIGNAL_COUNT];
     struct itimerval old_timer;
     int timer_changed;
+};
+
+enum guest_halt_state {
+    GUEST_HALT_NONE,
+    GUEST_HALT_REQUESTED,
+    GUEST_HALT_UNREQUESTED,
 };
 
 static const int stop_signals[STOP_SIGNAL_COUNT] = {
@@ -225,6 +233,23 @@ static void pump_input(struct machine *m)
     keyboard_pump(m);
 }
 
+static enum guest_halt_state guest_halt_state(struct machine *m)
+{
+    struct kvm_mp_state mp_state;
+    struct kvm_regs regs;
+
+    memset(&mp_state, 0, sizeof mp_state);
+    if (ioctl(m->vcpu, KVM_GET_MP_STATE, &mp_state) < 0)
+        die("KVM_GET_MP_STATE after stopped run");
+    if (mp_state.mp_state != KVM_MP_STATE_HALTED)
+        return GUEST_HALT_NONE;
+    if (ioctl(m->vcpu, KVM_GET_REGS, &regs) < 0)
+        die("KVM_GET_REGS after halted run");
+    if (regs.rflags & GUEST_RFLAGS_IF)
+        return GUEST_HALT_NONE;
+    return m->power_request_seen ? GUEST_HALT_REQUESTED : GUEST_HALT_UNREQUESTED;
+}
+
 static uint32_t io_read(struct machine *m, uint16_t port, unsigned size)
 {
     struct ide_state *d = &m->ide;
@@ -295,6 +320,11 @@ static void io_write(struct machine *m, uint16_t port, uint32_t value, unsigned 
     case 0x60: break;
     case 0x61: m->port61=byte; break;
     case 0x64: break;
+    case BEMU_POWER_PORT:
+        if (size == 1 && (byte == BEMU_POWER_HALT || byte == BEMU_POWER_REBOOT)) {
+            m->power_request_seen = 1;
+        }
+        break;
     case 0x70: m->cmos_index=byte; break;
     case 0x40:
     case 0x43:
@@ -417,6 +447,7 @@ int main(int argc, char **argv)
     long exits = 0;
     int status = 1;
     int boot_traced = 0;
+    enum guest_halt_state halt_state;
     const char *shutdown_reason = NULL;
     machine_create(&m);
     if (cli_parse_args(argc, argv, &opts) < 0) {
@@ -490,8 +521,23 @@ int main(int argc, char **argv)
         if (stop_requested)
             break;
         if (ioctl(m.vcpu, KVM_RUN, 0) < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
+                halt_state = guest_halt_state(&m);
+                if (halt_state == GUEST_HALT_REQUESTED) {
+                    fprintf(stderr,
+                            "[bemu-linux01] guest halted with interrupts disabled after power request\n");
+                    m.done = 1;
+                    break;
+                }
+                if (halt_state == GUEST_HALT_UNREQUESTED) {
+                    fprintf(stderr,
+                            "[bemu-linux01] unrequested guest halt with interrupts disabled\n");
+                    shutdown_reason = "error";
+                    status = BEMU_EXIT_RUNTIME;
+                    goto out;
+                }
                 continue;
+            }
             die("KVM_RUN");
         }
         irq_run_completed(&m);
@@ -500,6 +546,18 @@ int main(int argc, char **argv)
             handle_io(&m);
             break;
         case KVM_EXIT_HLT:
+            halt_state = guest_halt_state(&m);
+            if (halt_state == GUEST_HALT_REQUESTED) {
+                fprintf(stderr,
+                        "[bemu-linux01] guest halted with interrupts disabled after power request\n");
+                m.done = 1;
+            } else if (halt_state == GUEST_HALT_UNREQUESTED) {
+                fprintf(stderr,
+                        "[bemu-linux01] unrequested guest halt with interrupts disabled\n");
+                shutdown_reason = "error";
+                status = BEMU_EXIT_RUNTIME;
+                goto out;
+            }
             break;
         case KVM_EXIT_IRQ_WINDOW_OPEN:
             break;

@@ -85,6 +85,12 @@ checksums. A zero status is the aggregate decision. Individual successful boots
 also end with `[bemu-linux01] RESULT: PASS after <N> KVM exits` and reject known
 kernel-fault markers.
 
+The focused persistence gate is also available as `make test-fs-persistence`.
+It writes and syncs a disposable copy in each profile, requires guest-driven
+termination, validates exact bytes with the independent inspector, requires a
+clean external `fsck.minix` metadata check, and reads the bytes from a fresh
+bEMU/KVM/RAM instance.
+
 CI is behavioral validation, not an immutable research-run bundle. Most logs and
 disposable images are not retained, and the hosted GitHub workflow is a selected
 matrix rather than a claim that every runner executes this exact local aggregate.
@@ -198,20 +204,21 @@ duration.
 | Symptom | Boundary and action |
 |---|---|
 | `/dev/kvm: Permission denied` or missing device | Grant the current user read/write access and confirm host virtualization; do not expect a software fallback. |
-| KVM API, irqchip, guest-debug, or IRQ-state ioctl failure | The host or nested hypervisor lacks a capability used by the suite even if `make doctor` passed basic access. |
+| KVM API, irqchip, MP-state, guest-debug, or IRQ-state ioctl failure | The host or nested hypervisor lacks a capability used by the suite even if `make doctor` passed basic access. |
 | `git rev-parse --is-shallow-repository` returns `true`, or a dataset reports a missing commit | Fetch full history with `git fetch --unshallow --tags`; a source archive has no historical Git objects. |
 | Host static PIE probe or bEMU link fails | Install the host static libc development support required by `-static-pie`. |
 | Hosted i386 case fails around `-m32` headers or linking | On Ubuntu 24.04 install `gcc-multilib` and `libc6-dev-i386`; a freestanding cross compiler does not replace hosted libraries. |
 | `fsck.minix not found` | Install the util-linux package that supplies the independent `fsck.minix` oracle. |
 | `make artifact` reports missing inputs | Run the complete one-command build above; `make all && make checksums` does not create `build/REPRODUCIBLE.sha256`. |
-| `sync`, orderly shutdown, or a persistence experiment stalls | Stop treating that run as successful cross-boot evidence; see `docs/FS-LIMITATIONS.md`. |
+| `sync`, orderly shutdown, or `make test-fs-persistence` stalls | The required guest-driven lifecycle failed; inspect the captured transcript and KVM MP-state support rather than treating the run as persistence evidence. |
 
 ## Known limits
 
 - The i386 guest executes on a Linux/x86-64/KVM host; CPU virtualization and
   bEMU-modeled devices are not physical 1991 hardware equivalence.
-- IDE write-completion delivery can leave guest `sync()` blocked, so
-  **cross-boot persistence remains outside the successful boundary**.
+- Orderly cross-process persistence is proven only for bEMU's `MAP_SHARED`
+  virtual medium in the two tested profiles; in-process reset and physical-media
+  durability remain outside the successful boundary.
 - Record/replay reconstructs input and compares a filtered observable event
   projection; it is **not machine-state replay**.
 - The published golden console and machine traces are separate alive-profile

@@ -24,7 +24,7 @@ EXPECTED_TARGETS = {
     "RQ2": {"test-quick", "test-bemu-loading", "test-artifact-truncation", "bbp-conformance"},
     "RQ3": {"compiler-cases", "compare-assembly", "compiler-audit", "compiler-matrix"},
     "RQ4": {"test-experiences", "test-fs-inspect", "test-trace-workflow", "fault-test"},
-    "RQ5": {"verify-reproducible", "test-rtc", "compare-trace", "fault-test"},
+    "RQ5": {"verify-reproducible", "test-rtc", "compare-trace", "fault-test", "test-fs-persistence"},
 }
 
 REQUIRED_EVIDENCE = {
@@ -58,6 +58,7 @@ REQUIRED_EVIDENCE = {
         "docs/REPRODUCIBILITY.md",
         "tests/compare_trace.py",
         "tests/test_power_cut.py",
+        "tests/test_fs_persistence.py",
     },
 }
 

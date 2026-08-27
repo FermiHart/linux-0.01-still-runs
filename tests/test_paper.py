@@ -55,6 +55,7 @@ REQUIRED_PATHS = (
     "datasets/compiler-cases/v1/MANIFEST.json",
     "datasets/compiler-cases/v1/observations.jsonl",
     "datasets/compiler-cases/v1/classifications.json",
+    "tests/test_fs_persistence.py",
 )
 
 REQUIRED_RESULT_BOUNDARIES = {
@@ -80,6 +81,7 @@ REQUIRED_RESULT_BOUNDARIES = {
     ),
     "RQ5 - Reproducible historical experience": (
         "not machine-state replay",
+        "Orderly cross-process persistence is `IMPLEMENTED`",
         "build and fixed-vector procedures are `IMPLEMENTED`, while observable trace equivalence remains `PARTIAL`",
     ),
 }
@@ -106,6 +108,7 @@ RQ_EVIDENCE_PATHS = {
     "RQ5 - Reproducible historical experience": (
         "datasets/golden-traces/v1/MANIFEST.json",
         "tests/test_power_cut.py",
+        "tests/test_fs_persistence.py",
         "docs/REPRODUCIBILITY.md",
     ),
 }

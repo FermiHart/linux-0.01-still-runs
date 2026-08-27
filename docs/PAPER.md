@@ -21,7 +21,9 @@ changed historical-core paths and 19 adaptation groups but contains no paired
 baseline experiment or ablation. An 18-cell compiler dataset observes one
 optimization-sensitive source-contract violation and two unreproduced historical
 hypotheses. Experience, trace, build, and fault procedures establish separate
-conformance dimensions rather than a scalar authenticity score. The principal
+conformance dimensions rather than a scalar authenticity score. An orderly
+two-process test also persists exact guest-written bytes in both profiles and
+checks them with an independent inspector plus external metadata fsck. The principal
 contribution is therefore not a claim of historical or hardware equivalence, but
 an auditable method for keeping an early operating system executable while making
 adaptations, negative results, normalization, and unresolved questions explicit.
@@ -75,8 +77,8 @@ partial evidence, and proposed experiments. Third, it reports three versioned
 datasets for source deltas, inherited traces, and reduced compiler cases. Fourth,
 it reports negative findings as first-class results: the present evidence does
 not establish causal invalidation for most adaptations, a minimum adaptation set,
-a broad compiler-version result, complete machine replay, cross-boot filesystem
-persistence, or independent reproduction.
+a broad compiler-version result, complete machine replay, physical-media
+durability, or independent reproduction.
 
 The paper is deliberately an evidence synthesis rather than a replacement for
 the repository. Internal citations name versioned files and executable oracles so
@@ -180,10 +182,11 @@ superblock, bitmaps, inodes, directories, device nodes, and files directly. An
 independent read-only inspector and util-linux `fsck.minix` provide stronger
 metadata oracles than guest self-report alone. In-session operations such as
 create, read, append, link, move, remove, directory creation, pipes, and
-redirection traverse real Linux 0.01 syscalls and kernel structures. Cross-boot
-persistence is outside the current successful boundary because IDE
-write-completion interrupt delivery can leave `sync()` blocked. This limitation
-is not inferred from a clean offline filesystem check.
+redirection traverse real Linux 0.01 syscalls and kernel structures. In both
+profiles, an orderly lifecycle returns from `sync`, halts the guest, closes the
+first bEMU process, validates the changed image with the independent inspector
+and external `fsck.minix`, and reads exact bytes in a second process with fresh
+KVM and RAM state. This does not prove in-process reset or physical durability.
 
 Two experience profiles share the same kernel mechanisms and machine ceiling.
 The `1991` profile uses a distinct root image, a period-oriented identity,
@@ -418,11 +421,16 @@ different runs with incomplete environment identity.
 
 Thus build bytes and selected fixed-vector outcomes have implemented deterministic
 procedures, while runtime trace equivalence remains partial. Cross-host byte
-identity, full event equality, cross-boot filesystem persistence, and third-party
-reproduction remain outside the evidence. The build and fixed-vector procedures
-are `IMPLEMENTED`, while observable trace equivalence remains `PARTIAL`.
-Evidence: `datasets/golden-traces/v1/MANIFEST.json`, `tests/test_power_cut.py`,
-and `docs/REPRODUCIBILITY.md`.
+identity, full event equality, in-process reset, physical-media durability, and
+third-party reproduction remain outside the evidence. Orderly cross-process
+persistence is `IMPLEMENTED` for bEMU's virtual medium: one lifecycle in each
+profile requires a post-sync marker, terminal halt and normal cleanup, changed
+disposable-image hash, exact inspector bytes, clean `fsck.minix`, exact read from
+a fresh bEMU/KVM/RAM instance, and unchanged canonical images. The build and
+fixed-vector procedures are `IMPLEMENTED`, while observable trace equivalence
+remains `PARTIAL`. Evidence: `datasets/golden-traces/v1/MANIFEST.json`,
+`tests/test_power_cut.py`, `tests/test_fs_persistence.py`, and
+`docs/REPRODUCIBILITY.md`.
 
 ## 7. Fault model and bounded responses
 
@@ -474,7 +482,8 @@ limits, trace equality, and fault responses have different oracles and threats.
 A weighted score would hide these distinctions and make a strong dimension
 compensate for an absent one. Reporting dimensions separately allows the artifact
 to support real process and filesystem behavior while stating plainly that
-cross-boot persistence and physical-machine comparison are missing.
+in-process reset, physical-media durability, and physical-machine comparison are
+missing.
 
 The fourth lesson is that normalization is part of the result, not an
 implementation detail. The golden comparison retains only 612 of 23,529 events.
@@ -537,9 +546,9 @@ environment.
 
 **Completeness.** Important absences are part of the result. No experiment proves
 minimality of the adaptation set. The compiler-version/ABI cross-product is
-missing. Full machine-state replay, both-profile trace publication, cross-boot
-persistence, guest fault recovery, arbitrary-host bit identity, and third-party
-reproduction remain open. The system-call count shown in architectural
+missing. Full machine-state replay, both-profile trace publication, in-process
+reset, physical-media durability, guest fault recovery, arbitrary-host bit
+identity, and third-party reproduction remain open. The system-call count shown in architectural
 documentation has not been promoted here to an audited completeness result.
 
 ## 10. Reproducibility boundary
@@ -589,7 +598,8 @@ the adaptation layer, bind strong statements to versioned evidence, retain
 negative results, name oracle layers, and treat normalization and missing data as
 part of the claim. Future work should implement paired RQ1 experiments, a
 dependency-aware RQ2 ablation universe, a broader compiler matrix, complete run
-envelopes, cross-boot persistence, stronger replay, and independent evaluation.
+envelopes, in-process reset, physical-media experiments, stronger replay, and
+independent evaluation.
 
 ## Data availability
 

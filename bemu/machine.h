@@ -55,6 +55,7 @@ struct machine {
     const char *experience;
     const char *script, *expect;
     int script_queued, prompt_count, expect_seen, done;
+    int power_request_seen;
     size_t script_prompts_pending;
     char serial_log[SERIAL_LOG_MAX];
     size_t serial_len;

@@ -49,6 +49,8 @@ void setup_kvm(struct machine *m)
         fail("KVM API version mismatch");
     if (ioctl(kvm, KVM_CHECK_EXTENSION, KVM_CAP_IRQCHIP) <= 0)
         fail("KVM irqchip support is required");
+    if (ioctl(kvm, KVM_CHECK_EXTENSION, KVM_CAP_MP_STATE) <= 0)
+        fail("KVM MP state support is required");
     m->vm = ioctl(kvm, KVM_CREATE_VM, 0);
     if (m->vm < 0) die("KVM_CREATE_VM");
     if (ioctl(m->vm, KVM_SET_TSS_ADDR, 0xfffbd000UL) < 0)

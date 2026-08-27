@@ -15,7 +15,7 @@ contracts; there is no third transitional runtime mode.
 | Date source | 1991-09-17 00:00:00 UTC boot epoch | Host UTC snapshot at boot |
 | Memory ceiling | Fixed 8 MiB | Fixed 8 MiB |
 | Shell | Small grammar and bounded interaction aids | Same grammar plus narrative commands |
-| Filesystem | Real Minix v1 operations; cross-boot persistence incomplete | Same |
+| Filesystem | Real Minix v1 operations and orderly cross-process persistence | Same |
 | Output style | Period Unix messages | Vesica Piscis MOTD and modern glyphs |
 | Input | Raw scancodes, no host paste | Same |
 | Network | None | None |
@@ -85,8 +85,8 @@ The following must remain true regardless of mode:
 - Pipes and redirection are handled by the kernel.
 - `man` reads shared internal Unix manual pages from the real Minix v1 image.
 - `ps aux` shows a bounded snapshot of real scheduler task slots.
-- `sync` uses the real Linux 0.01 filesystem path; the current IDE completion
-  limitation can still block it before cross-boot persistence is established.
+- `sync` uses the real Linux 0.01 filesystem path; an orderly terminal halt
+  flushes a disposable image before a fresh bEMU/KVM/RAM instance reads it.
 
 `make test-experiences` runs complete, bounded sessions in both profiles. Each
 command has unique transcript boundaries and independently proves identity,
@@ -133,21 +133,21 @@ The following are considered regressions in either mode:
 
 ## Current gaps
 
-- Cross-boot persistence is blocked by incomplete IDE write-completion IRQ
-  delivery in bEMU; `sync()` can still block.
 - `mount` reports the configured root mount because Linux 0.01 has no live
   mount-table interface; `ps` exposes at most 16 task slots.
-- Guest halt/reset requests do not yet terminate or restart the bEMU host
-  process, and they remain downstream of the blocking `sync()` path.
+- A guest terminal halt now ends the current bEMU process, but the keyboard
+  controller reset request does not restart the VM in-process.
+- Persistence evidence covers bEMU's `MAP_SHARED` virtual medium after orderly
+  `sync`; it does not establish controller-cache or physical-media durability.
 - Bounded history, completion, editing and ANSI colors remain shared interaction
   aids; they do not add kernel or distribution capabilities.
 
-## Remaining fidelity gate
+## Fidelity gate
 
-The experience modes are implemented, but full fidelity still requires:
+The implemented experience gate requires:
 
 1. Boot to shell in both modes.
-2. Create, read, write and delete a file, then reboot and verify.
+2. Create and sync a file, halt, then read its exact bytes in a fresh process.
 3. Run `/bin/hello` as a real external process.
 4. Use a pipe between two real programs.
 5. Verify `ps aux` matches scheduler state.

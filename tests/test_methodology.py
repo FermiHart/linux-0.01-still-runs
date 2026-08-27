@@ -33,6 +33,7 @@ REQUIRED_PATHS = (
     "tests/test_experience.py",
     "tests/compare_trace.py",
     "tests/test_power_cut.py",
+    "tests/test_fs_persistence.py",
     "scripts/verify-reproducibility.sh",
     "datasets/patches/MANIFEST.json",
     "datasets/patches/file_deltas.csv",
@@ -86,6 +87,7 @@ REQUIRED_SECTION_ANCHORS = {
         "one conversion per controlled profile/input",
         "one golden-versus-replay comparison",
         "two repeats per profile/scenario",
+        "one two-process lifecycle per profile",
         "each of eight scenarios for each profile runs twice",
         "Sanitized versus optimized execution is a configuration comparison, not a repeat",
         "not complete machine state",
@@ -119,7 +121,7 @@ EXPECTED_RQ_TARGETS = {
     "RQ4 - Behavioral fidelity":
         {"test-experiences", "test-fs-inspect", "test-trace-workflow", "fault-test"},
     "RQ5 - Reproducibility layers":
-        {"verify-reproducible", "test-rtc", "compare-trace", "fault-test"},
+        {"verify-reproducible", "test-rtc", "compare-trace", "fault-test", "test-fs-persistence"},
 }
 
 FORBIDDEN_CLAIMS = (

@@ -318,13 +318,16 @@ workflow.
 
 **Audit**: the shell no longer maintains a private VFS. File creation, reads,
 writes, links, moves via link/copy/unlink, and directories use Linux 0.01 syscalls against the
-mounted Minix v1 image. Cross-boot durability is still limited because bEMU does
-not yet complete the IDE interrupt path required by `sync()`.
+mounted Minix v1 image. In both profiles, an orderly `sync` and terminal halt
+persist exact file bytes for a second bEMU process with fresh KVM and RAM state.
 
-**Status**: CORRECTED / QUALIFIED.
+**Status**: PROVEN for bEMU's orderly virtual-medium lifecycle; QUALIFIED for
+physical durability and in-process reset.
 
 **Evidence**: `tests/test_shell.py` and the filesystem tests exercise the real
-kernel paths; `docs/FS-LIMITATIONS.md` records the remaining reboot limitation.
+kernel paths. `tests/test_fs_persistence.py` checks guest-driven cleanup, changed
+copy and unchanged canonical hashes, exact independent-inspector bytes, clean
+`fsck.minix`, and a fresh-process read in `alive` and `1991`.
 
 ### "Pipes and redirection are handled by the kernel"
 

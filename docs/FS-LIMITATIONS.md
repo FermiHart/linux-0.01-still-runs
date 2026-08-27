@@ -13,28 +13,39 @@ This document records the current state of real filesystem operations in
 These are covered by `make test-fs-write`, `make test-fs-mkdir` and
 `make test-fs-link`.
 
+## Orderly cross-process persistence
+
+`make test-fs-persistence` now proves the guest filesystem lifecycle in both
+`alive` and `1991` profiles. For each profile the harness:
+
+- hashes a canonical image and copies it to a temporary directory;
+- creates a file through Linux 0.01, calls the real `sync()` path, emits an
+  unambiguous post-sync marker, and invokes `halt`;
+- requires an explicit guest power request followed by a halted vCPU with
+  interrupts disabled, then normal disk unmap and a zero exit;
+- requires the disposable image hash to change while the canonical hash does not;
+- resolves `/tmp/d01p/proof` and its exact bytes with `minix-inspect --audit`,
+  then checks the extracted partition with util-linux `fsck.minix`;
+- starts a new bEMU process with new KVM and RAM state over the same copy and
+  reads exactly the previously written payload without recreating it.
+
+This is cross-boot persistence at the artifact's process boundary. It is not an
+in-process machine reset: the guest's keyboard-controller reset request is not
+modeled, so `reboot` terminates the current runner rather than recreating the VM.
+
 ## What does not yet work
 
-### Cross-boot persistence
+### Physical-media durability
 
-Guest writes are mapped back to the host `root.img` via `MAP_SHARED` in bEMU,
-and the shell now has a `sync` built-in backed by `lib/sync.c`. However,
-calling `sync()` from userland causes the kernel to block waiting for IDE
-write-completion interrupts that are not yet fully delivered by bEMU.
-
-Therefore:
-
-- `sync` in the shell blocks.
-- `halt`/`reboot` block after flushing.
-- Files created in one boot are not visible in a subsequent boot.
-
-The next bEMU high-level wave (IDE IRQ handling during writes) will resolve
-this.
+The backing file is a `MAP_SHARED` virtual medium. The test proves guest flush,
+normal bEMU cleanup, a changed backing image, independent metadata consistency,
+and a fresh-process read. It does not model controller caches, host page-cache
+loss, platter behavior, flush barriers, or physical power failure.
 
 ### `update` daemon
 
-`/bin/update` is built but not started by `init`. Even if it were started, it
-would block on the same `sync()` issue.
+`/bin/update` is built but not started by `init`; orderly persistence currently
+depends on an explicit `sync`, `halt`, `reboot`, or `exit` path.
 
 ### Full disk / full inode
 
@@ -61,14 +72,8 @@ This is bEMU's virtual-medium contract. `MAP_SHARED` plus test-side `msync` does
 not reproduce controller caches, host page-cache loss, platter behavior or a
 physical power failure. The seam is unavailable to the guest and CLI.
 
-### Multi-boot persistence
+### Abrupt process loss
 
-See the cross-boot persistence note above. Files created in one bEMU run are
-not yet visible in a second run because dirty buffers are not flushed to the
-backing image.
-
-## Workarounds
-
-For testing, all filesystem operations are verified within a single boot using
-a writable copy of `build/root.img`. Cross-boot tests will be enabled once the
-IDE write path is fixed.
+The cross-process gate is intentionally orderly. Killing bEMU before guest
+`sync()` is outside that proof and may leave only the sector prefixes described
+by the deterministic power-cut model above.

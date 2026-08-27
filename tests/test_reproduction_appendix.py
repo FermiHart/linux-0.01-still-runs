@@ -28,6 +28,7 @@ REQUIRED_COMMANDS = (
     "make doctor",
     "SOURCE_DATE_EPOCH=1700000000 make reproducible artifact",
     "make -j8 ci",
+    "make test-fs-persistence",
     "make verify-reproducible",
     "(cd build && sha256sum --check SHA256SUMS)",
 )
@@ -56,7 +57,7 @@ REQUIRED_BOUNDARIES = (
     "make toolchain does not provision hosted multilib",
     "CI removes build/REPRODUCIBLE.sha256",
     "not machine-state replay",
-    "cross-boot persistence remains outside the successful boundary",
+    "Orderly cross-process persistence is proven only",
     "independent third-party reproduction has not yet occurred",
     "no DOI or archival deposit exists yet",
     "estimates, not guarantees",

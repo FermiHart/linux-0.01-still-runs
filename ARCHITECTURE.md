@@ -90,6 +90,12 @@ The keyboard module exposes only a host-test seam for Set-1 error bytes `0x00`
 and `0xff`. Its terminal decoder carries escape state across polling boundaries;
 non-TTY EOF emits a lone Escape key but discards incomplete CSI/SS3 input before
 returning to the idle decoder state.
+The guest power path emits an explicit one-byte intent on private port `0x8900`
+before entering its `cli; hlt` loop. bEMU terminates normally only when that
+request is followed by `KVM_MP_STATE_HALTED` with IF=0; the same CPU state without
+a request, including kernel panic, is an error. HLT with IF=1 remains the normal
+interruptible idle path. The reboot request ends the current process but does not
+reset and recreate the VM in-process.
 BBP corruption tests map a disposable copy of the exact 64 KiB handoff window
 at `0xC0000` and call the production `bbp_linux01_init()` consumer. They repair
 CRC64 after semantic mutations, leave it broken for integrity mutations, and

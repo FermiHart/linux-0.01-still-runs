@@ -4,6 +4,7 @@
 #include <linux/tty.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/bemu.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/system.h>
@@ -153,6 +154,7 @@ int sys_phys(int cmd)
 			good = inb_p(0x64);
 		outb(0xfe,0x64);
 	}
+	outb(cmd == 1 ? BEMU_POWER_REBOOT : BEMU_POWER_HALT, BEMU_POWER_PORT);
 	for (;;)
 		__asm__("hlt");
 }

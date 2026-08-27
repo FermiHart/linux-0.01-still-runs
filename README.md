@@ -208,7 +208,7 @@ Toolchain: `x86_64-elf-gcc` or native GCC with `-Wall -Werror -O2 -std=gnu89 -m3
 | **`linus`** | Alive-only text of the August 1991 post with retrospective epilogue |
 | `hello` | External userland demonstration reached through `$PATH` |
 | `/bin/hello`, `/bin/yes`, `/bin/cat` | External programs executed through `$PATH` or an explicit path |
-| `halt` / `reboot` / `exit` | Issue guest halt/reset requests after sync; host termination/restart is not implemented yet |
+| `halt` / `reboot` / `exit` | Sync and terminate the current bEMU process; `reboot` does not reset/restart the VM in-process |
 
 Tab completion: press `Tab` once to complete, twice to list matches in columns. Line editing: emacs bindings (`Ctrl-A/E/K/U/W/Y`, arrow keys for cursor + history).
 
@@ -245,7 +245,7 @@ explicitly rather than being presented as syntax errors.
 | | |
 |---|---|
 | The supported build/test host is Linux KVM | bEMU requires Linux headers and writable `/dev/kvm`; no fallback backend is claimed |
-| Cross-boot persistence remains blocked by incomplete IDE write-completion IRQ delivery in bEMU | in-session Minix v1 operations are real; `sync()` can still block |
+| Orderly cross-process persistence is scoped to bEMU's virtual medium | `sync` + terminal halt is proven across fresh bEMU/KVM/RAM instances; in-process reset and physical-media durability are not claimed |
 | Shell grammar is intentionally small | no quoting, globbing, job control, command substitution, or modern shell extensions |
 | `/bin/yes | head` may block | Linux 0.01 pipe close/SIGPIPE behavior is no longer hidden by a bounded built-in `yes`; finite external pipelines are tested instead |
 | System views are bounded | `mount` reports the configured root, `ps` exposes at most 16 task slots, and `uptime` starts with the shell because Linux 0.01 has no modern procfs/load-average interface |
