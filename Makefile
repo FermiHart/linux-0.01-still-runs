@@ -213,7 +213,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology test-paper patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain \
         compiler-cases compare-assembly compiler-audit compiler-summary compiler-classify compiler-bugreport compiler-matrix compiler-dataset test-compiler-cases test-compare-assembly test-compiler-audit test-compiler-summary test-compiler-classification test-compiler-bugreport test-compiler-matrix test-compiler-dataset test-compiler-case-dataset
 
@@ -522,6 +522,7 @@ test: all
 	@$(MAKE) --no-print-directory test-fault-catalog
 	@$(MAKE) --no-print-directory test-research-questions
 	@$(MAKE) --no-print-directory test-methodology
+	@$(MAKE) --no-print-directory test-paper
 	@$(MAKE) --no-print-directory test-patch-dataset
 	@$(MAKE) --no-print-directory test-golden-trace-dataset
 	@$(MAKE) --no-print-directory test-compiler-case-dataset
@@ -847,6 +848,10 @@ test-research-questions:
 test-methodology:
 	$(call STEP,experimental methodology consistency check)
 	@python3 tests/test_methodology.py
+
+test-paper:
+	$(call STEP,technical paper evidence and integration check)
+	@python3 tests/test_paper.py
 
 patch-dataset:
 	$(call STEP,publishing historical-core patch dataset)
@@ -1359,6 +1364,7 @@ help:
 	@printf '    $(CWH)test-fault-catalog$(CR) validate fault catalog references\n'
 	@printf '    $(CWH)test-research-questions$(CR) validate research scopes and evidence\n'
 	@printf '    $(CWH)test-methodology$(CR) validate experimental methodology\n'
+	@printf '    $(CWH)test-paper$(CR)      validate the technical paper and evidence links\n'
 	@printf '    $(CWH)patch-dataset$(CR)  regenerate the published patch dataset\n'
 	@printf '    $(CWH)test-patch-dataset$(CR) validate the published patch dataset\n'
 	@printf '    $(CWH)test-golden-trace-dataset$(CR) validate published golden traces\n'

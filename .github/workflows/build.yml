@@ -53,6 +53,9 @@ jobs:
       - name: Test experimental methodology
         run: python3 tests/test_methodology.py
 
+      - name: Test technical paper
+        run: make test-paper
+
       - name: Test historical-core patch dataset
         run: python3 tests/test_patch_dataset.py
 

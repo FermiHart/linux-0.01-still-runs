@@ -4,6 +4,7 @@ This document defines how the questions in `docs/RESEARCH-QUESTIONS.md` are to
 be investigated and how current evidence may be reported. It distinguishes the
 procedures already encoded in the repository from incomplete or future designs.
 It does not convert a regression suite into evidence that was never retained.
+The resulting RQ1-RQ5 evidence synthesis is published in `docs/PAPER.md`.
 
 ## Status vocabulary
 

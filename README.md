@@ -27,7 +27,7 @@ Not works in the sense of a museum exhibit under rope and velvet. Works in the s
 
 He was wrong about the scale. But he was right about the spirit.
 
-This project exists to keep that spirit running. **Not frozen behind a glass pane. Running.** The historical Linux 0.01 core — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is the thinnest possible bridge between that world and this one: a firmware-free KVM runner with emulated legacy devices, a toolchain that speaks 2026 C while respecting 1991 conventions, and documented runtime patches that make the thing boot without hiding its changed assumptions.
+This project exists to keep that spirit running. **Not frozen behind a glass pane. Running.** The historical Linux 0.01 core — every `sched.c`, every `buffer.c`, every hand-tuned assembly routine — is still here, still recognizable, still the heart of the machine. What we added is a deliberately bounded bridge between that world and this one: a firmware-free KVM runner with emulated legacy devices, a toolchain that speaks 2026 C while respecting 1991 conventions, and documented runtime patches that make the thing boot without hiding its changed assumptions. The current evidence proves one sufficient bridge configuration, not a minimum one.
 
 **Welcome to 1991. It still runs in 2026.**
 
@@ -156,12 +156,17 @@ The five academic questions and their operational evidence boundaries are in
 [docs/RESEARCH-QUESTIONS.md](docs/RESEARCH-QUESTIONS.md).
 The experimental controls, repetition counts, oracle classes, retention policy,
 and analysis rules are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
+The complete technical paper, including results and threats to validity for all
+five questions, is [docs/PAPER.md](docs/PAPER.md).
 The versioned historical-core patch, per-path hashes, stable adaptation IDs,
 ledger joins, and explicit evidence gaps are in
 [datasets/patches/](datasets/patches/).
 The inherited console and machine golden traces, exact event schema, comparison
 policy, checksums, and missing capture identities are in
 [datasets/golden-traces/v1/](datasets/golden-traces/v1/).
+The versioned 18-cell reduced compiler reference run, retained binaries and
+assembly, environment identities, and tri-state classifications are in
+[datasets/compiler-cases/v1/](datasets/compiler-cases/v1/).
 
 Quick targeted shell test (≈ 30s per run):
 

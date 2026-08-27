@@ -83,3 +83,5 @@ The bounded RQ4/RQ5 golden observations and their normalization policy are
 published in `datasets/golden-traces/v1/`.
 The bounded RQ3 reduced-case observations, toolchain/ABI identities and
 tri-state classifications are published in `datasets/compiler-cases/v1/`.
+The complete evidence synthesis, results, discussion and threats to validity are
+published in `docs/PAPER.md`.

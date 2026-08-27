@@ -22,7 +22,7 @@ printf 'Checking required documentation...\n'
 for doc in MISSION.md EXPERIENCE.md docs/AUDIT-STATEMENTS.md \
            docs/ADRS.md docs/RISKS.md docs/PORTING_LEDGER.md \
            docs/TOOLCHAIN.md docs/CONTAINER.md docs/REPRODUCIBILITY.md \
-           docs/SBOM.md; do
+           docs/SBOM.md docs/PAPER.md; do
     if [ -f "${doc}" ]; then
         printf '  OK: %s\n' "${doc}"
     else

@@ -3,8 +3,9 @@
 This document turns the five questions in `MISSION.md` into bounded research
 questions that can be answered with the artifact. It defines observations and
 decision criteria, not conclusions. The implemented, partial, and proposed
-procedures are consolidated in `docs/METHODOLOGY.md`; later delivery waves will
-publish the datasets and paper.
+procedures are consolidated in `docs/METHODOLOGY.md`. The three bounded datasets
+and the complete technical article are now published; results and threats to
+validity are in `docs/PAPER.md`.
 
 The supported environment is Linux/x86-64/KVM with the reference toolchain
 versions in `docs/TOOLCHAIN.md`. The host kernel, CPU/KVM identity, and other
@@ -76,5 +77,6 @@ Three boundaries apply to every question:
 retention, and analysis procedures for these questions. Wave 108 publishes the
 bounded patch and incompatibility dataset in `datasets/patches/`; Wave 109
 publishes bounded inherited traces in `datasets/golden-traces/v1/`, and Wave 110
-publishes compiler-case evidence. Questions may be refined only by preserving
+publishes compiler-case evidence. Wave 111 synthesizes the bounded results in
+`docs/PAPER.md`. Questions may be refined only by preserving
 their IDs, recording the reason, and updating this document's validation gate.
