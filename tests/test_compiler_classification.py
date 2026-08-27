@@ -41,10 +41,12 @@ def main():
         assert case in classification["cases"], f"missing classification for {case}"
         meta = classification["cases"][case]
         assert "category" in meta
-        assert "gcc_bug" in meta
-        assert "source_ub" in meta
+        assert "gcc_bug_status" in meta
+        assert "source_contract_status" in meta
         assert "rationale" in meta
         assert meta["category"] in VALID_CATEGORIES
+        assert not isinstance(meta["gcc_bug_status"], bool)
+        assert not isinstance(meta["source_contract_status"], bool)
 
     print("compiler-case classification valid")
     return 0

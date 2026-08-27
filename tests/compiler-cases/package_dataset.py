@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Package the compiler-case investigation as an academic dataset.
+Package a transient legacy bundle of the compiler-case investigation.
 
 The dataset includes:
   * the three minimal reproduction sources (C files)
@@ -8,8 +8,8 @@ The dataset includes:
   * the generated report, audit log, classification, matrix and assembly diffs
   * a manifest and SHA-256 checksums
 
-The output directory is build/compiler-dataset/ and is suitable for archival or
-release (e.g. as part of the artifact package or Zenodo deposit).
+The output directory is build/compiler-dataset/. It is not the versioned Wave
+110 publication; see datasets/compiler-cases/v1/ for archival evidence.
 """
 
 import hashlib

@@ -118,21 +118,29 @@ the declared universe.
 
 ## RQ3 - Compiler experiments
 
-**Current status: `PARTIAL`.** The selected-compiler harness in
-`tests/compiler-cases/Makefile` contains 18 cells: three reductions, two ABIs,
-and `-O0`/`-O1`/`-O2`. `make compiler-cases` compiles and runs each cell once;
-`make compare-assembly` writes extracted assembly/diffs; and
-`make compiler-audit` runs diagnostic and sanitizer variants. Separately,
-`make compiler-matrix` discovers compiler command names and runs nine x86-64
-cells per name. These experiments are not a compiler-version/ABI cross-product.
+**Current status: `PARTIAL`.** The versioned dataset in
+`datasets/compiler-cases/v1/` retains 18 published cells: three reductions, two
+hosted GNU/Linux ABIs, and `-O0`/`-O1`/`-O2`, each run once with one identified
+GCC 13.3.0 executable. Seventeen pass; only the x86-64 `bitmap_inline_asm -O2`
+cell fails. Its identity and cells are in
+`datasets/compiler-cases/v1/MANIFEST.json`,
+`datasets/compiler-cases/v1/observations.jsonl`, and
+`datasets/compiler-cases/v1/classifications.json`. The live harness in
+`tests/compiler-cases/Makefile` supplies `make compiler-cases`, `make compare-assembly`, and
+`make compiler-audit` remain transient investigation targets. Separately,
+`make compiler-matrix` discovers command names and runs nine x86-64 cells per
+name. These experiments are not a compiler-version/ABI cross-product.
 
 The observation unit is one compiler identity, reduction, ABI, optimization,
-and instrumentation condition. Compile status, runtime status/output, exact
-compiler identity, full command, executable hash, assembly, diagnostics, and
-sanitizer output should be retained. Current generated files are ignored, cell
-runs have no identical repetitions, compiler aliases are not deduplicated, and
-the generated classification does not consume every assembly/audit/matrix
-artifact.
+and instrumentation condition. The published reference grid retains normalized
+full argv, compile and runtime status/output, compiler/ABI/tool identities,
+executable hashes and payloads, and full compiler-generated assembly. The sole
+assembly normalization replaces the ephemeral extracted-sysroot prefix with
+`${MULTILIB_ROOT}` in comments and removes trailing horizontal whitespace. It has
+zero identical repetitions and does not retain the separate diagnostic,
+sanitizer, extracted-diff, or compiler-name matrix runs. Those generated files
+remain ignored, compiler aliases are not deduplicated there, and those transient
+artifacts are not inputs to the published classifications.
 
 Attribution requires a reproduced behavior difference, a relevant generated
 code/dataflow difference, and a language or GNU inline-assembly contract
@@ -140,10 +148,10 @@ analysis. Sanitized and unsanitized cells remain separate because instrumentatio
 can change manifestation. Without those links, report ABI-sensitive
 manifestation or historical hypothesis, never an inferred GCC bug.
 
-`PROPOSED`: execute unique compiler binary/hash x reduction x ABI x optimization,
-retain each isolated cell and repeated outcome, and derive the result table from
-the evidence rather than fixed narrative categories. Publication of that
-dataset remains Wave 110, outside Waves 108-109.
+`PROPOSED`: expand beyond the one published compiler identity into a predeclared
+unique compiler binary/hash x reduction x ABI x optimization cross-product,
+retain repeated outcomes and diagnostic/sanitizer conditions separately, and
+derive any broader attribution only from those added observations.
 
 ## RQ4 - Behavioral fidelity
 
@@ -230,8 +238,9 @@ underlying mechanism without focused trace or independent evidence.
 ## Evidence retention
 
 Currently versioned evidence includes source, tests, specifications, golden
-traces, fault catalog, compiler reductions, interpretive classifications, the
-Wave 108 source-delta dataset and the Wave 109 inherited trace dataset. The
+traces, fault catalog, the Wave 108 source-delta dataset, the Wave 109 inherited
+trace dataset, and the Wave 110 compiler-case dataset with 18 newly retained
+hosted observations. The
 patch dataset records zero paired RQ1 observations and zero RQ2 ablation
 configurations. The trace dataset records incomplete capture identities and two
 separate legacy runs rather than a new controlled repetition.
@@ -240,12 +249,10 @@ traces, power-cut hashes, sanitizer logs, and double-build artifacts are usually
 overwritten or deleted.
 
 `PROPOSED`: the common run envelope retains immutable raw and normalized outputs
-plus manifests. Publication waves then curate stable subsets without rewriting
-the raw record: Wave 108 publishes bounded patch/incompatibility data, Wave 109
-publishes bounded inherited golden traces, and Wave 110 publishes compiler-case data.
-Waves 108-110 must distinguish newly retained observations from historical
-summaries that lack raw logs. The common run envelope is therefore `PROPOSED`,
-not implemented.
+plus manifests. Waves 108-110 now curate stable bounded subsets, but only Wave
+110 contains newly executed cells; the patch dataset has no paired experiment
+logs and the traces are inherited. The common run envelope is therefore
+`PROPOSED`, not implemented across the research program.
 
 ## Analysis and reporting rules
 
@@ -275,8 +282,9 @@ not implemented.
   generalize to arbitrary hardware or toolchains.
 - **Conclusion:** most cells have one execution, so stability beyond fixed
   vectors is unmeasured; deterministic matrices do not justify probabilities.
-- **Reproducibility:** environment identity and raw outputs are not yet retained
-  as one immutable run bundle.
+- **Reproducibility:** Wave 110 retains one immutable compiler reference run,
+  but the common environment envelope and most other raw outputs are not yet
+  retained as immutable run bundles.
 - **Completeness:** RQ2 ablation, the compiler cross-product, cross-boot
   persistence, complete machine replay, and third-party reproduction remain
   absent and must be reported as such.

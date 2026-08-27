@@ -214,7 +214,8 @@ endef
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
         test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
-        bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
+        bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain \
+        compiler-cases compare-assembly compiler-audit compiler-summary compiler-classify compiler-bugreport compiler-matrix compiler-dataset test-compiler-cases test-compare-assembly test-compiler-audit test-compiler-summary test-compiler-classification test-compiler-bugreport test-compiler-matrix test-compiler-dataset test-compiler-case-dataset
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              MAIN BUILD                                  ║
@@ -249,13 +250,11 @@ fs/buffer.o: fs/buffer.c
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 compiler-shield]$(CR)\n' "$<" "$@"
 	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
 
-# fs/bitmap.c: -O1 workaround.  The inline-asm bit-operation macros in this
-# file lack a "memory" clobber, which is undefined behavior in the GCC
-# inline-asm contract.  The isolated reproduction in
-# tests/compiler-cases/bitmap_inline_asm.c fails at -O2 on x86_64 because the
-# compiler keeps the bitmap word in a register across set_bit.  Keeping this
-# object at -O1 avoids the observable failure in the full kernel.
-# See tests/compiler-cases/CLASSIFICATION.md.  Waves 075-083.
+# fs/bitmap.c: -O1 workaround.  Its inline asm declares the modified bitmap as
+# an input-only memory operand, violating the GCC extended-asm contract.  The
+# isolated hosted reduction fails at x86_64 -O2 because a stale preloaded value
+# is reused.  That observation does not prove that -O1 is necessary in the
+# freestanding kernel.  See datasets/compiler-cases/v1/.  Waves 075-083, 110.
 fs/bitmap.o: fs/bitmap.c
 	@printf '  $(CGY)cc  $(CR) $(CWH)%-40s$(CR) $(CGY)→$(CR) %s $(CGY)[-O1 asm-memory-shield]$(CR)\n' "$<" "$@"
 	@$(CC) $(filter-out -O2,$(CFLAGS)) -O1 $(DEPFLAGS) -c -o "$@" "$<"
@@ -525,6 +524,7 @@ test: all
 	@$(MAKE) --no-print-directory test-methodology
 	@$(MAKE) --no-print-directory test-patch-dataset
 	@$(MAKE) --no-print-directory test-golden-trace-dataset
+	@$(MAKE) --no-print-directory test-compiler-case-dataset
 	@python3 tests/test_fault_test.py --make "$(MAKE_COMMAND)"
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
@@ -539,7 +539,6 @@ test: all
 	@python3 tests/test_compiler_classification.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compiler_bugreport.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_compiler_matrix.py --make "$(MAKE_COMMAND)"
-	@python3 tests/test_compiler_dataset.py --make "$(MAKE_COMMAND)"
 	@python3 tests/test_trace_io.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 30
 	@python3 tests/test_trace_input.py --bemu $(BUILD)/bemu-linux01 \
@@ -782,8 +781,14 @@ compiler-matrix:
 	@$(MAKE) -C tests/compiler-cases matrix
 
 compiler-dataset:
-	$(call STEP,package compiler cases as academic dataset)
-	@$(MAKE) -C tests/compiler-cases package-dataset
+	$(call STEP,build compiler-case dataset candidate)
+	@if [ -z "$(MULTILIB_PACKAGES)" ]; then \
+	  printf 'set MULTILIB_PACKAGES to the directory containing the five package archives\n' >&2; \
+	  exit 1; \
+	fi
+	@python3 scripts/build-compiler-case-dataset.py \
+	  --compiler "$${COMPILER_DATASET_CC:-/usr/bin/gcc-13}" \
+	  --multilib-packages "$(MULTILIB_PACKAGES)"
 
 test-compiler-cases:
 	$(call STEP,compiler case harness check)
@@ -813,9 +818,11 @@ test-compiler-matrix:
 	$(call STEP,compiler matrix check)
 	@python3 tests/test_compiler_matrix.py --make "$(MAKE_COMMAND)"
 
-test-compiler-dataset:
-	$(call STEP,compiler dataset package check)
-	@python3 tests/test_compiler_dataset.py --make "$(MAKE_COMMAND)"
+test-compiler-case-dataset:
+	$(call STEP,published compiler-case dataset check)
+	@python3 tests/test_compiler_case_dataset.py
+
+test-compiler-dataset: test-compiler-case-dataset
 
 test-bemu-devices: $(BUILD)/test-bemu-devices $(BUILD)/test-ide-faults $(BUILD)/test-irq-faults $(BUILD)/test-keyboard-faults $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-rtc $(BUILD)/test-trace-clock $(BUILD)/test-trace-producer
 	$(call STAGE,9/10,running bEMU device unit tests)
@@ -1355,6 +1362,8 @@ help:
 	@printf '    $(CWH)patch-dataset$(CR)  regenerate the published patch dataset\n'
 	@printf '    $(CWH)test-patch-dataset$(CR) validate the published patch dataset\n'
 	@printf '    $(CWH)test-golden-trace-dataset$(CR) validate published golden traces\n'
+	@printf '    $(CWH)compiler-dataset$(CR) build a compiler dataset candidate under build/\n'
+	@printf '    $(CWH)test-compiler-case-dataset$(CR) validate published compiler cases\n'
 	@printf '    $(CWH)fault-test$(CR)     run all deterministic fault scenarios\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'

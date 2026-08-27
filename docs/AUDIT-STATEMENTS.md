@@ -67,12 +67,12 @@ refer to `tests/compiler-cases/` for the investigation outcome.
 
 **Audit**: the isolated reproduction `tests/compiler-cases/bitmap_inline_asm.c`
 fails at `-O2` on x86_64.  The root cause is the inline-asm macros in
-`fs/bitmap.c` (`set_bit`, `clear_bit`, `find_first_zero`) that modify memory
-without declaring a `"memory"` clobber.  GCC is therefore permitted to keep the
-bitmap word in a register across the asm block, making the write invisible to a
-subsequent read.  This is undefined behavior in the GCC inline-asm contract, not
-a compiler bug.  The case is classified as **UNDEFINED_BEHAVIOR** in
-`tests/compiler-cases/CLASSIFICATION.md`.
+`fs/bitmap.c` (`set_bit`, `clear_bit`, `find_first_zero`) that modify a memory
+operand declared input-only. GCC may therefore reuse a preloaded bitmap value
+after the asm block. This supports a source-contract violation in the hosted
+reduction, not a compiler bug or a proof about the freestanding kernel's need
+for `-O1`. The 18 retained cells and classification are published in
+`datasets/compiler-cases/v1/`.
 
 **Status**: CORRECTED → Waves 075–083 completed.
 

@@ -21,18 +21,19 @@ hypothesis.
 ## bitmap_inline_asm
 
 * **Original source:** `fs/bitmap.c` `set_bit` / `clear_bit` / `find_first_zero`.
-* **Historical pattern:** Inline-asm macros that modify memory but do not
-  declare a `"memory"` clobber.
+* **Historical pattern:** Inline-asm macros that modify memory through an
+  operand declared input-only rather than read-write.
 * **Reproduced on GCC 13.3?** Yes. The isolated case fails at `-O2` on
   `x86_64` while passing at `-O0`, `-O1` and on `i386`.
 * **Audit findings:** UBSan does not flag the failure, because the issue is a
   violation of the inline-asm contract rather than a dynamic UB event.
 * **Classification:** **UNDEFINED_BEHAVIOR (source contract violation)**
-* **Rationale:** GCC is permitted to assume that an `asm` statement without a
-  memory clobber does not modify memory. At `-O2` it keeps the bitmap word in a
-  register across `set_bit`, so the subsequent memory read observes the old
-  value. Adding `"memory"` to the clobber list (or using proper atomic
-  built-ins) would fix the source. This is not a GCC bug.
+* **Rationale:** The `"m"` operand tells GCC that the asm reads memory but not
+  that it writes it. At `-O2` GCC keeps a preloaded bitmap word in a register, so
+  the subsequent C read observes the old value. A read-write memory operand,
+  suitable clobber, or proper atomic built-in would express the side effect.
+  This supports a source-contract violation in the hosted reduction, not a GCC
+  bug or proof that `-O1` is necessary in the freestanding kernel.
 
 ## vsprintf_percent_s
 
@@ -54,3 +55,7 @@ hypothesis.
 | `buffer_freelist` | HISTORICAL_HYPOTHESIS | unproven | no evidence |
 | `bitmap_inline_asm` | UNDEFINED_BEHAVIOR | no | yes (asm contract) |
 | `vsprintf_percent_s` | HISTORICAL_HYPOTHESIS | unproven | no evidence |
+
+The versioned observations and tri-state machine classifications are published
+in `datasets/compiler-cases/v1/`. Boolean `false` is not used for propositions
+that the retained run merely fails to establish.

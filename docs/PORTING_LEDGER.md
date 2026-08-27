@@ -99,7 +99,7 @@ purpose. The complete path-level delta, including unmatched ledger joins, is in
   currently not reproduced. The `-O1` workaround is retained as a defensive
   shield.
 - **Test**: `tests/test_shell.py` creates files repeatedly without panic;
-  `tests/compiler-cases/buffer_freelist.c` documents the isolated pattern.
+  `datasets/compiler-cases/v1/` retains six passing hosted reduction cells.
 - **Status**: QUALIFIED → see `tests/compiler-cases/CLASSIFICATION.md`
 
 ### Bitmap `-O1` workaround
@@ -108,12 +108,12 @@ purpose. The complete path-level delta, including unmatched ledger joins, is in
 - **Files**: `fs/bitmap.c`, `Makefile`
 - **Category**: UndefinedBehavior (inline-asm contract)
 - **Evidence**: The `set_bit`/`clear_bit`/`find_first_zero` macros use inline asm
-  that modifies memory without a `"memory"` clobber. The isolated reproduction
-  `tests/compiler-cases/bitmap_inline_asm.c` fails at `-O2` on x86_64 because
-  GCC keeps the bitmap word in a register across the asm block. This is a source
-  contract violation, not a compiler bug.
+  that modifies a memory operand declared input-only. The hosted reduction fails
+  at x86-64 `-O2` because a stale preloaded value is reused. This supports a
+  source-contract violation in that cell, not a GCC bug or a necessity claim for
+  the freestanding kernel.
 - **Test**: Filesystem smoke tests pass;
-  `tests/compiler-cases/bitmap_inline_asm.c` reproduces the contract violation.
+  `datasets/compiler-cases/v1/` retains all six reduction cells and assembly.
 - **Status**: CORRECTED → see `tests/compiler-cases/CLASSIFICATION.md`
 
 ### `vsprintf` `%s` handling
@@ -126,7 +126,7 @@ purpose. The complete path-level delta, including unmatched ledger joins, is in
   `tests/compiler-cases/vsprintf_percent_s.c` on GCC 13.3. The `-O1` workaround
   is retained as a defensive shield.
 - **Test**: BBP status strings and shell `printk` output contain valid text;
-  `tests/compiler-cases/vsprintf_percent_s.c` documents the isolated pattern.
+  `datasets/compiler-cases/v1/` retains six passing hosted reduction cells.
 - **Status**: QUALIFIED → see `tests/compiler-cases/CLASSIFICATION.md`
 
 ### ATA PIO read helper and port macros

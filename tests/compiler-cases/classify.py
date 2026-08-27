@@ -20,8 +20,8 @@ TEXT_PATH = os.path.join(BUILD_DIR, "classification.txt")
 CLASSIFICATIONS = {
     "buffer_freelist": {
         "category": "HISTORICAL_HYPOTHESIS",
-        "gcc_bug": False,
-        "source_ub": False,
+        "gcc_bug_status": "NOT_ESTABLISHED",
+        "source_contract_status": "NOT_ESTABLISHED",
         "rationale": (
             "Isolated reproduction passes on GCC 13.3 at all optimization levels. "
             "The claimed -O2 miscompilation could not be reproduced; the -O1 workaround "
@@ -30,18 +30,18 @@ CLASSIFICATIONS = {
     },
     "bitmap_inline_asm": {
         "category": "UNDEFINED_BEHAVIOR",
-        "gcc_bug": False,
-        "source_ub": True,
+        "gcc_bug_status": "NOT_SUPPORTED",
+        "source_contract_status": "SUPPORTED_FOR_REDUCED_X86_64_O2_CASE",
         "rationale": (
-            "Inline-asm macros modify memory without a 'memory' clobber. GCC may keep "
-            "the bitmap word in a register across set_bit, so the write is not observed. "
-            "This is a source contract violation, not a compiler bug."
+            "The inline asm modifies an operand declared as input-only. GCC may keep the "
+            "bitmap word in a register across set_bit, so the write is not observed. This "
+            "supports a source contract violation in the reduction, not a compiler bug."
         ),
     },
     "vsprintf_percent_s": {
         "category": "HISTORICAL_HYPOTHESIS",
-        "gcc_bug": False,
-        "source_ub": False,
+        "gcc_bug_status": "NOT_ESTABLISHED",
+        "source_contract_status": "NOT_ESTABLISHED",
         "rationale": (
             "Isolated reproduction passes on GCC 13.3 at all optimization levels. "
             "The va_arg(args, char*) fetch for %s behaves correctly in isolation; "
@@ -71,8 +71,8 @@ def main():
     for case, meta in CLASSIFICATIONS.items():
         classification["cases"][case] = {
             "category": meta["category"],
-            "gcc_bug": meta["gcc_bug"],
-            "source_ub": meta["source_ub"],
+            "gcc_bug_status": meta["gcc_bug_status"],
+            "source_contract_status": meta["source_contract_status"],
             "rationale": meta["rationale"],
             "results": summary["results"].get(case, {}),
         }
@@ -89,8 +89,8 @@ def main():
         for case, meta in classification["cases"].items():
             f.write(f"--- {case} ---\n")
             f.write(f"Category: {meta['category']}\n")
-            f.write(f"GCC bug: {meta['gcc_bug']}\n")
-            f.write(f"Source UB: {meta['source_ub']}\n")
+            f.write(f"GCC bug status: {meta['gcc_bug_status']}\n")
+            f.write(f"Source contract status: {meta['source_contract_status']}\n")
             f.write(f"Rationale: {meta['rationale']}\n\n")
 
     print(f"classification written to {CLASSIFICATION_PATH} and {TEXT_PATH}")

@@ -26,6 +26,19 @@ SHA-256 of upstream tarball:
 | Sync daemon | `userland/update.asm` | BSD-3-Clause / Unlicense | Calls `sync()` in a loop |
 | VGA 80×50 driver | `kernel/vga_text50.c`, `kernel/vga_font8x8.h` | BSD-3-Clause / Unlicense | Higher-density text mode for the boot experience |
 
+## Research datasets
+
+| Dataset | Location | Contents |
+|---|---|---|
+| Historical-core patches | `datasets/patches/` | Pinned source deltas, adaptation joins and evidence gaps |
+| Golden traces v1 | `datasets/golden-traces/v1/` | Two bounded inherited traces, schema and normalization policy |
+| Reduced compiler cases v1 | `datasets/compiler-cases/v1/` | Three source snapshots, 18 hosted GCC 13.3.0 cells, binaries, assembly, outputs and identities |
+
+The compiler-case executables are retained research observations, not components
+of the bootable guest. Their GCC, binutils, glibc loader/libc and five multilib
+package identities are recorded in `environment.json` inside the dataset. This
+identity record is not a complete archive of every host build input.
+
 ## Modified historical files
 
 All source-path changes to the original Linux 0.01 core are enumerated and

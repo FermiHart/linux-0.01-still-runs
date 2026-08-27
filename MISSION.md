@@ -81,3 +81,5 @@ The RQ1/RQ2 source deltas and bounded historical interpretations are published
 in `datasets/patches/`.
 The bounded RQ4/RQ5 golden observations and their normalization policy are
 published in `datasets/golden-traces/v1/`.
+The bounded RQ3 reduced-case observations, toolchain/ABI identities and
+tri-state classifications are published in `datasets/compiler-cases/v1/`.

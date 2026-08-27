@@ -41,7 +41,11 @@ REQUIRED_EVIDENCE = {
         "docs/PORTING_LEDGER.md",
         "tests/test_boot.py",
     },
-    "RQ3": {"tests/compiler-cases/README.md", "tests/compiler-cases/CLASSIFICATION.md"},
+    "RQ3": {
+        "datasets/compiler-cases/v1/MANIFEST.json",
+        "datasets/compiler-cases/v1/observations.jsonl",
+        "datasets/compiler-cases/v1/classifications.json",
+    },
     "RQ4": {
         "datasets/golden-traces/v1/MANIFEST.json",
         "EXPERIENCE.md",

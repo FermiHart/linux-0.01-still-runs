@@ -7,7 +7,7 @@ works around by compiling specific objects at `-O1`:
 | Case | Original file | Workaround | Pattern |
 |------|---------------|------------|---------|
 | `buffer_freelist` | `fs/buffer.c` | `fs/buffer.o` at `-O1` | Original `getblk()` free-list walk used `do { ... } while (tmp != free_list \|\| (tmp = NULL))`. |
-| `bitmap_inline_asm` | `fs/bitmap.c` | `fs/bitmap.o` at `-O1` | `set_bit`/`clear_bit`/`find_first_zero` inline-asm macros lack a `"memory"` clobber. |
+| `bitmap_inline_asm` | `fs/bitmap.c` | `fs/bitmap.o` at `-O1` | `set_bit`/`clear_bit`/`find_first_zero` declare modified memory as input-only. |
 | `vsprintf_percent_s` | `kernel/vsprintf.c` | `kernel/vsprintf.o` at `-O1` | `va_arg(args, char *)` fetch for `%s` reportedly reads the wrong slot at `-O2`. |
 
 ## Running the harness
@@ -25,9 +25,10 @@ original kernel is an i386 binary.
 ## What the reproductions demonstrate (GCC 13.3, Ubuntu 24.04)
 
 * `bitmap_inline_asm` **fails at `-O2` on x86_64** because the compiler keeps
-  the bitmap word in a register across the inline-asm `set_bit`.  Adding a
-  `"memory"` clobber makes the write visible and the test passes.  This is a
-  textbook undefined-behavior pattern in the inline-asm contract, not a GCC bug.
+  the bitmap word in a register across the inline-asm `set_bit`, whose memory
+  operand is declared input-only. This supports a source-contract violation in
+  the hosted reduction, not a GCC bug or a claim that `-O1` is necessary in the
+  freestanding kernel.
 
 * `buffer_freelist` **passes at all optimization levels** with the current
   minimal reproduction.  The historical symptom may require the full kernel
@@ -58,3 +59,9 @@ All generated artifacts live under `build/` and are not committed:
 * `build/asm/*.asm` — disassembly of the target function.
 * `build/asm/*.diff` — unified diffs between `-O0`, `-O1` and `-O2`.
 * `build/audit.txt` — output of the audit passes.
+
+The bounded Wave 110 reference run is separately versioned in
+`datasets/compiler-cases/v1/`. It retains all 18 hosted cells, compiler and ABI
+identities, normalized argv, stdout/stderr, binaries, full assembly and
+evidence-linked classifications. The generated files above remain transient and
+are not cited as published evidence.

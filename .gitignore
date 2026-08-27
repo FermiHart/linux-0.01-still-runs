@@ -5,6 +5,8 @@ release/
 *.d
 *.a
 *.bin
+!datasets/compiler-cases/v1/binaries/
+!datasets/compiler-cases/v1/binaries/*.bin
 *.elf
 *.iso
 __pycache__/

@@ -45,10 +45,10 @@ Three boundaries apply to every question:
 - **Question:** How do compiler version, target ABI, and optimization level affect the reduced GNU89-era cases?
 - **Scope:** Study the three committed reductions across `-O0`/`-O1`/`-O2`; the dual-ABI harness compares x86-64/i386 for one selected compiler, while the available compiler-version matrix currently covers x86-64 only.
 - **Run:** `make compiler-cases`, `make compare-assembly`, `make compiler-audit`, `make compiler-matrix`
-- **Evidence:** `tests/compiler-cases/README.md`, `tests/compiler-cases/CLASSIFICATION.md`, `tests/compiler-cases/Makefile`, `docs/AUDIT-STATEMENTS.md`
+- **Evidence:** `datasets/compiler-cases/v1/MANIFEST.json`, `datasets/compiler-cases/v1/observations.jsonl`, `datasets/compiler-cases/v1/classifications.json`, `tests/compiler-cases/Makefile`, `docs/AUDIT-STATEMENTS.md`
 - **Measures:** Record compile status, runtime exit/output, compiler identity, ABI, optimization level, sanitizer/diagnostic output, extracted function assembly, and pairwise assembly differences for each experimental cell.
 - **Answer criterion:** Attribute a failure only when the reduced case reproduces, the relevant generated-code difference is identified, and language or inline-assembly rules support the classification; otherwise retain it as a bounded historical hypothesis rather than a compiler bug.
-- **Limits:** Linux 0.01 uses C89-era GNU extensions, not pre-standard C; there is no full compiler-version/ABI cross-product, generated raw reports are not yet a published dataset, and behavior on one ABI/compiler does not establish causality or necessity for the i386 kernel build.
+- **Limits:** Linux 0.01 uses C89-era GNU extensions, not pre-standard C; the published 18-cell run has one compiler identity, hosted process ABIs rather than the freestanding kernel ABI, and no repeated cells or diagnostic/sanitizer observations; there is no full compiler-version/ABI cross-product, and behavior in this grid does not establish necessity for the i386 kernel build.
 
 ## RQ4 - Behavioral fidelity measurement
 

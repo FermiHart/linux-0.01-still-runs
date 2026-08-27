@@ -51,13 +51,13 @@ against historical `-O2` sensitivity:
 - `fs/bitmap.c`
 - `kernel/vsprintf.c`
 
-The investigation in `tests/compiler-cases/` (Waves 075–083) found that
-`fs/bitmap.c` contains inline-asm macros that modify memory without a `"memory"`
-clobber, which is undefined behavior in the GCC contract and explains the `-O2`
-failure on x86_64. The `-O2` symptoms originally attributed to
-`fs/buffer.c` and `kernel/vsprintf.c` could not be reproduced in isolation on
-GCC 13.3 and are recorded as historical hypotheses. See
-`tests/compiler-cases/CLASSIFICATION.md` and `docs/AUDIT-STATEMENTS.md`.
+The investigation in `tests/compiler-cases/` found that the `fs/bitmap.c`
+inline asm declares modified memory as input-only. The hosted reduction fails at
+x86-64 `-O2`, supporting a source-contract violation in that reduced cell. The
+`fs/buffer.c` and `kernel/vsprintf.c` symptoms could not be reproduced in the
+retained GCC 13.3.0 grid and remain historical hypotheses. The exact 18-cell
+reference run is in `datasets/compiler-cases/v1/`; it is not a freestanding
+kernel run and does not prove that the overrides are necessary or minimal.
 
 ## Container lock
 

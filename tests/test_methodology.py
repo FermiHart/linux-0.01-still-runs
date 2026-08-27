@@ -39,6 +39,9 @@ REQUIRED_PATHS = (
     "datasets/patches/adaptations.csv",
     "datasets/golden-traces/v1/MANIFEST.json",
     "datasets/golden-traces/v1/alive-boot-machine.jsonl",
+    "datasets/compiler-cases/v1/MANIFEST.json",
+    "datasets/compiler-cases/v1/observations.jsonl",
+    "datasets/compiler-cases/v1/classifications.json",
 )
 
 REQUIRED_SECTION_ANCHORS = {
@@ -62,10 +65,12 @@ REQUIRED_SECTION_ANCHORS = {
         "No candidate universe, dependency graph, subset generator",
     ),
     "RQ3 - Compiler experiments": (
-        "18 cells",
+        "18 published cells",
+        "one identified GCC 13.3.0 executable",
         "nine x86-64 cells per name",
         "not a compiler-version/ABI cross-product",
-        "Publication of that dataset remains Wave 110",
+        "sole assembly normalization",
+        "zero identical repetitions",
     ),
     "RQ4 - Behavioral fidelity": (
         "Current status: `IMPLEMENTED` as multidimensional conformance",
@@ -97,6 +102,7 @@ REQUIRED_SECTION_ANCHORS = {
         "usually overwritten or deleted",
         "zero paired RQ1 observations and zero RQ2 ablation configurations",
         "incomplete capture identities and two separate legacy runs",
+        "Wave 110 compiler-case dataset with 18 newly retained hosted observations",
         "The common run envelope is therefore `PROPOSED`, not implemented",
         "Waves 108-110",
     ),
