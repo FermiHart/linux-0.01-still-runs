@@ -98,4 +98,7 @@ starts at the host's current UTC time. Linux reads the same CMOS register model
 in both modes and advances time through its PIT-driven `jiffies`; bEMU does not
 forge shell command output.
 
-The source retains the upstream BSD-3-Clause license and provenance header.
+The main source carries the current author's BSD-3-Clause identifier and records
+its adaptation from bEMU-NANO. No public upstream commit/hash is currently
+available, so that ancestry remains author-declared rather than independently
+verified.

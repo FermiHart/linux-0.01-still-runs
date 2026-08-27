@@ -161,6 +161,9 @@ five questions, is [docs/PAPER.md](docs/PAPER.md).
 The clean-clone, one-command artifact procedure, expected outputs, validation
 steps, timing guidance and troubleshooting are in
 [docs/REPRODUCTION.md](docs/REPRODUCTION.md).
+The versioned evaluator checklist, bounded claim-to-command-to-evidence map,
+environment capture protocol, and redistribution notices are in
+[evaluation/v1/](evaluation/v1/).
 The versioned historical-core patch, per-path hashes, stable adaptation IDs,
 ledger joins, and explicit evidence gaps are in
 [datasets/patches/](datasets/patches/).
@@ -256,7 +259,7 @@ explicitly rather than being presented as syntax errors.
 
 The historical kernel remains © 1991 Linus Torvalds under the original Linux
 0.01 distribution terms. Modern files are under the Unlicense unless they
-carry another identifier; bEMU and BBP are BSD-3-Clause. See [LICENSE](LICENSE)
+carry another identifier; identified bEMU/BBP files use BSD-3-Clause. See [LICENSE](LICENSE)
 for the complete notices and the pinned provenance of the public-domain VGA
 font data.
 

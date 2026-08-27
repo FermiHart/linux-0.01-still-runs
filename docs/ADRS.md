@@ -48,7 +48,8 @@ modern code with clear interfaces, tests and static checks.
 compiler versions change behavior, especially for pre-standard C.
 
 **Decision**: Pin toolchain versions, container digest, package versions and
-`SOURCE_DATE_EPOCH`. Provide `make reproducible` that builds twice and compares
+`SOURCE_DATE_EPOCH`. Provide `make reproducible` for one controlled build and
+`make verify-reproducible` to build twice and compare
 artifacts byte for byte.
 
 **Consequences**:

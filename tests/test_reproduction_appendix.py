@@ -30,6 +30,7 @@ REQUIRED_COMMANDS = (
     "make -j8 ci",
     "make test-fs-persistence",
     "make verify-reproducible",
+    "make verify-artifact-reproducible",
     "(cd build && sha256sum --check SHA256SUMS)",
 )
 
@@ -40,7 +41,9 @@ REQUIRED_OUTPUTS = (
     "build/bemu-linux01",
     "build/SHA256SUMS",
     "build/REPRODUCIBLE.sha256",
-    "release/linux-0.01-still-runs-<rev>.tar.gz",
+    "release/linux-0.01-still-runs-evaluator-<commit-prefix>.tar.gz",
+    "release/linux-0.01-still-runs-evaluator-<commit-prefix>.check.py",
+    "release/linux-0.01-still-runs-evaluator-<commit-prefix>.tar.gz.sha256",
 )
 
 REQUIRED_BOUNDARIES = (
@@ -50,10 +53,10 @@ REQUIRED_BOUNDARIES = (
     "no supported fallback backend",
     "one deterministic build",
     "two copied-tree builds",
-    "not a self-contained source package",
-    "embedded manifest is not a bundle manifest",
-    "outer tarball bytes are not claimed reproducible",
-    "transfer-integrity hash",
+    "self-contained evaluator package",
+    "package-wide manifest",
+    "normalized archive metadata",
+    "detached archive checksum",
     "make toolchain does not provision hosted multilib",
     "CI removes build/REPRODUCIBLE.sha256",
     "not machine-state replay",
@@ -129,12 +132,20 @@ def main():
         fail("appendix does not distinguish measured time from timeout ceilings")
 
     troubleshooting = blocks["Troubleshooting"]
-    for symptom in ("Permission denied", "shallow", "static PIE", "-m32", "fsck.minix"):
+    for symptom in ("Permission denied", "shallow", "dynamic PIE", "-m32", "fsck.minix"):
         if symptom not in troubleshooting:
             fail(f"appendix troubleshooting omits {symptom!r}")
 
     makefile = read("Makefile")
-    for target in ("doctor", "reproducible", "artifact", "ci", "verify-reproducible"):
+    for target in (
+        "doctor",
+        "reproducible",
+        "artifact",
+        "artifact-check",
+        "ci",
+        "verify-reproducible",
+        "verify-artifact-reproducible",
+    ):
         if not re.search(rf"^{re.escape(target)}\s*:", makefile, re.MULTILINE):
             fail(f"documented Make target {target!r} is not defined")
 
@@ -157,29 +168,37 @@ def main():
             fail(f"{path} does not expose appendix integration anchor {anchor!r}")
 
     artifact_script = read("scripts/make-artifact.sh")
-    if "docs/" not in artifact_script:
-        fail("the academic tarball does not package the reproduction appendix")
-    packaged_outputs = set(re.findall(r"\bbuild/([A-Za-z0-9_.-]+)", artifact_script))
+    if "archive --format=tar" not in artifact_script:
+        fail("the academic tarball does not export the tracked reproduction appendix")
     required_packaged = {
+        "kernel.elf",
         "kernel.bin",
         "root.img",
         "root-1991.img",
         "bemu-linux01",
-        "SHA256SUMS",
-        "REPRODUCIBLE.sha256",
+        "mkimage",
+        "minix-inspect",
+        "shell.bin",
+        "update.bin",
+        "hello.bin",
+        "yes.bin",
+        "pathcheck.bin",
+        "cat.bin",
     }
-    if not required_packaged <= packaged_outputs:
-        fail(f"artifact script lost required outputs {sorted(required_packaged - packaged_outputs)!r}")
-    for packaged_tree in ("docs/", "datasets/", "LICENSE", "README.md"):
-        if packaged_tree not in artifact_script:
-            fail(f"artifact script lost documented package input {packaged_tree!r}")
-    if "SOURCE_DATE_EPOCH=1700000000 make reproducible artifact" not in artifact_script:
-        fail("artifact failure diagnostic does not name the sufficient recovery command")
+    missing_outputs = {output for output in required_packaged if output not in artifact_script}
+    if missing_outputs:
+        fail(f"artifact script lost required outputs {sorted(missing_outputs)!r}")
+    for packaged_input in ("archive --format=tar", "bundle create", "source/evaluation/v1", "source/LICENSE"):
+        if packaged_input not in artifact_script:
+            fail(f"artifact script lost documented package input {packaged_input!r}")
     tar_is_normalized = all(
         anchor in artifact_script for anchor in ("--sort=name", "--mtime", "--owner", "--group")
     ) and "gzip -n" in artifact_script
-    if not tar_is_normalized and "outer tarball bytes are not claimed reproducible" not in appendix:
-        fail("appendix does not disclose that current tar metadata is not normalized")
+    if not tar_is_normalized:
+        fail("evaluator package tar/gzip metadata is not normalized")
+    for package_control in ("ARTIFACT-IDENTITY.json", "SOURCE-MANIFEST.tsv", ".tar.gz.sha256"):
+        if package_control not in artifact_script:
+            fail(f"artifact script lacks package control {package_control!r}")
 
     if "SOURCE_DATE_EPOCH=1700000000 make reproducible artifact" not in blocks["One-command artifact build"]:
         fail("the primary one-command build is not in its operational section")

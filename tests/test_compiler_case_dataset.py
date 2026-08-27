@@ -369,8 +369,8 @@ def main():
     if "test-compiler-case-dataset:" not in makefile:
         fail("Makefile does not expose the compiler-case dataset gate")
     with open(os.path.join(REPO_ROOT, "scripts", "make-artifact.sh"), encoding="utf-8") as source:
-        if "datasets" not in source.read():
-            fail("artifact packaging does not include the published datasets")
+        if "archive --format=tar" not in source.read():
+            fail("artifact packaging does not export the tracked published datasets")
 
     print("compiler-case dataset valid: 3 cases, 18 observations, 17 PASS, 1 FAIL")
     return 0

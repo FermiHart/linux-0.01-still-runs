@@ -49,12 +49,13 @@ SOURCE_DATE_EPOCH=1700000000 make reproducible
 
 | Artifact | Reference SHA-256 (prefix) |
 |---|---|
-| `build/kernel.elf` | `44c8538c` |
-| `build/kernel.bin` | `9291a46d` |
+| `build/kernel.elf` | `79499f3b` |
+| `build/kernel.bin` | `df45852a` |
 | `build/root.img` | `d9c47086` |
 | `build/root-1991.img` | `4ff943e2` |
-| `build/bemu-linux01` | `a17ea46a` |
+| `build/bemu-linux01` | `358345ec` |
 | `build/mkimage` | `c6f441e5` |
+| `build/minix-inspect` | `c044de95` |
 | `build/shell.bin` | `4296fc4a` |
 | `build/update.bin` | `4a0212fc` |
 | `build/hello.bin` | `7596c6b3` |
@@ -64,6 +65,30 @@ SOURCE_DATE_EPOCH=1700000000 make reproducible
 
 See `build/REPRODUCIBLE.sha256` after running `make reproducible` for the full
 checksums.
+
+## Evaluator package bytes
+
+`SOURCE_DATE_EPOCH=1700000000 make reproducible artifact` builds a package named
+for the first 12 digits of the clean source commit. It exports tracked bytes from
+that commit, includes its reachable history as `repository.bundle`, records the
+full commit/tree and Git blob inventory, covers every non-self-referential file
+with the root `SHA256SUMS`, and emits a detached pre-extraction checker plus a
+checksum manifest covering both checker and archive. The package builder performs
+its own fresh build in a clone of the fixed history bundle rather than trusting
+ignored outputs left in the caller's checkout.
+
+Archive members use lexical order, ustar format, the fixed epoch, uid/gid zero,
+and normalized modes; gzip uses `-n`. Run:
+
+```bash
+make verify-artifact-reproducible
+make artifact-check ARTIFACT=release/linux-0.01-still-runs-evaluator-<commit-prefix>.tar.gz
+```
+
+The first target performs two commit-bound builds and package constructions and
+requires equal archive bytes. The second independently checks transfer hash, safe paths,
+metadata, package-wide inventory, source Git objects, identity, and build hashes.
+This package-byte claim does not erase the cross-host limits below.
 
 ## Known non-determinism
 

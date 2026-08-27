@@ -358,8 +358,8 @@ def main():
     artifact_script = os.path.join(REPO_ROOT, "scripts", "make-artifact.sh")
     with open(artifact_script, encoding="utf-8") as source:
         artifact = source.read()
-    if "docs/" not in artifact or "datasets/" not in artifact:
-        fail("the academic artifact tarball does not package the paper and datasets")
+    if "archive --format=tar" not in artifact or "source/evaluation/v1" not in artifact:
+        fail("the evaluator package does not export tracked evidence and its package guide")
 
     print("technical paper is complete, evidence-linked, and publicly integrated")
     return 0

@@ -59,6 +59,16 @@ jobs:
       - name: Test reproduction appendix
         run: make test-reproduction-appendix
 
+      - name: Test evaluator package contract
+        run: make test-evaluator-package
+
+      - name: Build and validate evaluator package
+        run: |
+          SOURCE_DATE_EPOCH=1700000000 make artifact
+          revision="$(git rev-parse --short=12 HEAD)"
+          package="release/linux-0.01-still-runs-evaluator-${revision}.tar.gz"
+          python3 "${package%.tar.gz}.check.py" --archive "${package}"
+
       - name: Test historical-core patch dataset
         run: python3 tests/test_patch_dataset.py
 
@@ -231,7 +241,7 @@ jobs:
             - `root.img`: Minix v1 root filesystem
             - `kernel.elf`: kernel ELF with debug symbols
             - `kernel.bin`: PA0 kernel payload with a host-side length trailer
-            - `bemu-linux01`: statically linked Linux x86-64 KVM runner
+            - `bemu-linux01`: dynamically linked Linux x86-64 KVM runner
             - `LICENSE`: historical Linux, BSD-3-Clause, and modern-project terms
             - `SHA256SUMS`: release artifact checksums
 

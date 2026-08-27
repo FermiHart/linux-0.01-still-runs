@@ -3,13 +3,13 @@
 ## Scope
 
 This appendix is the shortest operational path from a normal Git clone to the
-current academic tarball and its bounded validation gates. The historical
+current self-contained evaluator package and its bounded validation gates. The historical
 Linux-derived **i386 guest/kernel** executes through KVM on a **Linux/x86-64
 host**. This is **not a port of the kernel to the x86-64 ISA**: bEMU is the
 x86-64 host process, while the guest remains 32-bit i386.
 
 Three commands answer different questions. The one-command build below creates
-the current binary/documentation/data bundle. `make -j8 ci` tests the supported
+the commit-bound source/history/build evaluator package. `make -j8 ci` tests the supported
 behavior. `make verify-reproducible` compares two builds on one host and
 toolchain. None of these commands alone is an external artifact evaluation.
 
@@ -18,7 +18,7 @@ toolchain. None of these commands alone is an external artifact evaluation.
 Use a Linux/x86-64 host with a full Git history and the reference tools in
 `docs/TOOLCHAIN.md`: GCC 13.3.0, Binutils 2.42 (including `readelf`), NASM
 2.16.01, GNU Make 4.3, Python 3.12.3, Bash 5.x, util-linux with `fsck.minix`
-2.39.3, Git, GNU tar, gzip, coreutils (`dd` and `sha256sum`), static libc
+2.39.3, Git, GNU tar, gzip, coreutils (`dd` and `sha256sum`), hosted libc
 development files, and Linux KVM headers. The hosted i386 compiler-case cells
 also need `-m32` multilib headers, startup objects, libraries, and host execution
 support; this is separate from freestanding i386 kernel compilation.
@@ -65,10 +65,10 @@ make doctor
 ```
 
 `make doctor` checks required command-line tools, freestanding i386 compilation,
-hosted i386 compile/link/execute support, static PIE linking, KVM headers, and
+hosted i386 compile/link/execute support, dynamic PIE linking, KVM headers, and
 `/dev/kvm` access. It is not a complete KVM-capability probe, environment capture,
-or substitute for CI. Wave 113 will define an immutable evaluator package and run
-envelope, so this appendix does not invent either.
+or substitute for CI. The package supplies an evaluator-owned environment-capture
+script, but capture does not establish that any test succeeded.
 
 ## Behavioral validation
 
@@ -95,8 +95,8 @@ CI is behavioral validation, not an immutable research-run bundle. Most logs and
 disposable images are not retained, and the hosted GitHub workflow is a selected
 matrix rather than a claim that every runner executes this exact local aggregate.
 The clean phase means **CI removes build/REPRODUCIBLE.sha256** if an earlier
-artifact build created it; for that reason, construct the final bundle only after
-all cleaning gates below.
+root build created it; for that reason, run the final command after cleaning
+gates when those root-level outputs are also being retained.
 
 ## Two-build verification
 
@@ -130,26 +130,29 @@ bounded artifact with one final Make invocation from the repository root:
 SOURCE_DATE_EPOCH=1700000000 make reproducible artifact
 ```
 
-The first goal performs **one deterministic build**, writes
+The first goal performs **one deterministic build** in the root checkout, writes
 `build/SHA256SUMS`, verifies its entries, and copies the manifest to
-`build/REPRODUCIBLE.sha256`. The second goal creates
-`release/linux-0.01-still-runs-<rev>.tar.gz`, where `<rev>` is the short Git
-revision. Goal order matters: `make artifact` alone packages existing outputs and
-does not build or test them.
+`build/REPRODUCIBLE.sha256`. The second goal independently clones the fixed
+commit from its generated Git bundle, rebuilds the selected outputs there, and creates
+`release/linux-0.01-still-runs-evaluator-<commit-prefix>.tar.gz` plus a detached
+checker and archive checksum. The prefix is the first 12 digits of the full
+commit recorded inside. `make artifact` is also safe alone because it always
+performs that fresh commit-bound build; it does not run behavioral tests. It
+rejects a dirty public worktree or shallow history.
 
-The tarball contains four runtime outputs, the two build manifests, the `docs/`
-tree, all three published datasets, `LICENSE`, and `README.md`. The embedded
-`build/SHA256SUMS` covers the complete selected `ARTIFACT_NAMES` set, some of
-which is not packaged; the **embedded manifest is not a bundle manifest**. The result bundle is
-**not a self-contained source package**: source, root-level research documents,
-Makefile, scripts, Dockerfile, and Git history remain in the clone. Preparing a
-self-contained package and package-wide manifest belongs to Wave 113.
+The tarball is a **self-contained evaluator package**: it contains every tracked
+source file exported from the fixed commit, complete reachable history in a Git
+bundle, all selected build outputs, the paper and datasets, a claim/evidence map,
+an evaluator checklist, redistribution notices, and environment-capture tooling.
+`SOURCE-MANIFEST.tsv` binds source paths to Git modes and blob identities.
+The root `SHA256SUMS` is the **package-wide manifest** covering every regular
+member except itself; `artifacts/SHA256SUMS` remains the narrower build manifest.
 
-The current tar/gzip recipe does not normalize archive ordering, ownership, or
-timestamps. Consequently, **outer tarball bytes are not claimed reproducible**.
-The build payload manifests carry the current byte-reproducibility claim; the
-outer digest recorded below is a **transfer-integrity hash** for that generated
-file, not a cross-clone reference digest.
+GNU tar uses lexical order, ustar format, the fixed epoch, uid/gid zero and
+normalized staged modes; `gzip -n` removes gzip name/time fields. These controls
+provide **normalized archive metadata**. `make verify-artifact-reproducible`
+constructs the archive twice from one fixed source/output set and requires equal
+outer bytes. This does not widen host-linked output identity across toolchains.
 
 ## Expected outputs
 
@@ -163,24 +166,29 @@ The one-command artifact build must leave these principal files:
 | `build/bemu-linux01` | Linux/x86-64 KVM host runner |
 | `build/SHA256SUMS` | Manifest of the selected build outputs |
 | `build/REPRODUCIBLE.sha256` | Copy retained by the one-build reproducible target |
-| `release/linux-0.01-still-runs-<rev>.tar.gz` | Current binary, docs, and datasets bundle |
+| `release/linux-0.01-still-runs-evaluator-<commit-prefix>.tar.gz` | Fixed source, history, evidence, and build package |
+| `release/linux-0.01-still-runs-evaluator-<commit-prefix>.check.py` | Detached pre-extraction package verifier |
+| `release/linux-0.01-still-runs-evaluator-<commit-prefix>.tar.gz.sha256` | Detached checksum for archive and verifier |
 
 Confirm live build self-consistency, inspect the tarball rather than trusting its
 name, and retain an outer hash when transferring that exact file:
 
 ```bash
-REV=$(git rev-parse --short HEAD)
+REV=$(git rev-parse --short=12 HEAD)
 (cd build && sha256sum --check SHA256SUMS)
-tar -tzf "release/linux-0.01-still-runs-${REV}.tar.gz"
-sha256sum "release/linux-0.01-still-runs-${REV}.tar.gz"
+PACKAGE="release/linux-0.01-still-runs-evaluator-${REV}.tar.gz"
+(cd release && sha256sum --check "$(basename "${PACKAGE}").sha256")
+python3 "${PACKAGE%.tar.gz}.check.py" --archive "${PACKAGE}"
+make artifact-check ARTIFACT="${PACKAGE}"
+make verify-artifact-reproducible
 ```
 
-This generated manifest proves self-consistency of the just-built files; the
-two-build target supplies the same-host comparison. It is not a commit-bound
-reference manifest and cannot validate an extracted bundle whose omitted build
-outputs are absent. Host-linked bEMU bytes can differ across distributions or
-linker versions. The kernel and root-image byte claims are narrower than
-arbitrary-host identity.
+The detached independent checker verifies the **detached archive checksum**, path safety,
+single top-level directory, metadata normalization, commit/tree identity,
+source Git blobs, complete package inventory, and build manifests. The two-build
+target supplies the same-host output comparison. Host-linked bEMU bytes can
+differ across distributions or linker versions; the kernel and root-image byte
+claims remain narrower than arbitrary-host identity.
 
 ## Timing
 
@@ -206,10 +214,11 @@ duration.
 | `/dev/kvm: Permission denied` or missing device | Grant the current user read/write access and confirm host virtualization; do not expect a software fallback. |
 | KVM API, irqchip, MP-state, guest-debug, or IRQ-state ioctl failure | The host or nested hypervisor lacks a capability used by the suite even if `make doctor` passed basic access. |
 | `git rev-parse --is-shallow-repository` returns `true`, or a dataset reports a missing commit | Fetch full history with `git fetch --unshallow --tags`; a source archive has no historical Git objects. |
-| Host static PIE probe or bEMU link fails | Install the host static libc development support required by `-static-pie`. |
+| Host dynamic PIE probe or bEMU link fails | Install the host libc development files and inspect the host compiler/linker diagnostics. |
 | Hosted i386 case fails around `-m32` headers or linking | On Ubuntu 24.04 install `gcc-multilib` and `libc6-dev-i386`; a freestanding cross compiler does not replace hosted libraries. |
 | `fsck.minix not found` | Install the util-linux package that supplies the independent `fsck.minix` oracle. |
-| `make artifact` reports missing inputs | Run the complete one-command build above; `make all && make checksums` does not create `build/REPRODUCIBLE.sha256`. |
+| `make artifact` rejects a dirty tree | Commit or intentionally remove public changes before packaging; the source snapshot must equal the recorded commit. |
+| `make artifact` reports a commit-bound build failure | Run `make doctor`, confirm full history, and inspect the fresh-clone build diagnostic; ignored outputs in the caller's `build/` directory are never packaged. |
 | `sync`, orderly shutdown, or `make test-fs-persistence` stalls | The required guest-driven lifecycle failed; inspect the captured transcript and KVM MP-state support rather than treating the run as persistence evidence. |
 
 ## Known limits
@@ -226,9 +235,11 @@ duration.
   machine events are excluded by the default comparison policy.
 - Two-build equality is currently bounded to one host/toolchain family; host ELF
   differences are possible elsewhere.
-- The current `.tar.gz` metadata is not normalized, and its embedded build
-  manifest does not cover every packaged file; package-wide reproducibility is
-  reserved for Wave 113.
+- Package-byte equality is proven for repeated packaging of one fixed source and
+  build-output set; cross-host build bytes retain the narrower boundary above.
+- The package includes full LGPL terms and an engineering redistribution audit,
+  but bEMU-NANO upstream identity and quoted historical text remain disclosed
+  provenance/rights-review limits rather than independently cleared claims.
 - **independent third-party reproduction has not yet occurred**; that belongs to
   Waves 114-115.
 - **no DOI or archival deposit exists yet**; Zenodo archival and citation belong

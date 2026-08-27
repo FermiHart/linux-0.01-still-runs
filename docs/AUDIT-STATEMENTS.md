@@ -483,12 +483,14 @@ silently deleting it.
 
 **Source**: `bemu/README.md`.
 
-**Audit**: `bemu/bemu_linux01.c` is adapted from bEMU-NANO. The upstream
-license and provenance are preserved in the file header.
+**Audit**: `bemu/bemu_linux01.c` records adaptation from bEMU-NANO and carries
+the current author's BSD-3-Clause identifier. The repository has no public
+upstream URL, commit, or original-file hash with which to verify that ancestry
+or an upstream notice independently.
 
-**Status**: PROVEN.
+**Status**: PARTIAL.
 
-**Evidence**: file header license block.
+**Evidence**: current file header and `evaluation/v1/THIRD-PARTY-NOTICES.md`.
 
 ## Outstanding claims requiring future audit
 

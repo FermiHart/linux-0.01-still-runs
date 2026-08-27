@@ -60,7 +60,7 @@ EXPERIENCE_ROOT = $(if $(filter 1991,$(SELECTED_EXPERIENCE)),$(BUILD)/root-1991.
 EXPERIENCE_ARGS = --experience $(SELECTED_EXPERIENCE)
 
 ARTIFACT_NAMES := kernel.elf kernel.bin root.img root-1991.img bemu-linux01 mkimage \
-                  shell.bin update.bin hello.bin yes.bin pathcheck.bin cat.bin
+                  minix-inspect shell.bin update.bin hello.bin yes.bin pathcheck.bin cat.bin
 ARTIFACTS = $(addprefix $(BUILD)/,$(ARTIFACT_NAMES))
 
 # ──────────────────────────────────────────────── toolchain ─────────────────
@@ -105,7 +105,7 @@ HOSTCFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wformat-security \
               -Werror=format-security -fstack-protector-strong \
               -D_FORTIFY_SOURCE=2 -fPIE
 HOSTLDFLAGS ?= -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
-BEMU_LDFLAGS ?= -static-pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
+BEMU_LDFLAGS ?= -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
 BEMU_SANFLAGS ?= -fsanitize=undefined -fno-omit-frame-pointer
 BBP_SANFLAGS ?= -fsanitize=address,undefined -fno-omit-frame-pointer
 
@@ -210,8 +210,8 @@ endef
 # ──────────────────────────────────────────────── phony decls ───────────────
 .PHONY: help all clean run run-headless kernel image bemu bemu-sanitized dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
-        reproducible verify-reproducible release-check artifact inspect-rootfs \
-        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
+        reproducible verify-reproducible release-check artifact artifact-check verify-artifact-reproducible inspect-rootfs \
+        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs test-evaluator-package \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property test-fs-persistence \
         test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology test-paper test-reproduction-appendix patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain \
@@ -526,6 +526,7 @@ test: all
 	@$(MAKE) --no-print-directory test-methodology
 	@$(MAKE) --no-print-directory test-paper
 	@$(MAKE) --no-print-directory test-reproduction-appendix
+	@$(MAKE) --no-print-directory test-evaluator-package
 	@$(MAKE) --no-print-directory test-patch-dataset
 	@$(MAKE) --no-print-directory test-golden-trace-dataset
 	@$(MAKE) --no-print-directory test-compiler-case-dataset
@@ -868,6 +869,10 @@ test-reproduction-appendix:
 	$(call STEP,operational reproduction appendix check)
 	@python3 tests/test_reproduction_appendix.py
 
+test-evaluator-package:
+	$(call STEP,commit-bound evaluator package contract check)
+	@python3 tests/test_evaluator_package.py
+
 patch-dataset:
 	$(call STEP,publishing historical-core patch dataset)
 	@python3 scripts/build-patch-dataset.py
@@ -1018,10 +1023,11 @@ test-bbp-corruption-sanitized: $(BUILD)/test-bbp-corruption-sanitized
 	@$(BUILD)/test-bbp-corruption-sanitized
 
 bbp-golden-vectors: $(BUILD)/bbp-tool | dirs
+	@mkdir -p tests/bemu/golden
 	@$(BUILD)/bbp-tool encode tests/bemu/golden/bbp-minimal.bin
 	$(call OK,wrote tests/bemu/golden/bbp-minimal.bin)
 
-bbp-conformance: $(BUILD)/bbp-tool $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-bbp-corruption $(BUILD)/test-bbp-corruption-sanitized $(BUILD)/test-bbp-golden | dirs
+bbp-conformance: bbp-golden-vectors $(BUILD)/bbp-tool $(BUILD)/test-bbp-invalid $(BUILD)/test-bbp-trunc $(BUILD)/test-bbp-corruption $(BUILD)/test-bbp-corruption-sanitized $(BUILD)/test-bbp-golden | dirs
 	$(call STAGE,9/10,running BBP conformance tests)
 	@rm -f /tmp/bbp-conformance.bin
 	@$(BUILD)/bbp-tool encode /tmp/bbp-conformance.bin
@@ -1072,9 +1078,9 @@ doctor:
 	    status=1; \
 	  fi; \
 	  if printf 'int main(void) { return 0; }\n' | $(HOSTCC) $(HOSTCFLAGS) -x c -o "$$tmp/host" - $(BEMU_LDFLAGS) >/dev/null 2>&1; then \
-	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)static PIE$(CR)\n" "host linker probe"; \
+	    printf "  $(CG)$(G_OK)$(CR) %-22s $(CGY)dynamic PIE$(CR)\n" "host linker probe"; \
 	  else \
-	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)static PIE unavailable$(CR)\n" "host linker probe"; \
+	    printf "  $(CRD)$(G_NO)$(CR) %-22s $(CRD)dynamic PIE unavailable$(CR)\n" "host linker probe"; \
 	    status=1; \
 	  fi; \
 	  printf '\n  $(CB)$(CWH)virtualization$(CR)\n\n'; \
@@ -1223,6 +1229,16 @@ release-check:
 
 artifact:
 	@bash "$(REPO_ROOT)/scripts/make-artifact.sh"
+
+artifact-check:
+	@if [ -z "$(ARTIFACT)" ]; then \
+	  printf '  $(CRD)$(G_NO)$(CR) usage: make artifact-check ARTIFACT=release/<package>.tar.gz\n' >&2; \
+	  exit 1; \
+	fi
+	@python3 "$(REPO_ROOT)/scripts/check-evaluator-package.py" --archive "$(ARTIFACT)"
+
+verify-artifact-reproducible:
+	@bash "$(REPO_ROOT)/scripts/verify-artifact-reproducibility.sh"
 
 inspect-rootfs: $(BUILD)/root.img $(BUILD)/minix-inspect
 	@"$(BUILD)/minix-inspect" "$(BUILD)/root.img"
@@ -1384,6 +1400,7 @@ help:
 	@printf '    $(CWH)test-methodology$(CR) validate experimental methodology\n'
 	@printf '    $(CWH)test-paper$(CR)      validate the technical paper and evidence links\n'
 	@printf '    $(CWH)test-reproduction-appendix$(CR) validate the operational reproduction guide\n'
+	@printf '    $(CWH)test-evaluator-package$(CR) validate the evaluator package contract\n'
 	@printf '    $(CWH)patch-dataset$(CR)  regenerate the published patch dataset\n'
 	@printf '    $(CWH)test-patch-dataset$(CR) validate the published patch dataset\n'
 	@printf '    $(CWH)test-golden-trace-dataset$(CR) validate published golden traces\n'
@@ -1429,7 +1446,9 @@ help:
 	@printf '    $(CWH)reproducible$(CR)   clean build with SOURCE_DATE_EPOCH\n'
 	@printf '    $(CWH)verify-reproducible$(CR) double-build byte compare\n'
 	@printf '    $(CWH)release-check$(CR)  independent release verification\n'
-	@printf '    $(CWH)artifact$(CR)       create release tarball\n'
+	@printf '    $(CWH)artifact$(CR)       create commit-bound evaluator package\n'
+	@printf '    $(CWH)artifact-check$(CR) independently validate an evaluator package\n'
+	@printf '    $(CWH)verify-artifact-reproducible$(CR) compare two evaluator archives\n'
 	@printf '    $(CWH)toolchain$(CR)      auto-install all tools (detects OS)\n'
 	@printf '    $(CWH)backup$(CR)         git tag with codename\n'
 	@printf '    $(CWH)journey$(CR)        cinematic 1991→2026 story\n'
