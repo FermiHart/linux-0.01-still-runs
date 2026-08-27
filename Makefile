@@ -37,6 +37,8 @@ GIT_DIRTY  := $(shell test -z "$$(git status --porcelain 2>/dev/null)" && printf
 UNAME_S    := $(shell uname -s)
 REPO_ROOT  := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 BUILD      ?= build
+GOLDEN_TRACE_DIR := datasets/golden-traces/v1
+GOLDEN_MACHINE_TRACE := $(GOLDEN_TRACE_DIR)/alive-boot-machine.jsonl
 MAKE_COMMAND := $(MAKE)
 FAULT_TEST_COMMAND ?= $(MAKE) --no-print-directory
 FAULT_TEST_TARGETS := test-bemu-loading test-ide-faults test-fs-corruption \
@@ -211,7 +213,7 @@ endef
         reproducible verify-reproducible release-check artifact inspect-rootfs \
         fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property \
-        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology patch-dataset test-patch-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
+        test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -522,6 +524,7 @@ test: all
 	@$(MAKE) --no-print-directory test-research-questions
 	@$(MAKE) --no-print-directory test-methodology
 	@$(MAKE) --no-print-directory test-patch-dataset
+	@$(MAKE) --no-print-directory test-golden-trace-dataset
 	@python3 tests/test_fault_test.py --make "$(MAKE_COMMAND)"
 	@$(MAKE) --no-print-directory test-bemu-devices
 	@$(MAKE) --no-print-directory test-irq-faults-kvm
@@ -544,9 +547,9 @@ test: all
 	@python3 tests/test_trace_format.py --bemu $(BUILD)/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 	@python3 tests/test_record.py --make "$(MAKE_COMMAND)" --timeout 120
-	@python3 tests/replay.py --bemu build/bemu-linux01 --trace tests/golden/boot.jsonl --timeout 60
-	@python3 tests/test_compare_trace.py --bemu build/bemu-linux01 --golden tests/golden/boot.jsonl --timeout 60
-	@python3 tests/test_timeline.py --trace tests/golden/boot.jsonl
+	@python3 tests/replay.py --bemu build/bemu-linux01 --trace $(GOLDEN_MACHINE_TRACE) --timeout 60
+	@python3 tests/test_compare_trace.py --bemu build/bemu-linux01 --golden $(GOLDEN_MACHINE_TRACE) --timeout 60
+	@python3 tests/test_timeline.py --trace $(GOLDEN_MACHINE_TRACE)
 	@python3 tests/test_trace_syscalls.py --bemu build/bemu-linux01 \
 	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img --timeout 60
 	@$(MAKE) --no-print-directory test-trace-workflow BUILD=build/trace-workflow-test
@@ -669,11 +672,13 @@ test-fs-real: all
 
 golden-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace.py --bemu $(BUILD)/bemu-linux01 \
-	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img \
+	  --output $(BUILD)/golden-candidates/alive-boot-console.trace
 
 golden-trace-jsonl: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	@python3 tests/golden_trace_jsonl.py --bemu $(BUILD)/bemu-linux01 \
-	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img
+	  --kernel $(BUILD)/kernel.bin --img $(BUILD)/root.img \
+	  --output $(BUILD)/golden-candidates/alive-boot-machine.jsonl
 
 record: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STEP,recording bEMU machine trace)
@@ -690,17 +695,17 @@ record: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 replay: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STEP,replaying bEMU machine trace)
 	@python3 tests/replay.py --bemu "$(BUILD)/bemu-linux01" \
-	  --trace tests/golden/boot.jsonl --timeout 60
+	  --trace $(GOLDEN_MACHINE_TRACE) --timeout 60
 
 compare-trace: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STEP,comparing replayed trace to golden trace)
 	@python3 tests/test_compare_trace.py --bemu "$(BUILD)/bemu-linux01" \
-	  --golden tests/golden/boot.jsonl --timeout 60
+	  --golden $(GOLDEN_MACHINE_TRACE) --timeout 60
 
 timeline: $(BUILD)/bemu-linux01 $(BUILD)/kernel.bin $(BUILD)/root.img
 	$(call STEP,generating trace timeline)
 	@mkdir -p "$(BUILD)/traces"; \
-	  python3 tests/timeline.py tests/golden/boot.jsonl \
+	  python3 tests/timeline.py $(GOLDEN_MACHINE_TRACE) \
 	    --output "$(BUILD)/traces/boot-timeline.txt"; \
 	  printf '  $(CG)$(G_OK)$(CR) wrote %s\n' "$(BUILD)/traces/boot-timeline.txt"
 
@@ -727,17 +732,17 @@ test-trace-syscalls:
 
 test-timeline:
 	$(call STEP,timeline visualizer test)
-	@python3 tests/test_timeline.py --trace tests/golden/boot.jsonl
+	@python3 tests/test_timeline.py --trace $(GOLDEN_MACHINE_TRACE)
 
 test-replay:
 	$(call STEP,replay test)
 	@python3 tests/replay.py --bemu build/bemu-linux01 \
-	  --trace tests/golden/boot.jsonl --timeout 60
+	  --trace $(GOLDEN_MACHINE_TRACE) --timeout 60
 
 test-compare-trace:
 	$(call STEP,golden trace comparison test)
 	@python3 tests/test_compare_trace.py --bemu build/bemu-linux01 \
-	  --golden tests/golden/boot.jsonl --timeout 60
+	  --golden $(GOLDEN_MACHINE_TRACE) --timeout 60
 
 test-record:
 	$(call STEP,record mode test)
@@ -843,6 +848,10 @@ patch-dataset:
 test-patch-dataset:
 	$(call STEP,historical-core patch dataset consistency check)
 	@python3 tests/test_patch_dataset.py
+
+test-golden-trace-dataset: $(BUILD)/test-trace-producer
+	$(call STEP,published golden-trace dataset consistency check)
+	@python3 tests/test_golden_trace_dataset.py
 
 fault-test: test-fault-catalog
 	$(call STAGE,9/10,running all deterministic fault scenarios)
@@ -1345,6 +1354,7 @@ help:
 	@printf '    $(CWH)test-methodology$(CR) validate experimental methodology\n'
 	@printf '    $(CWH)patch-dataset$(CR)  regenerate the published patch dataset\n'
 	@printf '    $(CWH)test-patch-dataset$(CR) validate the published patch dataset\n'
+	@printf '    $(CWH)test-golden-trace-dataset$(CR) validate published golden traces\n'
 	@printf '    $(CWH)fault-test$(CR)     run all deterministic fault scenarios\n'
 	@printf '    $(CWH)test-bemu-loading$(CR) guest RAM and kernel loading limits\n'
 	@printf '    $(CWH)test-ide-faults$(CR) deterministic IDE read/write failures\n'
@@ -1367,8 +1377,8 @@ help:
 	@printf '    $(CWH)test-fs-corruption$(CR) deterministic Minix metadata faults\n'
 	@printf '    $(CWH)test-fs-real$(CR)   real filesystem verification\n'
 	@printf '\n  $(CB)$(CP)trace$(CR)\n'
-	@printf '    $(CWH)golden-trace$(CR)  capture console boot trace to tests/golden/\n'
-	@printf '    $(CWH)golden-trace-jsonl$(CR) capture machine trace to tests/golden/boot.jsonl\n'
+	@printf '    $(CWH)golden-trace$(CR)  capture a console candidate under build/\n'
+	@printf '    $(CWH)golden-trace-jsonl$(CR) capture a machine candidate under build/\n'
 	@printf '    $(CWH)record$(CR)          record compressed machine trace to build/traces/\n'
 	@printf '    $(CWH)replay$(CR)          replay golden trace inputs\n'
 	@printf '    $(CWH)compare-trace$(CR)   compare replayed trace to golden\n'

@@ -1,9 +1,10 @@
 # Observability Event Schema
 
 This document defines the machine-readable event schema used by bEMU for
-deterministic observation, record and replay. The schema is intentionally
-minimal: every event is a single line of JSON that can be appended to a trace
-file without loss of structure.
+observation, input reconstruction and normalized regression comparison. The
+schema is intentionally minimal: every event is a single line of JSON. The
+machine-readable contract is published in
+`datasets/golden-traces/v1/trace-event-v1.schema.json`.
 
 ## Event envelope
 
@@ -17,7 +18,7 @@ file without loss of structure.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `ts` | integer | nanoseconds since `bootloader_start_ts` |
+| `ts` | integer | logical run-attempt clock, offset by `SOURCE_DATE_EPOCH` when set |
 | `type` | string | event category |
 | `data` | object | event-specific payload |
 
@@ -34,14 +35,16 @@ Emitted when bEMU enters the main KVM loop.
   "data": {
     "kernel": "build/kernel.bin",
     "root": "build/root.img",
-    "ram_mib": 8
+    "ram_mib": 8,
+    "trace_version": 1
   }
 }
 ```
 
 ### `kvm_exit`
 
-Emitted after every KVM exit.
+The emitter is defined for KVM exits, but the production main loop does not
+currently call it. Unit fixtures exercise this schema member.
 
 ```json
 {
@@ -65,7 +68,7 @@ Emitted for `KVM_EXIT_IO` exits.
   "type": "io_access",
   "data": {
     "direction": "out",
-    "port": 0x3f8,
+    "port": 1016,
     "size": 1,
     "value": 65
   }
@@ -94,14 +97,15 @@ Valid actions currently emitted: `raise`, `lower`, `fault_drop`,
 
 ### `timer`
 
-Emitted on PIT-related activity.
+The emitter is defined for PIT-related activity, but production currently emits
+PIT I/O and IRQ observations instead. Unit fixtures exercise this schema member.
 
 ```json
 {
   "ts": 1237,
   "type": "timer",
   "data": {
-    "port": 0x40,
+    "port": 64,
     "action": "latch"
   }
 }
@@ -117,10 +121,15 @@ Emitted when host input is injected into the guest.
   "type": "input",
   "data": {
     "bytes": 1,
+    "hex": "78",
     "source": "script"
   }
 }
 ```
+
+The producer records at most the first 64 input bytes in `hex`; `bytes` reports
+the original length. Replay can reconstruct an event completely only when these
+lengths agree.
 
 ### `syscall`
 
@@ -142,7 +151,8 @@ consume it.
 
 ### `interrupt`
 
-Emitted when the guest takes a hardware or software interrupt.
+The emitter is defined for explicitly instrumented interrupt observations, but
+production currently has no call site. Unit fixtures exercise this schema member.
 
 ```json
 {
@@ -198,15 +208,16 @@ if the file extension is `.trace.gz`.
 
 ## Logical clock
 
-The `ts` field is produced by a deterministic logical clock (`bemu/trace_clock.h`).
-The clock is reset at machine creation and advances by one fixed quantum for every
-observable event (currently one nanosecond per KVM exit). It does **not** read the
-host wall clock. The same ordered event sequence and epoch therefore yield the
-same `ts` values, while host scheduling may still alter the event sequence.
+The `ts` field is produced by a logical clock (`bemu/trace_clock.h`). The clock
+is reset at machine creation and advances by one fixed quantum before each KVM
+run attempt. Multiple events emitted during one attempt share a timestamp, and
+attempts interrupted by the host may still advance it. It does **not** read the
+host wall clock directly.
 
 When `SOURCE_DATE_EPOCH` is present in the environment, the clock uses it as the
-boot epoch; otherwise the epoch is zero.  This makes the trace stable across
-reproducible builds without depending on the host `time(NULL)`.
+logical offset in epoch nanoseconds; otherwise the offset is zero. Matching
+timestamps therefore require matching epoch and run-attempt progression, not
+merely matching observable events.
 
 | Function | Meaning |
 |---|---|
@@ -219,7 +230,8 @@ reproducible builds without depending on the host `time(NULL)`.
 
 traces are emitted by bEMU when the `--trace-file PATH` command-line option is
 used.  The file contains one JSON object per line.  Pass `-` to write the trace
-to standard error.  Console UART bytes (`0x3f8`) are intentionally omitted from
+to standard error. Console UART data and line-status ports (`0x3f8` and `0x3fd`)
+are intentionally omitted from
 `io_access` events to keep traces focused on device I/O and to avoid noise.
 
 Useful CLI flags:
@@ -242,34 +254,34 @@ Example:
 | Target | Purpose |
 |---|---|
 | `make record` | Record a compressed boot trace to `build/traces/boot-<ts>.jsonl.gz` |
-| `make replay` | Replay the golden trace inputs and emit a new trace |
-| `make compare-trace` | Compare a replayed trace to `tests/golden/boot.jsonl` |
+| `make replay` | Reconstruct the published trace's scripted input and emit a new trace |
+| `make compare-trace` | Compare a replayed trace to `datasets/golden-traces/v1/alive-boot-machine.jsonl` |
 | `make timeline` | Generate a text timeline from the golden trace |
 | `make trace-workflow` | Run record → replay → compare → timeline in one shot |
+| `make test-golden-trace-dataset` | Validate the offline published traces, schema, policy and checksums |
 
 ## Stability guarantees
 
-- New event types may be added without bumping the trace version.
-- Event payloads are additive: new fields may appear, but existing fields will not
-  be removed or change type.
+- The published v1 dataset requires the exact envelope and payload fields in its
+  JSON schema. New event types or incompatible payload changes require a new
+  schema/dataset version.
 - The `ts` field is monotonic within a trace but is comparable across traces only
   when both use the same `SOURCE_DATE_EPOCH` and matching event sequences.
 
 ## Replay invariants
 
-For deterministic replay, the following events must reproduce identical
-side-effects:
-
-1. `io_access` `in` operations must return the same value.
-2. `irq` events must arrive at the same guest instruction boundary.
-3. `input` events must inject the same byte sequence at the same exit count.
-
-Logical `ts` values are ignored during replay comparison because host scheduling
-can alter the number and ordering of low-level events even though no wall clock
-is read.
+The current replay tool concatenates complete `input` events whose source is
+`script` and injects those bytes into a fresh run. It does not replay I/O read
+values, IRQ delivery, timestamps, registers, RAM or device state, and it does
+not preserve separate injection boundaries. The comparator then drops logical
+timestamps and declared counters and may filter whole event types or I/O ports
+before exact positional comparison. This is input reconstruction plus an
+observable regression oracle, not machine-state replay.
 
 ## Future work
 
-Waves 064-074 implemented the trace producer, record and replay engine,
-golden-trace comparator, and timeline visualizer. Future work expands fault
-coverage while preserving this schema contract.
+Waves 064-074 implemented the trace producer, input reconstruction, comparator,
+and timeline visualizer. Wave 109 publishes the inherited fixtures with their
+incomplete provenance and exact comparison boundary. Future captures require
+new IDs and retained environment/artifact identities rather than overwriting the
+published observations.

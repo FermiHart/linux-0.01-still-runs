@@ -79,3 +79,5 @@ The implemented, partial and proposed procedures are distinguished in
 `docs/METHODOLOGY.md`.
 The RQ1/RQ2 source deltas and bounded historical interpretations are published
 in `datasets/patches/`.
+The bounded RQ4/RQ5 golden observations and their normalization policy are
+published in `datasets/golden-traces/v1/`.

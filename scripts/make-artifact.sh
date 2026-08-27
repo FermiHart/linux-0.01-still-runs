@@ -28,6 +28,7 @@ tar -czf "${ARTIFACT}" \
     build/SHA256SUMS \
     build/REPRODUCIBLE.sha256 \
     docs/ \
+    datasets/ \
     LICENSE \
     README.md \
     2>/dev/null || {

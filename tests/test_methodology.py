@@ -37,6 +37,8 @@ REQUIRED_PATHS = (
     "datasets/patches/MANIFEST.json",
     "datasets/patches/file_deltas.csv",
     "datasets/patches/adaptations.csv",
+    "datasets/golden-traces/v1/MANIFEST.json",
+    "datasets/golden-traces/v1/alive-boot-machine.jsonl",
 )
 
 REQUIRED_SECTION_ANCHORS = {
@@ -72,6 +74,7 @@ REQUIRED_SECTION_ANCHORS = {
         "one record and one replay",
         "mostly one execution per vector",
         "not a user study",
+        "do not share a run ID",
     ),
     "RQ5 - Reproducibility layers": (
         "exactly two independent build directories",
@@ -81,6 +84,7 @@ REQUIRED_SECTION_ANCHORS = {
         "each of eight scenarios for each profile runs twice",
         "Sanitized versus optimized execution is a configuration comparison, not a repeat",
         "not complete machine state",
+        "filters 22,917 of 23,529 raw events and retains 612",
     ),
     "Oracle independence": (
         "External independent",
@@ -92,6 +96,7 @@ REQUIRED_SECTION_ANCHORS = {
     "Evidence retention": (
         "usually overwritten or deleted",
         "zero paired RQ1 observations and zero RQ2 ablation configurations",
+        "incomplete capture identities and two separate legacy runs",
         "The common run envelope is therefore `PROPOSED`, not implemented",
         "Waves 108-110",
     ),

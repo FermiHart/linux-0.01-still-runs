@@ -55,7 +55,7 @@ def main():
         "--trace-file", trace_path,
     ]
     try:
-        subprocess.run(
+        result = subprocess.run(
             command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -64,6 +64,11 @@ def main():
         )
     except subprocess.TimeoutExpired:
         print("  FAIL  bEMU timed out")
+        os.unlink(trace_path)
+        return 1
+
+    if result.returncode != 0:
+        print(f"  FAIL  bEMU exited with status {result.returncode}")
         os.unlink(trace_path)
         return 1
 

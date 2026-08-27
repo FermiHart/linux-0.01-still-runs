@@ -19,7 +19,9 @@ static int make_temp(char *out, size_t out_size)
     out[out_size - 1] = '\0';
     fd = mkstemp(out);
     return fd;
-}static void check(int condition, const char *name)
+}
+
+static void check(int condition, const char *name)
 {
     if (!condition) {
         fprintf(stderr, "FAIL: %s\n", name);
@@ -172,8 +174,34 @@ static void test_disabled(void)
     trace_close(&t);
 }
 
-int main(void)
+static int emit_schema_fixture(const char *path)
 {
+    struct trace_clock tc;
+    struct trace t;
+    uint64_t args[6] = {1, 2, 3, 4, 5, 6};
+
+    trace_clock_reset(&tc);
+    if (trace_open(&t, &tc, path) < 0)
+        return 1;
+    trace_event_boot(&t, "build/kernel.bin", "build/root.img", 8, 1);
+    trace_clock_tick(&tc);
+    trace_event_kvm_exit(&t, 2, "KVM_EXIT_IO");
+    trace_event_io_access(&t, "out", 0x3f8, 1, 65);
+    trace_event_irq(&t, 1, "raise");
+    trace_event_timer(&t, 0x40, "latch");
+    trace_event_input(&t, (const uint8_t *)"x", 1, "script");
+    trace_event_syscall(&t, 1, args, 6);
+    trace_event_interrupt(&t, 0x80);
+    trace_event_process(&t, 1, "fork", "init");
+    trace_event_shutdown(&t, "halt", 1, 0);
+    trace_close(&t);
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    if (argc == 3 && strcmp(argv[1], "--emit-schema-fixture") == 0)
+        return emit_schema_fixture(argv[2]);
     test_basic_events();
     test_syscall_interrupt_process();
     test_disabled();

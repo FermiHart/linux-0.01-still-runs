@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Compare two bEMU JSON Lines traces for equivalence.
+"""Compare two bEMU JSON Lines traces under a declared normalization.
 
-Deterministic replay should produce the same observable event stream.  Timestamps
-and per-run counters are ignored; the comparison focuses on event type order
-and payload values.  Non-deterministic sources (host wall-clock CMOS reads, PIT
-IRQ timing) can be filtered out via --ignore-event and --ignore-port.
+Timestamps and per-run counters are ignored; the comparison focuses on event
+type order and payload values. Scheduling-sensitive events can be filtered via
+--ignore-event and --ignore-port. Equality after filtering is not raw runtime
+determinism or machine-state replay.
 """
 
 import argparse
@@ -36,7 +36,7 @@ def parse_port(text):
 def load_trace(path):
     opener = gzip.open if path.endswith(".gz") else open
     events = []
-    with opener(path, "rt", encoding="utf-8", errors="replace") as f:
+    with opener(path, "rt", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:

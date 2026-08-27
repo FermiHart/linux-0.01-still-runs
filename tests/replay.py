@@ -13,7 +13,7 @@ import tempfile
 def parse_args():
     parser = argparse.ArgumentParser(description="Replay bEMU trace inputs")
     parser.add_argument("--bemu", default="build/bemu-linux01")
-    parser.add_argument("--trace", default="tests/golden/boot.jsonl")
+    parser.add_argument("--trace", default="datasets/golden-traces/v1/alive-boot-machine.jsonl")
     parser.add_argument("--output-trace", default=None)
     parser.add_argument("--timeout", type=int, default=60)
     parser.add_argument("--expect", default="Welcome to 1991")
@@ -22,7 +22,7 @@ def parse_args():
 
 def load_trace(path):
     opener = gzip.open if path.endswith(".gz") else open
-    with opener(path, "rt", encoding="utf-8", errors="replace") as f:
+    with opener(path, "rt", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
 
 
@@ -44,10 +44,10 @@ def extract_script(events):
         hex_text = data.get("hex", "")
         if not hex_text:
             continue
-        try:
-            parts.append(bytes.fromhex(hex_text))
-        except ValueError:
-            pass
+        raw = bytes.fromhex(hex_text)
+        if data.get("bytes") != len(raw):
+            raise ValueError("input hex is truncated or has the wrong byte count")
+        parts.append(raw)
     return b"".join(parts)
 
 
@@ -95,6 +95,12 @@ def main():
         )
     except subprocess.TimeoutExpired:
         print("FAIL  replay timed out")
+        if not args.output_trace:
+            os.unlink(output_trace)
+        return 1
+
+    if result.returncode != 0:
+        print(f"FAIL  bEMU replay exited with status {result.returncode}")
         if not args.output_trace:
             os.unlink(output_trace)
         return 1

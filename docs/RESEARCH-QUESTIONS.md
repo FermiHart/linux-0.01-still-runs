@@ -55,7 +55,7 @@ Three boundaries apply to every question:
 - **Question:** How can behavioral fidelity be measured as explicit dimensions in executable software archaeology?
 - **Scope:** Treat kernel-mediated mechanisms, historical limits, profile identity/time, filesystem behavior, observable traces, and bounded fault responses as separate conformance dimensions instead of collapsing them into an authenticity score.
 - **Run:** `make test-experiences`, `make test-fs-inspect`, `make test-trace-workflow`, `make fault-test`
-- **Evidence:** `EXPERIENCE.md`, `tests/test_experience.py`, `docs/FAULT-CATALOG.md`, `docs/OBSERVABILITY.md`
+- **Evidence:** `datasets/golden-traces/v1/MANIFEST.json`, `EXPERIENCE.md`, `tests/test_experience.py`, `docs/FAULT-CATALOG.md`, `docs/OBSERVABILITY.md`
 - **Measures:** For each declared dimension, record the invariant, controlled input, expected and forbidden observations, status, transcript or machine event, independent oracle where available, and a traceable limitation for behavior not observed.
 - **Answer criterion:** Support a fidelity claim only when its dimension has an explicit contract and a reproducible oracle that passes while incompatible cross-profile or modern behavior is rejected; report dimensions independently rather than averaging unlike observations.
 - **Limits:** The artifact has no scalar fidelity score, weighting model, user study, physical-1991-machine comparison, or independent full-system reference execution; claims about feel and historical authenticity remain goals rather than measured equivalence.
@@ -65,7 +65,7 @@ Three boundaries apply to every question:
 - **Question:** Which parts of the historical operating-system experience are reproducible under controlled inputs?
 - **Scope:** Separate byte-for-byte build reproduction, deterministic initial profile/RTC state, normalized record/replay equivalence, and repeated fault outcomes from wall-clock scheduling, complete machine-state replay, cross-boot persistence, and physical-media behavior.
 - **Run:** `make verify-reproducible`, `make test-rtc`, `make compare-trace`, `make fault-test`
-- **Evidence:** `docs/REPRODUCIBILITY.md`, `tests/compare_trace.py`, `tests/test_power_cut.py`, `docs/OBSERVABILITY.md`
+- **Evidence:** `datasets/golden-traces/v1/MANIFEST.json`, `datasets/golden-traces/v1/alive-boot-machine.jsonl`, `docs/REPRODUCIBILITY.md`, `tests/compare_trace.py`, `tests/test_power_cut.py`, `docs/OBSERVABILITY.md`
 - **Measures:** Repeat controlled builds and runs; compare SHA-256 manifests, RTC register values, normalized event count/order/type/payload, exact replayed input bytes, fault exit statuses, media byte prefixes, IRQ counts, and repeated state hashes.
 - **Answer criterion:** Call a layer reproducible only when repeated trials under named controls produce its predeclared identical outcome; list every normalization or ignored field and report layers that intentionally consume host time or remain scheduling-dependent separately.
 - **Limits:** Current evidence does not prove full event-by-event runtime determinism, bit identity across arbitrary distributions, cross-boot filesystem persistence, guest recovery from host faults, physical power-loss durability, or independent third-party reproduction.
@@ -74,7 +74,7 @@ Three boundaries apply to every question:
 
 `docs/METHODOLOGY.md` defines sampling, controls, execution order, evidence
 retention, and analysis procedures for these questions. Wave 108 publishes the
-bounded patch and incompatibility dataset in `datasets/patches/`; Waves 109-110
-publish trace and compiler-case evidence. Questions may be refined only by
-preserving their IDs, recording the reason, and updating this document's
-validation gate.
+bounded patch and incompatibility dataset in `datasets/patches/`; Wave 109
+publishes bounded inherited traces in `datasets/golden-traces/v1/`, and Wave 110
+publishes compiler-case evidence. Questions may be refined only by preserving
+their IDs, recording the reason, and updating this document's validation gate.

@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fermihart.com/schemas/bemu-trace-event-v1.json",
+  "title": "bEMU trace event version 1",
+  "type": "object",
+  "required": ["ts", "type", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "ts": {"type": "integer", "minimum": 0},
+    "type": {
+      "type": "string",
+      "enum": [
+        "boot_start",
+        "kvm_exit",
+        "io_access",
+        "irq",
+        "timer",
+        "input",
+        "syscall",
+        "interrupt",
+        "process",
+        "shutdown"
+      ]
+    },
+    "data": {"type": "object"}
+  },
+  "oneOf": [
+    {"properties": {"type": {"const": "boot_start"}, "data": {"$ref": "#/$defs/boot_start"}}},
+    {"properties": {"type": {"const": "kvm_exit"}, "data": {"$ref": "#/$defs/kvm_exit"}}},
+    {"properties": {"type": {"const": "io_access"}, "data": {"$ref": "#/$defs/io_access"}}},
+    {"properties": {"type": {"const": "irq"}, "data": {"$ref": "#/$defs/irq"}}},
+    {"properties": {"type": {"const": "timer"}, "data": {"$ref": "#/$defs/timer"}}},
+    {"properties": {"type": {"const": "input"}, "data": {"$ref": "#/$defs/input"}}},
+    {"properties": {"type": {"const": "syscall"}, "data": {"$ref": "#/$defs/syscall"}}},
+    {"properties": {"type": {"const": "interrupt"}, "data": {"$ref": "#/$defs/interrupt"}}},
+    {"properties": {"type": {"const": "process"}, "data": {"$ref": "#/$defs/process"}}},
+    {"properties": {"type": {"const": "shutdown"}, "data": {"$ref": "#/$defs/shutdown"}}}
+  ],
+  "$defs": {
+    "boot_start": {
+      "type": "object",
+      "required": ["kernel", "root", "ram_mib", "trace_version"],
+      "additionalProperties": false,
+      "properties": {
+        "kernel": {"type": "string"},
+        "root": {"type": "string"},
+        "ram_mib": {"type": "integer", "minimum": 1},
+        "trace_version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "kvm_exit": {
+      "type": "object",
+      "required": ["exit_reason", "exit_reason_name", "exit_count"],
+      "additionalProperties": false,
+      "properties": {
+        "exit_reason": {"type": "integer", "minimum": 0},
+        "exit_reason_name": {"type": "string"},
+        "exit_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "io_access": {
+      "type": "object",
+      "required": ["direction", "port", "size", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "direction": {"type": "string", "enum": ["in", "out"]},
+        "port": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "size": {"type": "integer", "enum": [1, 2, 4]},
+        "value": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+      }
+    },
+    "irq": {
+      "type": "object",
+      "required": ["irq", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "irq": {"type": "integer", "minimum": 0, "maximum": 255},
+        "action": {
+          "type": "string",
+          "enum": ["raise", "lower", "fault_drop", "fault_duplicate_queued", "fault_duplicate_replayed"]
+        }
+      }
+    },
+    "timer": {
+      "type": "object",
+      "required": ["port", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "port": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "action": {"type": "string"}
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["bytes", "hex", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {"type": "integer", "minimum": 0},
+        "hex": {"type": "string", "pattern": "^(?:[0-9a-f]{2})*$", "maxLength": 128},
+        "source": {"type": "string", "enum": ["script", "stdin"]}
+      }
+    },
+    "syscall": {
+      "type": "object",
+      "required": ["number", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "number": {"type": "integer", "minimum": 0},
+        "args": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "interrupt": {
+      "type": "object",
+      "required": ["vector"],
+      "additionalProperties": false,
+      "properties": {
+        "vector": {"type": "integer", "minimum": 0, "maximum": 255}
+      }
+    },
+    "process": {
+      "type": "object",
+      "required": ["pid", "action", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "pid": {"type": "integer", "minimum": 0},
+        "action": {"type": "string", "enum": ["fork", "exec", "exit", "wait", "switch"]},
+        "name": {"type": "string"}
+      }
+    },
+    "shutdown": {
+      "type": "object",
+      "required": ["reason", "exits", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {"type": "string", "enum": ["halt", "max_exits", "triple_fault", "signal", "error"]},
+        "exits": {"type": "integer", "minimum": 0},
+        "status": {"type": "integer"}
+      }
+    }
+  }
+}

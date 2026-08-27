@@ -42,8 +42,19 @@ REQUIRED_EVIDENCE = {
         "tests/test_boot.py",
     },
     "RQ3": {"tests/compiler-cases/README.md", "tests/compiler-cases/CLASSIFICATION.md"},
-    "RQ4": {"EXPERIENCE.md", "tests/test_experience.py", "docs/FAULT-CATALOG.md"},
-    "RQ5": {"docs/REPRODUCIBILITY.md", "tests/compare_trace.py", "tests/test_power_cut.py"},
+    "RQ4": {
+        "datasets/golden-traces/v1/MANIFEST.json",
+        "EXPERIENCE.md",
+        "tests/test_experience.py",
+        "docs/FAULT-CATALOG.md",
+    },
+    "RQ5": {
+        "datasets/golden-traces/v1/MANIFEST.json",
+        "datasets/golden-traces/v1/alive-boot-machine.jsonl",
+        "docs/REPRODUCIBILITY.md",
+        "tests/compare_trace.py",
+        "tests/test_power_cut.py",
+    },
 }
 
 REQUIRED_FIELDS = (

@@ -159,6 +159,9 @@ and analysis rules are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 The versioned historical-core patch, per-path hashes, stable adaptation IDs,
 ledger joins, and explicit evidence gaps are in
 [datasets/patches/](datasets/patches/).
+The inherited console and machine golden traces, exact event schema, comparison
+policy, checksums, and missing capture identities are in
+[datasets/golden-traces/v1/](datasets/golden-traces/v1/).
 
 Quick targeted shell test (≈ 30s per run):
 

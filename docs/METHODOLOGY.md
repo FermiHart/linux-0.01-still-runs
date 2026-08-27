@@ -170,6 +170,13 @@ Dimensions are not averaged or weighted into an authenticity score. “Feel” i
 not a measured variable, and one scripted session is not a user study or a
 physical-1991-machine comparison.
 
+Wave 109 publishes one inherited alive-profile console transcript and one
+separate alive-profile machine trace under
+`datasets/golden-traces/v1/MANIFEST.json`; the machine payload is
+`datasets/golden-traces/v1/alive-boot-machine.jsonl`. Their capture environments
+are incomplete, they do not share a run ID, and they do not add a second profile
+or user observation.
+
 ## RQ5 - Reproducibility layers
 
 **Current status: mixed.** Reproducibility is reported per layer, never as one
@@ -191,6 +198,9 @@ counts. The standard workflow also excludes all IRQ events and I/O ports
 `0x71`, `0x60`, `0x61`, `0x3d4`, `0x3d5`, and `0x1f0`. Remaining event count,
 order, type, and payload must match exactly. `tests/compare_trace.py` implements
 the comparator; replay reconstructs scripted input, not complete machine state.
+For the published inherited machine trace, this policy filters 22,917 of 23,529
+raw events and retains 612. Publication makes that boundary and normalized hash
+durable; it does not strengthen the procedure beyond `PARTIAL`.
 
 The power-cut image procedure in `tests/test_power_cut.py` is the only current
 fault path with identical scenario repetition: each of eight scenarios for each
@@ -220,18 +230,19 @@ underlying mechanism without focused trace or independent evidence.
 ## Evidence retention
 
 Currently versioned evidence includes source, tests, specifications, golden
-traces, fault catalog, compiler reductions, interpretive classifications, and
-the Wave 108 source-delta dataset. That dataset newly retains its patch, hashes,
-modes and joins, but records zero paired RQ1 observations and zero RQ2 ablation
-configurations.
+traces, fault catalog, compiler reductions, interpretive classifications, the
+Wave 108 source-delta dataset and the Wave 109 inherited trace dataset. The
+patch dataset records zero paired RQ1 observations and zero RQ2 ablation
+configurations. The trace dataset records incomplete capture identities and two
+separate legacy runs rather than a new controlled repetition.
 Generated `build/` reports, successful transcripts, temporary images, replay
 traces, power-cut hashes, sanitizer logs, and double-build artifacts are usually
 overwritten or deleted.
 
 `PROPOSED`: the common run envelope retains immutable raw and normalized outputs
 plus manifests. Publication waves then curate stable subsets without rewriting
-the raw record: Wave 108 now publishes bounded patch/incompatibility data, while
-Wave 109 publishes golden traces and Wave 110 publishes compiler-case data.
+the raw record: Wave 108 publishes bounded patch/incompatibility data, Wave 109
+publishes bounded inherited golden traces, and Wave 110 publishes compiler-case data.
 Waves 108-110 must distinguish newly retained observations from historical
 summaries that lack raw logs. The common run envelope is therefore `PROPOSED`,
 not implemented.

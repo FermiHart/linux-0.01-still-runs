@@ -1,0 +1,153 @@
+{
+  "captures": [
+    {
+      "byte_count": 2553,
+      "capture_provenance_status": "incomplete_historical",
+      "escape_byte_count": 35,
+      "format": "decoded_merged_console_transcript",
+      "last_payload_commit": "1ccb77fef673bcd8e64fed40ee99998692377a89",
+      "missing_identities": [
+        "capture_commit",
+        "dirty_state",
+        "host_kernel",
+        "cpu",
+        "microcode",
+        "kvm_capabilities",
+        "producer_binary",
+        "kernel_artifact",
+        "root_artifact",
+        "source_date_epoch",
+        "locale",
+        "timezone",
+        "process_exit_status"
+      ],
+      "normalization": [
+        "stdout and stderr merged",
+        "decoded as UTF-8 with replacement",
+        "trailing spaces and tabs removed per line"
+      ],
+      "path": "alive-boot-console.trace",
+      "physical_line_count": 152,
+      "profile": "alive",
+      "raw_console_bytes": false,
+      "sha256": "a6fd537a766a38d4762ad358cf7d826267be0090c9da0d25b38133ffc20f574c",
+      "source_path_at_publication_commit": "tests/golden/boot.trace",
+      "trace_id": "T-ALIVE-BOOT-CONSOLE-001"
+    },
+    {
+      "byte_count": 2068065,
+      "capture_provenance_status": "incomplete_historical",
+      "event_count": 23529,
+      "event_type_counts": {
+        "boot_start": 1,
+        "input": 1,
+        "io_access": 22906,
+        "irq": 620,
+        "shutdown": 1
+      },
+      "filter_removal_counts": {
+        "event_type:irq": 620,
+        "io_port:113": 7,
+        "io_port:496": 21504,
+        "io_port:96": 84,
+        "io_port:97": 255,
+        "io_port:980": 223,
+        "io_port:981": 224
+      },
+      "filtered_event_count": 22917,
+      "format": "jsonl",
+      "input_joins": [
+        {
+          "event_ordinal": 22750,
+          "input_id": "I-GOLDEN-BOOT-001"
+        }
+      ],
+      "last_payload_commit": "1ccb77fef673bcd8e64fed40ee99998692377a89",
+      "logical_ts_max": 6296,
+      "logical_ts_min": 0,
+      "missing_identities": [
+        "capture_commit",
+        "dirty_state",
+        "host_kernel",
+        "cpu",
+        "microcode",
+        "kvm_capabilities",
+        "producer_binary",
+        "kernel_artifact",
+        "root_artifact",
+        "source_date_epoch",
+        "locale",
+        "timezone",
+        "process_exit_status"
+      ],
+      "normalized_event_count": 612,
+      "normalized_event_type_counts": {
+        "boot_start": 1,
+        "input": 1,
+        "io_access": 609,
+        "shutdown": 1
+      },
+      "normalized_sha256": "c75dde26f3bea54406548a6d69f47b48ab7399f5271b6a024080e7936bd53e15",
+      "path": "alive-boot-machine.jsonl",
+      "profile": "alive",
+      "sha256": "4e292247f30973d468a701499d937d0979e3b81f396b143093753cba26cd0457",
+      "source_path_at_publication_commit": "tests/golden/boot.jsonl",
+      "trace_id": "T-ALIVE-BOOT-MACHINE-001"
+    }
+  ],
+  "captures_share_run_id": false,
+  "claims": {
+    "both_profiles_covered": false,
+    "full_runtime_determinism": false,
+    "machine_state_replay": false,
+    "physical_hardware_equivalence": false
+  },
+  "comparison_policy": {
+    "canonical_serialization": "UTF-8 compact sorted-key JSON Lines with LF",
+    "drop_payload_fields": {
+      "kvm_exit": [
+        "exit_count"
+      ],
+      "shutdown": [
+        "exits"
+      ]
+    },
+    "drop_top_level_fields": [
+      "ts"
+    ],
+    "id": "observable-compare-v1",
+    "ignore_event_types": [
+      "irq"
+    ],
+    "ignore_io_ports": [
+      113,
+      96,
+      97,
+      980,
+      981,
+      496
+    ],
+    "ordering": "positional",
+    "payload_comparison": "exact"
+  },
+  "dataset_id": "linux-0.01-golden-traces-v1",
+  "dataset_version": 1,
+  "event_schema": {
+    "id": "bemu-trace-event-v1",
+    "path": "trace-event-v1.schema.json",
+    "sha256": "5ca084d3933a3be9a80c3aa57a8f31169705bcb73953dfbd1cc35bc91a421a39"
+  },
+  "inputs": [
+    {
+      "byte_count": 24,
+      "encoding": "UTF-8",
+      "hex": "6563686f20474f4c44454e5f424f4f545f4d41524b45520a",
+      "input_id": "I-GOLDEN-BOOT-001",
+      "sha256": "4e46d4508745259749e3c0cc38a80dc04ace0ac7f49cc035e30e258d6a2a06bc",
+      "source": "script"
+    }
+  ],
+  "manifest_schema_version": 1,
+  "publication_date": "2026-08-26",
+  "publication_source_commit": "14638cf9deb708680a3c58266bb4c71a865355ea"
+}

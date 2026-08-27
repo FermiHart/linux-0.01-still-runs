@@ -11,7 +11,7 @@ import tempfile
 def parse_args():
     parser = argparse.ArgumentParser(description="bEMU golden trace comparison test")
     parser.add_argument("--bemu", default="build/bemu-linux01")
-    parser.add_argument("--golden", default="tests/golden/boot.jsonl")
+    parser.add_argument("--golden", default="datasets/golden-traces/v1/alive-boot-machine.jsonl")
     parser.add_argument("--timeout", type=int, default=60)
     return parser.parse_args()
 

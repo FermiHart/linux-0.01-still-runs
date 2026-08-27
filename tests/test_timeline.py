@@ -9,7 +9,7 @@ import sys
 
 def parse_args():
     parser = argparse.ArgumentParser(description="bEMU timeline visualizer test")
-    parser.add_argument("--trace", default="tests/golden/boot.jsonl")
+    parser.add_argument("--trace", default="datasets/golden-traces/v1/alive-boot-machine.jsonl")
     return parser.parse_args()
 
 

@@ -9,19 +9,29 @@ import sys
 import tempfile
 
 
+def is_published_path(path):
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    published = os.path.realpath(os.path.join(repo_root, "datasets", "golden-traces"))
+    output = os.path.realpath(path)
+    return os.path.commonpath((published, output)) == published
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Capture golden bEMU machine trace")
     parser.add_argument("--bemu", default="build/bemu-linux01")
     parser.add_argument("--kernel", default="build/kernel.bin")
     parser.add_argument("--img", default="build/root.img")
-    parser.add_argument("--output", default="tests/golden/boot.jsonl")
+    parser.add_argument("--output", default="build/golden-candidates/alive-boot-machine.jsonl")
     parser.add_argument("--timeout", type=int, default=60)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    if is_published_path(args.output):
+        print("refusing to overwrite a published golden-trace observation")
+        return 1
     for path in (args.bemu, args.kernel, args.img):
         if not os.path.exists(path):
             print(f"missing artifact: {path}; run make all first")
@@ -48,7 +58,12 @@ def main():
         os.unlink(trace_path)
         return 1
 
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    if result.returncode != 0:
+        print(f"golden machine trace capture failed with status {result.returncode}")
+        os.unlink(trace_path)
+        return 1
+
+    os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     shutil.copy(trace_path, args.output)
     os.unlink(trace_path)
     print(f"golden machine trace written to {args.output}")
