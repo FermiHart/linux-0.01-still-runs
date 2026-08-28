@@ -103,7 +103,7 @@ int do_exit(long code)
 	current->pwd=NULL;
 	iput(current->root);
 	current->root=NULL;
-	if (current->leader && current->tty >= 0)
+	if (current->leader && current->tty >= 0 && current->tty < NR_TTYS)
 		tty_table[current->tty].pgrp = 0;
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
@@ -127,8 +127,8 @@ int sys_waitpid(pid_t pid,int * stat_addr, int options)
 	int flag=0;
 	struct task_struct ** p;
 
-	if (stat_addr)
-		verify_area(stat_addr,4);
+	if (stat_addr && verify_area(stat_addr,4))
+		return -EFAULT;
 repeat:
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 		if (*p && *p != current &&
@@ -138,8 +138,9 @@ repeat:
 			if ((*p)->father == current->pid) {
 				flag=1;
 				if ((*p)->state==TASK_ZOMBIE) {
-					put_fs_long((*p)->exit_code,
-						(unsigned long *) stat_addr);
+					if (stat_addr)
+						put_fs_long((*p)->exit_code,
+							(unsigned long *) stat_addr);
 					current->cutime += (*p)->utime;
 					current->cstime += (*p)->stime;
 					flag = (*p)->pid;

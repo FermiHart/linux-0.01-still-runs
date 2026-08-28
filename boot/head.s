@@ -17,6 +17,33 @@ _startup_32:
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
+	/* bEMU enters directly, so initialize the cascaded PIC here instead of
+	 * inheriting firmware or bootloader state. IRQ0..15 become 0x20..0x2f. */
+	movb $0x11,%al
+	outb %al,$0x20
+	.word 0x00eb,0x00eb
+	outb %al,$0xa0
+	.word 0x00eb,0x00eb
+	movb $0x20,%al
+	outb %al,$0x21
+	.word 0x00eb,0x00eb
+	movb $0x28,%al
+	outb %al,$0xa1
+	.word 0x00eb,0x00eb
+	movb $0x04,%al
+	outb %al,$0x21
+	.word 0x00eb,0x00eb
+	movb $0x02,%al
+	outb %al,$0xa1
+	.word 0x00eb,0x00eb
+	movb $0x01,%al
+	outb %al,$0x21
+	.word 0x00eb,0x00eb
+	outb %al,$0xa1
+	.word 0x00eb,0x00eb
+	movb $0xff,%al
+	outb %al,$0x21
+	outb %al,$0xa1
 	lss _stack_start,%esp
 	call setup_idt
 	call setup_gdt
@@ -166,6 +193,7 @@ setup_paging:
 	movl %cr0,%eax
 	orl $0x80000000,%eax
 	movl %eax,%cr0		/* set paging (PG) bit */
+	cld				/* C code requires the direction flag clear */
 	ret			/* this also flushes prefetch-queue */
 
 .align 2

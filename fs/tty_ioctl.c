@@ -8,11 +8,12 @@
 #include <asm/segment.h>
 #include <asm/system.h>
 
-static void flush(struct tty_queue * queue)
+static void flush(struct tty_queue * queue,int reset_data)
 {
 	cli();
 	queue->head = queue->tail;
-	queue->data = 0;
+	if (reset_data)
+		queue->data = 0;
 	sti();
 }
 
@@ -28,7 +29,8 @@ static int get_termios(struct tty_struct * tty, struct termios * termios)
 {
 	int i;
 
-	verify_area(termios, sizeof (*termios));
+	if (verify_area(termios, sizeof (*termios)))
+		return -EFAULT;
 	for (i=0 ; i< (sizeof (*termios)) ; i++)
 		put_fs_byte( ((char *)&tty->termios)[i] , i+(char *)termios );
 	return 0;
@@ -38,7 +40,8 @@ static int set_termios(struct tty_struct * tty, struct termios * termios)
 {
 	int i;
 
-	verify_area(termios, sizeof(*termios));
+	if (verify_area(termios, sizeof(*termios)))
+		return -EFAULT;
 	cli();
 	for (i=0 ; i< (sizeof (*termios)) ; i++)
 		((char *)&tty->termios)[i]=get_fs_byte(i+(char *)termios);
@@ -51,7 +54,10 @@ static int get_termio(struct tty_struct * tty, struct termio * termio)
 	int i;
 	struct termio tmp_termio;
 
-	verify_area(termio, sizeof (*termio));
+	if (verify_area(termio, sizeof (*termio)))
+		return -EFAULT;
+	for (i=0 ; i<sizeof tmp_termio ; i++)
+		((char *)&tmp_termio)[i]=0;
 	tmp_termio.c_iflag = tty->termios.c_iflag;
 	tmp_termio.c_oflag = tty->termios.c_oflag;
 	tmp_termio.c_cflag = tty->termios.c_cflag;
@@ -69,7 +75,8 @@ static int set_termio(struct tty_struct * tty, struct termio * termio)
 	int i;
 	struct termio tmp_termio;
 
-	verify_area(termio, sizeof(*termio));
+	if (verify_area(termio, sizeof(*termio)))
+		return -EFAULT;
 	for (i=0 ; i< (sizeof (*termio)) ; i++)
 		((char *)&tmp_termio)[i]=get_fs_byte(i+(char *)termio);
 	cli();
@@ -93,13 +100,15 @@ int tty_ioctl(int dev, int cmd, int arg)
 			dev=0;
 	} else
 		dev=MINOR(dev);
+	if (dev < 0 || dev >= NR_TTYS)
+		return -ENXIO;
 	tty = dev + tty_table;
 	switch (cmd) {
 	case TCGETS:
 		return get_termios(tty,(struct termios *) arg);
 	case TCSETSF:
-		flush(&tty->read_q);
-		flush(&tty->secondary); /* fallthrough */
+		flush(&tty->read_q,0);
+		flush(&tty->secondary,1); /* fallthrough */
 	case TCSETSW:
 		wait_until_sent(tty); /* fallthrough */
 	case TCSETS:
@@ -107,9 +116,9 @@ int tty_ioctl(int dev, int cmd, int arg)
 	case TCGETA:
 		return get_termio(tty,(struct termio *) arg);
 	case TCSETAF:
-		flush(&tty->read_q);
-		flush(&tty->secondary);
-		flush(&tty->write_q); /* fallthrough */
+		flush(&tty->read_q,0);
+		flush(&tty->secondary,1);
+		flush(&tty->write_q,0); /* fallthrough */
 	case TCSETAW:
 		wait_until_sent(tty); /* fallthrough */
 	case TCSETA:
@@ -124,14 +133,14 @@ int tty_ioctl(int dev, int cmd, int arg)
 		return -EINVAL;
 	case TCFLSH:
 		if (arg==0) {
-			flush(&tty->read_q);
-			flush(&tty->secondary);
+			flush(&tty->read_q,0);
+			flush(&tty->secondary,1);
 		} else if (arg==1)
-			flush(&tty->write_q);
+			flush(&tty->write_q,0);
 		else if (arg==2) {
-			flush(&tty->read_q);
-			flush(&tty->secondary);
-			flush(&tty->write_q);
+			flush(&tty->read_q,0);
+			flush(&tty->secondary,1);
+			flush(&tty->write_q,0);
 		} else
 			return -EINVAL;
 		return 0;
@@ -142,14 +151,18 @@ int tty_ioctl(int dev, int cmd, int arg)
 	case TIOCSCTTY:
 		return -EINVAL;
 	case TIOCGPGRP:
-		verify_area((void *) arg,4);
+		if (verify_area((void *) arg,4))
+			return -EFAULT;
 		put_fs_long(tty->pgrp,(unsigned long *) arg);
 		return 0;
 	case TIOCSPGRP:
+		if (verify_area((void *) arg,4))
+			return -EFAULT;
 		tty->pgrp=get_fs_long((unsigned long *) arg);
 		return 0;
 	case TIOCOUTQ:
-		verify_area((void *) arg,4);
+		if (verify_area((void *) arg,4))
+			return -EFAULT;
 		put_fs_long(CHARS(tty->write_q),(unsigned long *) arg);
 		return 0;
 	case TIOCSTI:

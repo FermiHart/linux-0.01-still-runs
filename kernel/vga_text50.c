@@ -2,17 +2,17 @@
  *  vga_text50.c
  *
  * Switch VGA from default 80x25 to 80x50 in standard text mode (0xB8000
- * buffer). We carry the real IBM PC ROM 8x8 font as embedded data (see
- * vga_font8x8.h — the original 1981 character set) and write it into
+ * buffer). We carry a PC-compatible 8x8 font as embedded data (see
+ * vga_font8x8.h) and write it into
  * plane 2 at offset 0x8000 (font slot 2) at boot. Then we point the
  * Character Map Select at slot 2 and halve the CRTC max scan line.
  *
- * Why embedded and not the BIOS font: SeaBIOS / Limine leave the 8x16
+ * Why embedded and not a firmware font: the direct KVM machine has no BIOS
  * font loaded but not the 8x8 — slot 2 of plane 2 is empty at boot.
  * Earlier attempts at downsampling 8x16 -> 8x8 in software produced
  * either broken glyphs (every-other-row dropped cross-bars) or unreadably
  * thick ones (OR-fold blurred letters together). A properly designed
- * 8x8 font, even an authentic 1981 one, simply renders cleaner.
+ * 8x8 font simply renders cleaner.
  *
  * Must run before kernel/console.c con_init() so its geometry is set up
  * for LINES=50.
@@ -49,7 +49,7 @@ void vga_set_50_rows(void)
 	outb_p(0x05, 0x3CE); outb_p(0x00, 0x3CF);
 	outb_p(0x06, 0x3CE); outb_p(0x04, 0x3CF);
 
-	/* Write the embedded IBM PC 8x8 font into font slot 2 at offset
+	/* Write the embedded PC-compatible 8x8 font into slot 2 at offset
 	 * 0x8000. Each slot reserves 32 bytes per glyph; we use the first 8
 	 * and leave the rest at whatever it was (the CRTC only reads the
 	 * first MSL+1 = 8 rows so the tail is invisible). */

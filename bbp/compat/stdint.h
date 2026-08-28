@@ -4,7 +4,7 @@
  * -nostdinc -nostdlib, so this port-local shim satisfies that include. Two
  * worlds, like the tinalinux port:
  *
- *  - FREESTANDING TUs (osif.c, adapter.c, the core) provide the fixed-width
+ *  - FREESTANDING BBP core TUs get the fixed-width
  *    types from the compiler's own predefined builtins (available even under
  *    -nostdinc). This is the linux-0.01 case: it has no <linux/types.h> with
  *    int8_t..uint64_t (the 1991 tree predates them).

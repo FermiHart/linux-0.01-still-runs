@@ -32,6 +32,7 @@ _rs1_interrupt:
 _rs2_interrupt:
 	pushl $_table_list+16
 rs_int:
+	cld				# interrupted user code may have set DF
 	pushl %edx
 	pushl %ecx
 	pushl %ebx

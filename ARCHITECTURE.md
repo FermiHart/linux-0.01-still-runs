@@ -40,19 +40,15 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
 
 ```
                     linux-0.01-still-runs boot flow
- ┌──────────┐    ┌────────────┐    ┌──────────┐    ┌──────────┐
- │ Firmware │───►│  Limine    │───►│bootstub  │───►│  head.s  │
- │ (BIOS/   │    │ multiboot2 │    │ .S       │    │startup_32│
- │  UEFI)   │    │ loader     │    │ @ 1 MiB  │    │ @ 0x0000 │
- └──────────┘    └────────────┘    └──────────┘    └──────────┘
-                                         │
-                                     memcpy kernel.bin
-                                     to physical addr 0
-                                         │
-                                         ▼
-                                    far jump to 0x0000
-                                         │
-                                         ▼
+ ┌──────────────┐    ┌──────────────┐    ┌──────────┐
+ │ bEMU-NANO    │───►│ BBP handoff  │───►│  head.s  │
+ │ KVM machine  │    │ @ 0xC0000    │    │startup_32│
+ │ kernel @ 0   │    │ CRC64 tags   │    │ @ 0x0000 │
+ └──────────────┘    └──────────────┘    └──────────┘
+                                               │
+                                      direct KVM entry at 0
+                                               │
+                                               ▼
  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
  │ head.s   │───►│  main()  │───►│  init()  │───►│  /bin/sh │
  │ paging   │    │  inits   │    │  mounts  │    │  shell   │
@@ -64,14 +60,50 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
 
 | Stage | File | Address | What happens |
 |-------|------|---------|--------------|
-| 1 | `boot/bootstub.S` | `0x100000` | Limine entry; finds kernel.bin module, memcpy to phys 0 |
-| 2 | `boot/bootstub.S` | `0x100000` | Reprogram 8259 PIC, install bridge GDT, far jump to 0 |
-| 3 | `boot/head.s` | `0x000000` | Setup page directory/table, identity map 8 MiB |
-| 4 | `boot/head.s` | `0x000000` | Setup IDT (all -> ignore_int), GDT (8 MiB limit) |
-| 5 | `boot/head.s` | `0x000000` | Enable paging (CR0.PG=1), push args, call `main()` |
-| 6 | `init/main.c` | — | `time_init()`, `tty_init()`, `trap_init()`, `sched_init()` |
-| 7 | `init/main.c` | — | `buffer_init()`, `hd_init()`, `sti()`, `move_to_user_mode()` |
-| 8 | `init/main.c` | — | `fork()` → `init()`, task 0 idle loop `pause()` |
+| 1 | `bemu/memory.c`, `bemu/loader.c` | host | Allocate fixed 8 MiB RAM, validate the `L01KIMG1` length trailer, load only its payload at 0, and reject truncation, short reads or GDT/BBP overlap before KVM setup |
+| 2 | `bemu/loader.c` | `0xC0000` | Produce CRC64-checksummed HHDM, memory-map, kernel-address, command-line and hypervisor tags |
+| 3 | `boot/head.s` | `0x000000` | Remap 8259 PIC and setup page directory/table for 8 MiB |
+| 4 | `boot/head.s` | `0x000000` | Setup IDT, GDT, enable paging, and call `main()` |
+| 5 | `bbp/linux01_bbp.c` | `0xC0000` | Validate bEMU's untrusted BBP handoff and tag chain |
+| 6 | `init/main.c` | — | Initialize devices, scheduler, and buffer cache |
+| 7 | `init/main.c` | — | `sti()`, enter user mode, and `fork()` init |
+
+The IDE root image is mapped separately by `bemu/ide.c`; it is not copied into
+guest RAM. `bemu/kvm.c` receives already validated RAM and only registers it,
+installs the bootstrap GDT, creates the VM/vCPU, and sets registers.
+`kernel.bin` ends with an eight-byte `L01KIMG1` magic and an eight-byte
+little-endian payload length. The trailer is a host artifact envelope, not part
+of Linux memory; bEMU reports and loads only the preceding PA0 payload. Root
+images use their exact 977/5/17 CHS byte length as the independent truncation
+oracle before the writable mapping is created.
+The IDE module also has a host-only test seam for one-shot ATA read/write errors
+at a selected LBA; it is not exposed to the guest or command-line interface.
+IDE writes are staged for one complete 512-byte sector before an atomic copy to
+the mapped virtual medium. A separate host-only seam can stop the device at an
+LBA-selected write-accept, payload-received, sector-committed or IRQ-requested
+boundary. Tests materialize only committed sectors in disposable images; this
+models bEMU's virtual-media state, not physical disk/cache durability.
+The common IRQ bridge can similarly drop or defer one duplicate edge for a
+selected IRQ. Duplicate replay waits for a completed KVM run, a low device line,
+and clear IRR/ISR state in KVM's in-kernel 8259, including the slave cascade.
+The keyboard module exposes only a host-test seam for Set-1 error bytes `0x00`
+and `0xff`. Its terminal decoder carries escape state across polling boundaries;
+non-TTY EOF emits a lone Escape key but discards incomplete CSI/SS3 input before
+returning to the idle decoder state.
+The guest power path emits an explicit one-byte intent on private port `0x8900`
+before entering its `cli; hlt` loop. bEMU terminates normally only when that
+request is followed by `KVM_MP_STATE_HALTED` with IF=0; the same CPU state without
+a request, including kernel panic, is an error. HLT with IF=1 remains the normal
+interruptible idle path. The reboot request ends the current process but does not
+reset and recreate the VM in-process.
+BBP corruption tests map a disposable copy of the exact 64 KiB handoff window
+at `0xC0000` and call the production `bbp_linux01_init()` consumer. They repair
+CRC64 after semantic mutations, leave it broken for integrity mutations, and
+require bounded rejection of malformed headers, ranges, links, duplicate or
+missing tags, and Linux 0.01-specific tag contents. No corrupt handoff enters
+KVM or changes a canonical artifact.
+Minix metadata fault tests operate offline on disposable image copies. They
+never give a corrupt filesystem to the writable IDE mapping.
 
 ## Memory Layout (Physical)
 
@@ -88,7 +120,9 @@ It implements a minimal UNIX-like operating system in ~10,000 lines of C and x86
          │  Kernel .text / .rodata / .data      │
          │  Kernel .bss                         │
          ├──────────────────────────────────────┤
-         │  Buffer cache (end of kernel → 8 MiB)│
+0x0C0000 │  BBP handoff (legacy reserved hole)  │
+0x100000 ├──────────────────────────────────────┤
+         │  Buffer cache / allocatable pages    │
 0x800000 └──────────────────────────────────────┘
          │  (unmapped above 8 MiB)              │
 ```
@@ -146,7 +180,7 @@ CR3 ──► Page Directory (pg_dir @ phys 0)
           │            └── ...
           │
           └── [1] ──► Page Table 1 (pg1 @ phys 0x2000)
-                       ├── [0] → phys 0x40000
+                       ├── [0] → phys 0x400000
                        └── ...
 ```
 
@@ -210,7 +244,7 @@ struct m_inode {
 ### VGA Console (`kernel/console.c`)
 - Writes directly to framebuffer at `0xB8000` (VGA text mode)
 - VT102 subset: cursor, scroll, ANSI escape sequences
-- 80×25 characters, 16 colors
+- 80×50 characters, 16 colors
 
 ### Keyboard (`kernel/keyboard.s`)
 - i8042 interrupt handler (IRQ 1)
@@ -218,7 +252,7 @@ struct m_inode {
 - Handles shift, ctrl, alt, caps lock
 
 ### ATA Hard Disk (`kernel/hd.c`)
-- PIO mode, interrupt-driven
+- PIO mode; bounded polling reads and interrupt-driven writes
 - `hd_out()` sends command packets
 - `rw_abs_hd()` translates LBA to CHS
 - Block caching through `buffer.c`
@@ -226,7 +260,7 @@ struct m_inode {
 ### Serial (`kernel/serial.c` + `kernel/rs_io.s`)
 - RS-232 at 0x3F8 (IRQ 4)
 - Interrupt-driven transmit/receive
-- 2400 baud, 8N1
+- 115200 baud, 8N1
 
 ## System Calls (67 total)
 
@@ -259,7 +293,9 @@ Dispatch via `int $0x80` → `kernel/system_call.s` → `include/linux/sys.h` ta
 
 ```
 linux-0.01-still-runs/
-├── boot/           ← Boot chain (Limine stubs, head.s, linker scripts)
+├── bemu/           ← Firmware-free KVM machine and device models
+├── bbp/            ← CRC-checksummed bEMU-to-kernel handoff protocol
+├── boot/           ← Direct kernel entry and linker script
 ├── init/           ← Kernel C entry: main(), init()
 ├── kernel/         ← Core subsystems (sched, syscalls, drivers, tty)
 ├── mm/             ← Memory management (page alloc, page fault)
@@ -267,9 +303,9 @@ linux-0.01-still-runs/
 ├── lib/            ← Library linked into kernel (string, syscall wrappers)
 ├── include/        ← Kernel headers (merged from 1991)
 ├── userland/       ← Userspace programs (sh.asm, update.asm, libc/)
-├── tools/          ← Host tools (mkimage, bootmon)
+├── tools/          ← Host tools (root image and toolchain setup)
 ├── gdb/            ← GDB pretty-printers
-├── tests/          ← QEMU test harness
+├── tests/          ← bEMU/KVM test harness
 └── .github/        ← CI workflows
 ```
 
@@ -279,19 +315,17 @@ The following files are **NOT** from Linus' 1991 tree — they form the 2026 ada
 
 | File | Purpose |
 |------|---------|
-| `boot/bootstub.S` | Limine multiboot2 entry → kernel relocation to phys 0 |
-| `boot/bootstub.ld` | Linker script for bootstub at 1 MiB |
+| `bemu/bemu_linux01.c` | Direct KVM runner and Linux 0.01 device model |
+| `bbp/linux01_bbp.c` | Kernel-side validation of bEMU's BBP handoff |
 | `boot/kernel.ld` | Linker script for kernel at phys 0 |
-| `boot/limine.conf` | Limine bootloader configuration |
 | `tools/mkimage.c` | Minix v1 filesystem + MBR forger |
-| `tools/bootmon.py` | VGA marker decoder and boot analyzer |
 | `userland/sh.asm` | Minimal shell (NASM flat binary) |
 | `userland/update.asm` | Sync daemon stub |
-| `userland/libc/` | Userspace C library (syscall wrappers, crt0) |
+| `userland/libc.h`, `userland/crt0.S` | Userspace C syscall wrappers and runtime entry |
 | `Makefile` | Top-level build system (replaces original) |
 | `Dockerfile` | Containerized build |
 | `gdb/printers.py` | GDB pretty-printers for kernel structures |
-| `tests/test_boot.py` | QEMU-based boot test harness |
+| `tests/test_boot.py` | bEMU-based boot test harness |
 | `.github/workflows/` | CI automation |
 
 ## References
@@ -299,5 +333,5 @@ The following files are **NOT** from Linus' 1991 tree — they form the 2026 ada
 - [Linux 0.01 original source (kernel.org)](https://www.kernel.org/pub/linux/kernel/Historic/)
 - [Minix v1 filesystem specification](https://en.wikipedia.org/wiki/Minix_file_system)
 - [Intel 80386 Programmer's Reference Manual (1986)](https://pdos.csail.mit.edu/6.828/2018/readings/i386/toc.htm)
-- [Limine bootloader](https://github.com/limine-bootloader/limine)
+- [Linux KVM API](https://docs.kernel.org/virt/kvm/api.html)
 - [a.out (ZMAGIC) format](https://en.wikipedia.org/wiki/A.out)

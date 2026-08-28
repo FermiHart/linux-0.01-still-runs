@@ -1,8 +1,12 @@
 # Build artifacts
 build/
+release/
 *.o
+*.d
 *.a
 *.bin
+!datasets/compiler-cases/v1/binaries/
+!datasets/compiler-cases/v1/binaries/*.bin
 *.elf
 *.iso
 __pycache__/
@@ -18,11 +22,11 @@ Thumbs.db
 .idea/
 *.sublime-*
 
-# Logs & local runs
+# Upstream extraction output
+upstream/extracted/
+
 *.log
 serial.log
-qemu.log
-ci-serial.log
 
 # Secrets
 .env

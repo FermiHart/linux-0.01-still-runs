@@ -1,6 +1,8 @@
 #include <signal.h>
+#include <errno.h>
 
 #include <linux/sched.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>	/* for get_free_page */
 #include <asm/segment.h>
 
@@ -56,6 +58,8 @@ int sys_pipe(unsigned long * fildes)
 	int fd[2];
 	int i,j;
 
+	if (!fildes || verify_area(fildes,2*sizeof(*fildes)))
+		return -EFAULT;
 	j=0;
 	for(i=0;j<2 && i<NR_FILE;i++)
 		if (!file_table[i].f_count)

@@ -1,9 +1,6 @@
-.git
 build/
-*.o
-*.elf
-*.bin
-*.iso
+.git/
+upstream/extracted/
 *.img
-*.log
-.DS_Store
+*.bin
+*.elf

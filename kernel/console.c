@@ -41,6 +41,32 @@ static unsigned long npar,par[NPAR];
 static unsigned long ques=0;
 unsigned char attr=0x07;
 
+static inline void copy_screen(unsigned long dest,unsigned long src,
+	unsigned long count)
+{
+	__asm__ volatile("cld; rep; movsl"
+		: "+D" (dest), "+S" (src), "+c" (count)
+		:
+		: "memory", "cc");
+}
+
+static inline void copy_screen_down(unsigned long dest,unsigned long src,
+	unsigned long count)
+{
+	__asm__ volatile("std; rep; movsl; cld"
+		: "+D" (dest), "+S" (src), "+c" (count)
+		:
+		: "memory", "cc");
+}
+
+static inline void clear_screen(unsigned long dest,unsigned long count)
+{
+	__asm__ volatile("cld; rep; stosw"
+		: "+D" (dest), "+c" (count)
+		: "a" (0x0720)
+		: "memory", "cc");
+}
+
 /*
  * this is what the terminal answers to a ESC-Z or csi0c
  * query (= vt100 response).
@@ -75,59 +101,31 @@ static void scrup(void)
 		pos += cols2;
 		scr_end += cols2;
 		if (scr_end>SCREEN_END) {
-			__asm__("cld\n\t"
-				"rep\n\t"
-				"movsl\n\t"
-				"movl %3,%%ecx\n\t"
-				"rep\n\t"
-				"stosw"
-				::"a" (0x0720),
-				"c" ((lines-1)*(columns>>1)),
-				"D" (SCREEN_START),
-				"r" (columns)
-				:);
+			copy_screen(SCREEN_START,origin,
+				(lines-1)*(columns>>1));
+			clear_screen(SCREEN_START+(lines-1)*cols2,columns);
 			scr_end -= origin-SCREEN_START;
 			pos -= origin-SCREEN_START;
 			origin = SCREEN_START;
 		} else {
-			__asm__("cld\n\t"
-				"rep\n\t"
-				"stosl"
-				::"a" (0x07200720),
-				"c" (columns>>1),
-				"D" (scr_end-cols2)
-				:);
+			clear_screen(scr_end-cols2,columns);
 		}
 		set_origin();
 	} else {
-		__asm__("cld\n\t"
-			"rep\n\t"
-			"movsl\n\t"
-			"movl %3,%%ecx\n\t"
-			"rep\n\t"
-			"stosw"
-			::"a" (0x0720),
-			"c" ((bottom-top-1)*(columns>>1)),
-			"D" (origin+cols2*top),
-			"S" (origin+cols2*(top+1))
-			:);
+		copy_screen(origin+cols2*top,origin+cols2*(top+1),
+			(bottom-top-1)*(columns>>1));
+		clear_screen(origin+cols2*(bottom-1),columns);
 	}
 }
 
 static void scrdown(void)
 {
-	__asm__("std\n\t"
-		"rep\n\t"
-		"movsl\n\t"
-		"addl $2,%%edi\n\t"	/* %edi has been decremented by 4 */
-		"movl _columns,%%ecx\n\t"
-		"rep\n\t"
-		"stosw"
-		::"a" (0x0720),
-		"c" ((bottom-top-1)*columns>>1),
-		"D" (origin+(columns<<1)*bottom-4),
-		"S" (origin+(columns<<1)*(bottom-1)-4)
-		:);
+	unsigned long cols2 = columns<<1;
+
+	copy_screen_down(origin+cols2*bottom-4,
+		origin+cols2*(bottom-1)-4,
+		(bottom-top-1)*(columns>>1));
+	clear_screen(origin+cols2*top,columns);
 }
 
 static void lf(void)
@@ -186,12 +184,7 @@ static void csi_J(int par)
 		default:
 			return;
 	}
-	__asm__("cld\n\t"
-		"rep\n\t"
-		"stosw\n\t"
-		::"c" (count),
-		"D" (start),"a" (0x0720)
-		:);
+	clear_screen(start,count);
 }
 
 static void csi_K(int par)
@@ -217,12 +210,7 @@ static void csi_K(int par)
 		default:
 			return;
 	}
-	__asm__("cld\n\t"
-		"rep\n\t"
-		"stosw\n\t"
-		::"c" (count),
-		"D" (start),"a" (0x0720)
-		:);
+	clear_screen(start,count);
 }
 
 void csi_m(void)
@@ -403,10 +391,8 @@ switch(state) {
 						pos -= columns<<1;
 						lf();
 					}
-					__asm__("movb _attr,%%ah\n\t"
-						"movw %%ax,%1\n\t"
-						::"a" (c),"m" (*(short *)pos)
-						:);
+					*(unsigned short *)pos =
+						((unsigned short)attr<<8)|(unsigned char)c;
 pos += 2;
 x++;
 } else if (c==27)

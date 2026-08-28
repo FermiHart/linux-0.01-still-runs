@@ -15,13 +15,19 @@
 
 int main(int argc, char *argv[])
 {
-    write(1, "\033[36m", 5);   /* cyan */
-    write(1, "\n", 1);
-    write(1, "  +--------------------------------------+\n", 47);
-    write(1, "  |  Hello from C userland!               |\n", 45);
-    write(1, "  |  Linux 0.01 — Torvalds, 1991          |\n", 45);
-    write(1, "  +--------------------------------------+\n", 47);
-    write(1, "\033[0m", 4);
+    (void)argc;
+    (void)argv;
+    write(1, "\033[36m", sizeof("\033[36m") - 1);   /* cyan */
+    write(1, "\n", sizeof("\n") - 1);
+    write(1, "  +--------------------------------------+\n",
+          sizeof("  +--------------------------------------+\n") - 1);
+    write(1, "  |  Hello from C userland!               |\n",
+          sizeof("  |  Hello from C userland!               |\n") - 1);
+    write(1, "  |  Linux 0.01 -- Torvalds, 1991         |\n",
+          sizeof("  |  Linux 0.01 -- Torvalds, 1991         |\n") - 1);
+    write(1, "  +--------------------------------------+\n",
+          sizeof("  +--------------------------------------+\n") - 1);
+    write(1, "\033[0m", sizeof("\033[0m") - 1);
 
     return 42;
 }

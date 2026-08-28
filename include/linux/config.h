@@ -45,7 +45,7 @@
 #if	defined(LASU_HD)
 #define HD_TYPE { 7,35,915,65536,920,0 }
 #elif	defined(LINUS_HD)
-/* Modern port: single drive, geometry pinned in QEMU -drive cyls=977,heads=5,secs=17. */
+/* Modern port: one bEMU IDE drive with fixed 977/5/17 CHS geometry. */
 #define HD_TYPE { 5,17,977,300,977,0 }
 #else
 #error "must define a hard-disk type"

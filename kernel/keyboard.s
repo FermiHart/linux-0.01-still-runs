@@ -25,6 +25,7 @@ e0:	.byte 0
  *  ascii character(s).
  */
 _keyboard_interrupt:
+	cld				# interrupted user code may have set DF
 	pushl %eax
 	pushl %ebx
 	pushl %ecx

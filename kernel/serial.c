@@ -27,7 +27,7 @@ static void init(int port)
 				 * through both serial_puts AND tty_write paths,
 				 * the write_q saturated after ~25 commands and
 				 * the shell blocked in puts(prompt). 115200 fits
-				 * QEMU's host UART and eliminates the backpressure. */
+				 * bEMU's host UART and eliminates the backpressure. */
 	outb_p(0x00,port+1);	/* MS of divisor */
 	outb_p(0x03,port+3);	/* reset DLAB */
 	outb_p(0x0b,port+4);	/* set DTR,RTS, OUT_2 */

@@ -28,7 +28,7 @@ extern char _ctmp;
 #define isascii(c) (((unsigned) c)<=0x7f)
 #define toascii(c) (((unsigned) c)&0x7f)
 
-#define tolower(c) (_ctmp=(unsigned char)(c),isupper(_ctmp)?_ctmp+('a'+'A'):_ctmp)
+#define tolower(c) (_ctmp=(unsigned char)(c),isupper(_ctmp)?_ctmp+('a'-'A'):_ctmp)
 #define toupper(c) (_ctmp=(unsigned char)(c),islower(_ctmp)?_ctmp+('A'-'a'):_ctmp)
 
 #endif

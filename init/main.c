@@ -43,12 +43,7 @@ static inline int setup(void)
     __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_setup));
     return __res;
 }
-inline int sync(void)
-{
-    int __res;
-    __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_sync));
-    return __res;
-}
+extern int sync(void);
 
 #include <linux/tty.h>
 #include <linux/sched.h>
@@ -130,9 +125,7 @@ void main(void)		/* This really IS void, no error here. */
 	sched_init();
 	buffer_init();
 	hd_init();
-	bbp_linux01_init();	/* BBP: synthesize + CRC-validate the boot handoff
-				 * tag list from the kernel's RAM model. Additive,
-				 * non-fatal — logs "[bbp] linux-0.01 adapter: ok". */
+	bbp_linux01_init();	/* Validate bEMU's CRC-checksummed BBP handoff. */
 	sti();
 	move_to_user_mode();
 	if (!fork()) {
@@ -160,18 +153,22 @@ static int printf(const char *fmt, ...)
 }
 
 static char * argv[] = { "-",NULL };
-static char * envp[] = { "HOME=/home/fermihart", NULL };
+static char * alive_envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", "EXPERIENCE=alive", NULL };
+static char * historical_envp[] = { "HOME=/", "PATH=/bin:/usr/bin:.", "EXPERIENCE=1991", NULL };
 
 void init(void)
 {
 	int i,j;
+	char **shell_envp;
+	const char *experience;
 
+	experience = bbp_linux01_experience();
+	shell_envp = experience && experience[0] == '1' ? historical_envp : alive_envp;
 	setup();
 /*	if (!fork())
 		_exit(execve("/bin/update",NULL,NULL));  */
 	for (i=0;i<NR_OPEN;i++)
-		if (current->filp[i])
-			close(i);
+		close(i);
 	(void) open("/dev/tty0",O_RDWR,0);
 	(void) dup(0);
 	(void) dup(0);
@@ -186,7 +183,7 @@ void init(void)
 		(void) open("/dev/tty0",O_RDWR,0);
 		(void) dup(0);
 		(void) dup(0);
-		_exit(execve("/bin/shell",argv,envp));
+		_exit(execve("/bin/shell",argv,shell_envp));
 	}
 	j=wait(&i);
 	printf("child %d died with code %04x\n",j,i);

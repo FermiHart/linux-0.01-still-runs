@@ -2,6 +2,7 @@
 
 #include <linux/sched.h>
 #include <linux/kernel.h>
+#include <linux/tty.h>
 
 extern int tty_read(unsigned minor,char * buf,int count);
 extern int tty_write(unsigned minor,char * buf,int count);
@@ -25,6 +26,8 @@ static crw_ptr crw_table[]={
 
 static int rw_ttyx(int rw,unsigned minor,char * buf,int count)
 {
+	if (minor >= NR_TTYS)
+		return -ENXIO;
 	return ((rw==READ)?tty_read(minor,buf,count):
 		tty_write(minor,buf,count));
 }

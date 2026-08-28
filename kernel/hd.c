@@ -61,15 +61,30 @@ static int sorting=0;
 
 static void do_request(void);
 static void reset_controller(void);
+static void reset_controller_quiet(void);
 static void rw_abs_hd(int rw,unsigned int nr,unsigned int sec,unsigned int head,
+	unsigned int cyl,struct buffer_head * bh);
+static void read_abs_hd(unsigned int drive,unsigned int sec,unsigned int head,
 	unsigned int cyl,struct buffer_head * bh);
 void hd_init(void);
 
-#define port_read(port,buf,nr) \
-__asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr):)
+#define port_read(port,buf,nr) do { \
+	unsigned long __pr_buf = (unsigned long)(buf); \
+	unsigned long __pr_count = (nr); \
+	__asm__ volatile("cld;rep;insw" \
+		: "+D" (__pr_buf), "+c" (__pr_count) \
+		: "d" (port) \
+		: "memory"); \
+} while (0)
 
-#define port_write(port,buf,nr) \
-__asm__("cld;rep;outsw"::"d" (port),"S" (buf),"c" (nr):)
+#define port_write(port,buf,nr) do { \
+	unsigned long __pw_buf = (unsigned long)(buf); \
+	unsigned long __pw_count = (nr); \
+	__asm__ volatile("cld;rep;outsw" \
+		: "+S" (__pw_buf), "+c" (__pw_count) \
+		: "d" (port) \
+		: "memory"); \
+} while (0)
 
 extern void hd_interrupt(void);
 
@@ -164,6 +179,58 @@ static int controller_ready(void)
 	return (retries);
 }
 
+static void read_abs_hd(unsigned int drive,unsigned int sec,unsigned int head,
+	unsigned int cyl,struct buffer_head * bh)
+{
+	int attempt,i,retries,status;
+
+	/* Wait for a queued write before taking exclusive polling control. */
+	cli();
+	while (this_request)
+		sleep_on(&wait_for_request);
+	sti();
+	for (attempt=0; attempt<MAX_ERRORS; attempt++) {
+		outb(_CTL | 2,HD_CMD);	/* nIEN: do not race the IRQ handler */
+		if (!controller_ready())
+			goto retry;
+		outb_p(_WPCOM,HD_PRECOMP);
+		outb_p(2,HD_NSECTOR);
+		outb_p(sec,HD_SECTOR);
+		outb_p(cyl,HD_LCYL);
+		outb_p(cyl>>8,HD_HCYL);
+		outb_p(0xA0|(drive<<4)|head,HD_CURRENT);
+		outb(WIN_READ,HD_COMMAND);
+
+		for (i=0; i<2; i++) {
+			retries=100000;
+			do {
+				status=inb(HD_STATUS);
+				if (status & ERR_STAT)
+					goto retry;
+			} while (--retries &&
+				 ((status & (BUSY_STAT | DRQ_STAT)) != DRQ_STAT));
+			if (!retries)
+				goto retry;
+			port_read(HD_DATA,bh->b_data+512*i,256);
+		}
+		status=inb(HD_STATUS);
+		if (status & (BUSY_STAT | DRQ_STAT | ERR_STAT))
+			goto retry;
+		bh->b_uptodate=1;
+		bh->b_dirt=0;
+		outb(_CTL,HD_CMD);
+		unlock_buffer(bh);
+		return;
+
+retry:
+		(void) inb(HD_STATUS);
+		reset_controller_quiet();
+	}
+	bh->b_uptodate=0;
+	outb(_CTL,HD_CMD);
+	unlock_buffer(bh);
+}
+
 static int win_result(void)
 {
 	int i=inb(HD_STATUS);
@@ -222,8 +289,19 @@ static void reset_controller(void)
 	for(i = 0; i < 10000 && drive_busy(); i++) /* nothing */;
 	if (drive_busy())
 		printk("HD-controller still busy\n\r");
-	if((i = inb(ERR_STAT)) != 1)
+	if((i = inb(HD_ERROR)) != 1)
 		printk("HD-controller reset failed: %02x\n\r",i);
+}
+
+static void reset_controller_quiet(void)
+{
+	int i;
+
+	outb(4 | 2,HD_CMD);
+	for(i = 0; i < 1000; i++) nop();
+	outb(2,HD_CMD);
+	for(i = 0; i < 10000 && drive_busy(); i++) /* nothing */;
+	(void) inb(HD_STATUS);
 }
 
 static void reset_hd(int nr)
@@ -253,7 +331,7 @@ static void bad_rw_intr(void)
 
 static void read_intr(void)
 {
-	if (win_result()) {
+	if (win_result() || !(inb(HD_STATUS) & DRQ_STAT)) {
 		bad_rw_intr();
 		return;
 	}
@@ -368,7 +446,12 @@ void rw_abs_hd(int rw,unsigned int nr,unsigned int sec,unsigned int head,
 	if (rw!=READ && rw!=WRITE)
 		panic("Bad hd command, must be R/W");
 	lock_buffer(bh);
+	if (rw == READ) {
+		read_abs_hd(nr,sec,head,cyl,bh);
+		return;
+	}
 repeat:
+	cli();
 	for (req=0+request ; req<NR_REQUEST+request ; req++)
 		if (req->hd<0)
 			break;
@@ -377,6 +460,7 @@ repeat:
 		goto repeat;
 	}
 	req->hd=nr;
+	sti();
 	req->nsector=2;
 	req->sector=sec;
 	req->head=head;
@@ -402,7 +486,9 @@ void hd_init(void)
 		hd[i*5].nr_sects = hd_info[i].head*
 				hd_info[i].sect*hd_info[i].cyl;
 	}
+	reset_controller_quiet();
 	set_trap_gate(0x2E,&hd_interrupt);
 	outb_p(inb_p(0x21)&0xfb,0x21);
 	outb(inb_p(0xA1)&0xbf,0xA1);
+	outb(_CTL,HD_CMD);
 }

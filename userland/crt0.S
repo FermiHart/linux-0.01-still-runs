@@ -9,20 +9,28 @@
  */
 
 .code32
-.section .text
+.section .text.startup
 .globl _entry
 
 _entry:
     /* Zero BSS */
-    movl    $_bss_start, %edi
-    movl    $_bss_end, %ecx
+    cld
+    movl    $__bss_start, %edi
+    movl    $_end, %ecx
     subl    %edi, %ecx
     xorl    %eax, %eax
     rep     stosb
 
-    /* Call main(argc, argv) */
+    /* The a.out wrapper reserves enough BSS; expose only the linked extent. */
+    movl    $_end, %ebx
+    movl    $45, %eax               /* __NR_brk */
+    int     $0x80
+
+    /* The kernel's execve() builds: argc, argv, envp on the stack. */
     popl    %eax                    /* argc */
     popl    %ebx                    /* argv */
+    popl    %ecx                    /* envp */
+    pushl   %ecx
     pushl   %ebx
     pushl   %eax
     call    _main
@@ -35,9 +43,3 @@ _entry:
     /* Should never reach here */
 1:  hlt
     jmp     1b
-
-.section .bss
-.align 4
-_bss_start:
-    .skip 65536                     /* 64 KiB BSS */
-_bss_end:

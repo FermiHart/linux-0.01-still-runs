@@ -7,8 +7,11 @@
  */
 #define memcpy(dest,src,n) ({ \
 void * _res = dest; \
-__asm__ ("cld;rep;movsb" \
-	::"D" ((long)(_res)),"S" ((long)(src)),"c" ((long) (n)) \
-	:); \
+unsigned long _dst = (unsigned long)(_res); \
+unsigned long _src = (unsigned long)(src); \
+unsigned long _cnt = (unsigned long)(n); \
+__asm__ volatile ("cld;rep;movsb" \
+	:"+D" (_dst),"+S" (_src),"+c" (_cnt) \
+	: :"memory","cc"); \
 _res; \
 })

@@ -1,0 +1,152 @@
+[bemu-linux01] BBP @ 0xc0000: 5 tags, kernel=89224 bytes, root=/dev/hd1 ide=977,5,17 experience=alive
+[bemu-linux01] direct KVM entry: build/kernel.bin @ PA 0, 8 MiB, no firmware, no bootloader
+[bbp] bEMU handoff: ok, 5 tags, root=/dev/hd1 ide=977,5,17 experience=alive
+
+[36mPartition table[0m [32mok.[0m
+
+
+[32m938[0m/[37m1024[0m free blocks
+
+
+[32m229[0m/[37m256[0m free inodes
+
+
+[35msys_setup[0m [32mreturning[0m
+
+
+[36m1514 buffers[0m = [37m1550336 bytes[0m buffer space
+
+
+ [32mOk.[0m
+
+
+
+
+
+Vesica Piscis alive experience
+
+
+
+
+
+There is a specific feeling that comes from booting an operating
+
+
+system written three and a half decades ago. It is not nostalgia
+
+
+-- nostalgia implies distance, the safe view from behind glass.
+
+
+This is something else. This is the moment when the machine you
+
+
+built in 2026 loads a kernel whose ideas were typed out in a
+
+
+Helsinki bedroom, on a 386 with 33 megahertz and four megabytes
+
+
+of RAM, and it works.
+
+
+
+
+
+Not works in the sense of a museum exhibit under rope and velvet.
+
+
+Works in the sense that you can type a command, create a directory,
+
+
+write a file, read it back, and feel the same feedback loop that
+
+
+Linus described in his 25 August 1991 comp.os.minix post:
+
+
+
+
+
+  I'm doing a (free) operating system (just a hobby, won't be
+
+
+  big and professional).
+
+
+
+
+
+He was wrong about the scale. But he was right about the spirit.
+
+
+
+
+
+This project exists to keep that spirit running, not frozen behind
+
+
+a glass pane. The historical linux-0.01 core is still here, still
+
+
+recognizable, still the heart of the machine. What we added is a
+
+
+firmware-free KVM bridge with emulated legacy devices, a toolchain
+
+
+that speaks 2026 C while respecting 1991 conventions, and documented
+
+
+runtime patches that expose rather than hide changed assumptions.
+
+
+
+
+
+The experience we tried to bring back alive is the one Linus
+
+
+described: you sit at a terminal, you type, the machine answers.
+
+
+There is no container orchestration between you and the process
+
+
+table. There is no init system with seventy stages. There is a
+
+
+kernel, a console, a shell, and you.
+
+
+
+
+
+Today is not painted onto this screen. The date command reads Linux's
+
+
+clock, initialized from a coherent UTC snapshot supplied by bEMU.
+
+
+
+
+
+Welcome to 1991. It still runs in 2026.
+
+
+[0m
+
+
+ linux 0.01 -- experience: alive -- interactive shell
+
+
+
+
+
+[32mroot@linux01[0m:[34m/[0m[33m#[0m echo GOLDEN_BOOT_MARKER
+
+
+GOLDEN_BOOT_MARKER
+
+[32mroot@linux01[0m:[34m/[0m[33m#[0m
+[bemu-linux01] RESULT: PASS after 6294 KVM exits

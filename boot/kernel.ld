@@ -10,8 +10,8 @@
  *   0x3000  pg2  (reserved, unused)
  *   0x4000  after_page_tables (rest of kernel)
  *
- * Linked as ELF for symbol/debug ease; later objcopy -O binary → kernel.bin.
- * The bootstub memcpy's that flat blob to physical 0.
+ * Linked as ELF for symbol/debug ease; objcopy emits build/kernel.raw.
+ * The build wraps that PA0 payload with a host-only length trailer in kernel.bin.
  *
  * NOTE: code is built with -fleading-underscore so C symbol `main` lands as
  * `_main`, which is exactly what head.s references.

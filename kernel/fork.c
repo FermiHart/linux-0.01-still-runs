@@ -15,19 +15,31 @@ extern void write_verify(unsigned long address);
 
 long last_pid=0;
 
-void verify_area(void * addr,int size)
+int verify_area(void * addr,int size)
 {
-	unsigned long start;
+	unsigned long base,end,limit,start;
 
 	start = (unsigned long) addr;
+	if (!start || size < 0)
+		return -EFAULT;
+	if (!size)
+		return 0;
+	limit = get_limit(0x17);
+	if (start >= limit || (unsigned long)size > limit-start)
+		return -EFAULT;
+	end = start + size - 1;
+	base = get_base(current->ldt[2]);
+	if (start > ~0UL-base || end > ~0UL-base)
+		return -EFAULT;
 	size += start & 0xfff;
 	start &= 0xfffff000;
-	start += get_base(current->ldt[2]);
+	start += base;
 	while (size>0) {
 		size -= 4096;
 		write_verify(start);
 		start += 4096;
 	}
+	return 0;
 }
 
 int copy_mem(int nr,struct task_struct * p)

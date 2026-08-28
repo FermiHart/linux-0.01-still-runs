@@ -6,6 +6,7 @@
 .globl _page_fault
 
 _page_fault:
+	cld				# faulting user code may have set DF
 	xchgl %eax,(%esp)
 	pushl %ecx
 	pushl %edx

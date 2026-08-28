@@ -1,0 +1,27 @@
+{
+  "adaptation_count": 19,
+  "dataset_id": "linux-0.01-historical-core-patches-v1",
+  "generator_path": "scripts/build-patch-dataset.py",
+  "generator_sha256": "93339513e5af702d4817a8e8f70ecd83d514c9d49933252ef5d51c4a023891a0",
+  "historical_core_directories": [
+    "init",
+    "kernel",
+    "mm",
+    "fs",
+    "lib",
+    "include"
+  ],
+  "historical_core_patch_sha256": "e940fe18049b8b080b77078bfe21d9df09d29f6874e0d9a60930775bdc36ea1e",
+  "historical_core_path_count": 53,
+  "ledger_path": "docs/PORTING_LEDGER.md",
+  "ledger_sha256": "df135520dbb82edfdef329a454cd55ec273101cff7191950819d4e16a8ef5274",
+  "paired_observation_count": 0,
+  "port_commit": "ae458306905d4fee85121ac3c2b42e86ed099310",
+  "port_tree": "7a76d98d1658152c19daa4cbd0612f1f15c3f22b",
+  "publication_date": "2026-08-26",
+  "rq2_ablation_configuration_count": 0,
+  "schema_version": 1,
+  "unresolved_path_count": 9,
+  "upstream_path": "upstream/linux-0.01.tar.gz",
+  "upstream_sha256": "24454f830cdb571e2c4ad15481119c43b3cafd48dd869a9b2945d1036d1dc68d"
+}

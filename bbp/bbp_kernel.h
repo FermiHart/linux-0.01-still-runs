@@ -29,7 +29,7 @@ typedef enum {
 struct bbp_kctx {
     const struct bbp_info *info;   /* virtual ptr to validated info */
     bbp_virt_t hhdm_offset;        /* phys->virt offset (0 until known) */
-    int verify_tag_crc;            /* 1 = check each tag's CRC on lookup */
+    int verify_tag_crc;            /* retained ABI field; chain CRC is mandatory */
 
     /* OPTIONAL walk window (ADR-0009). When walk_hi > walk_lo, EVERY tag
      * pointer the parser dereferences must lie fully within the physical range
@@ -51,7 +51,10 @@ struct bbp_kctx {
  * offset 0 and this is the identity. */
 static inline void *bbp_phys_to_virt(const struct bbp_kctx *k, bbp_phys_t p)
 {
-    if (p == 0) return (void *)0;
+    uint64_t ptr_max = (uint64_t)(uintptr_t)-1;
+
+    if (!k || p == 0 || p > ptr_max || k->hhdm_offset > ptr_max - p)
+        return (void *)0;
     return (void *)(uintptr_t)(p + k->hhdm_offset);
 }
 
@@ -60,9 +63,8 @@ static inline void *bbp_phys_to_virt(const struct bbp_kctx *k, bbp_phys_t p)
  * is initialized with hhdm_offset taken from the HHDM tag if present. */
 bbp_status_t bbp_init(struct bbp_kctx *out, const struct bbp_info *info);
 
-/* Find the first tag with the given UUID. Returns NULL if absent.
- * When k->verify_tag_crc is set, a tag whose CRC fails is skipped (treated
- * as absent) — a corrupt tag must never be handed to a subsystem. */
+/* Find the first tag with the given UUID. Returns NULL if absent or if the
+ * bounded chain no longer satisfies its size/version/CRC/count contract. */
 const struct bbp_tag_header *bbp_find_tag(const struct bbp_kctx *k, uint64_t tag_id);
 
 /* Iterate every tag. `cb` returns non-zero to stop early. `user` is opaque.
