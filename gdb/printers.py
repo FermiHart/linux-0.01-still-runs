@@ -1,3 +1,6 @@
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 GDB Pretty-Printers for Linux 0.01 Kernel Structures.
 

@@ -1,4 +1,9 @@
 /*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
+/*
  * Tests for BBP truncation and tag overlap handling.
  */
 

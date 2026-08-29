@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>

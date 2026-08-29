@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """Boot Linux 0.01 directly through bEMU and validate serial milestones."""
 
 import argparse

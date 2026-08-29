@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """Test real mkdir/rmdir in a single boot."""
 
 import argparse

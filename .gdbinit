@@ -1,3 +1,6 @@
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # linux-0.01-modern GDB init
 # Usage: x86_64-elf-gdb build/kernel.elf -x .gdbinit
 

@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Verify host prerequisites and install/discover the project toolchain.
 set -euo pipefail
 

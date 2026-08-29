@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 /* yes.c — Classic Unix yes(1) for Linux 0.01
  *
  * Prints its argument (or "y") forever, one line per iteration.

@@ -1,3 +1,8 @@
+/*
+ * Maintainer and adaptation: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * bEMU-NANO provenance: see bemu/README.md
+ */
+
 #ifndef BEMU_PIC_H
 #define BEMU_PIC_H
 

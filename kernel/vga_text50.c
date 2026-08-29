@@ -1,4 +1,9 @@
 /*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
+/*
  *  vga_text50.c
  *
  * Switch VGA from default 80x25 to 80x50 in standard text mode (0xB8000

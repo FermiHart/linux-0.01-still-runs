@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 Package a transient legacy bundle of the compiler-case investigation.
 

@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Build the pinned x86_64-elf binutils/GCC toolchain used by this project.
 set -euo pipefail
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 Verify that the compiler-case summary JSON is generated and contains results for
 all cases, ABIs and optimization levels.

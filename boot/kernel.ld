@@ -1,7 +1,8 @@
 /*
  * kernel.ld — Linus' linux-0.01 kernel image, linked at physical 0.
  *
- * F E R M I ∞ H A R T <contact@fermihart.com>
+ * Author: F E R M I ∞ H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
  *
  * Layout dictated by boot/head.s (DO NOT CHANGE without rewriting head.s):
  *   0x0000  startup_32 code → becomes pg_dir at runtime (.org statements)

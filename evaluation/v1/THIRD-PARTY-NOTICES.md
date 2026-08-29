@@ -22,6 +22,12 @@ See `source/LICENSE`, `source/upstream/README.md`, and
 
 ## Modern Project Code, BBP, And bEMU
 
+The canonical modern-project identity is
+`F E R M I ∞ H A R T <contact@fermihart.com>`; ASCII-only source headers spell
+the symbol as `INFINITY`. `source/AUTHORS.md` and
+`source/docs/AUTHORSHIP.md` define the attribution categories and automated
+coverage gate. Authorship does not override the component boundaries below.
+
 Files with `SPDX-License-Identifier: BSD-3-Clause` are governed by the BSD text
 in `source/LICENSE`. Other original modern material is covered only where its
 author had the right to apply the stated project terms. Do not infer a directory
@@ -70,8 +76,8 @@ uses that license.
 
 ## Historical Text And Quotations
 
-`source/userland/shell.c`, `source/README.md`, `source/tools/mkimage.c`, and the
-retained console trace contain copies or excerpts of Linus
+`source/userland/shell.c`, `source/README.md`, `source/tools/mkimage.c`,
+`source/Makefile`, and the retained console trace contain copies or excerpts of Linus
 Torvalds's August 1991 `comp.os.minix` announcement and several attributed
 technical quotations. Generated copies also occur in `artifacts/shell.bin` and
 the two root images. Attribution is not itself a license. Their inclusion is for

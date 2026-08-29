@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Independent release verifier for linux-0.01-still-runs.
 # Run from the repository root. Exits non-zero if release criteria fail.
 set -euo pipefail
@@ -22,10 +25,10 @@ else
 fi
 
 printf 'Checking required documentation...\n'
-for doc in MISSION.md EXPERIENCE.md docs/AUDIT-STATEMENTS.md \
-           docs/ADRS.md docs/RISKS.md docs/PORTING_LEDGER.md \
-           docs/TOOLCHAIN.md docs/CONTAINER.md docs/REPRODUCIBILITY.md \
-           docs/SBOM.md docs/PAPER.md docs/REPRODUCTION.md \
+for doc in AUTHORS.md MISSION.md EXPERIENCE.md docs/AUDIT-STATEMENTS.md \
+	       docs/ADRS.md docs/RISKS.md docs/PORTING_LEDGER.md \
+	       docs/TOOLCHAIN.md docs/CONTAINER.md docs/REPRODUCIBILITY.md \
+	       docs/AUTHORSHIP.md docs/SBOM.md docs/PAPER.md docs/REPRODUCTION.md \
            evaluation/v1/README.md evaluation/v1/CHECKLIST.md \
            evaluation/v1/CLAIM-EVIDENCE.tsv \
            evaluation/v1/THIRD-PARTY-NOTICES.md \

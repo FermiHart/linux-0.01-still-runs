@@ -1,4 +1,7 @@
 # syntax=docker/dockerfile:1
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Reproducible build environment for linux-0.01-still-runs.
 # This container provides the reference toolchain documented in docs/TOOLCHAIN.md.
 #

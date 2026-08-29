@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Verify byte-for-byte reproducibility by building twice and comparing hashes.
 set -euo pipefail
 

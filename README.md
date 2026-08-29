@@ -255,6 +255,20 @@ explicitly rather than being presented as syntax errors.
 
 ---
 
+## Authorship and provenance
+
+**F E R M I ∞ H A R T <contact@fermihart.com>** is the creator, principal
+author, research lead, and current maintainer of the modern project and the
+Vesica Piscis academic-artifact program.
+
+That attribution does not claim authorship of Linux 0.01, bEMU-NANO-derived
+portions, third-party material, quotations, generated outputs, or retained
+datasets. See [AUTHORS.md](AUTHORS.md) and
+[docs/AUTHORSHIP.md](docs/AUTHORSHIP.md) for the explicit boundaries and
+automated path-level gate.
+
+---
+
 ## License
 
 The historical kernel remains © 1991 Linus Torvalds under the original Linux
@@ -267,6 +281,7 @@ font data.
 
 <div align="center">
 
-**F E R M I ∞ H A R T**
+**F E R M I ∞ H A R T**<br>
+<contact@fermihart.com>
 
 </div>

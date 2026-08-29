@@ -1,3 +1,6 @@
+; Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+; SPDX-License-Identifier: Unlicense
+
 ; ============================================================
 ; update.asm  -  /bin/update stub (block-cache sync daemon)
 ; F E R M I ~ H A R T  <contact@fermihart.com>

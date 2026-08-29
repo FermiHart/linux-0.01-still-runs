@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 Verify that the compiler-case academic dataset is packaged and contains a valid
 manifest and checksum file.

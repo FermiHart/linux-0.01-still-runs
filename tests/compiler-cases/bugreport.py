@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 Generate upstream bug-report drafts for any compiler case classified as a
 GCC bug.  If no case is classified as a GCC bug, produce a note explaining why

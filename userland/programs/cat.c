@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 /* cat.c - Minimal Unix cat(1) for Linux 0.01. */
 
 #include "libc.h"

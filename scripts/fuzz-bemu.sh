@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # fuzz-bemu.sh - lightweight fault injection for bEMU loader/root/CLI/BBP.
 # Not a coverage-guided fuzzer; it exercises a small set of malformed
 # inputs and verifies bEMU exits cleanly (no hang/crash).

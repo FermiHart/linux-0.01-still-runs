@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 /* hello.c — A C userland program for linux-0.01.
  *
  * Demonstrates using the minimal libc to perform syscalls.

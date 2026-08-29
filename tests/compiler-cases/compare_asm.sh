@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Extract and compare the disassembly of the function under investigation for
 # each compiler case across -O0, -O1 and -O2.
 

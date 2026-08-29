@@ -1,3 +1,6 @@
+; Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+; SPDX-License-Identifier: Unlicense
+
 ; ============================================================
 ; sh.asm  -  FERMIHART mini-ash for linux-0.01 (userland)
 ; F E R M I ~ H A R T  <contact@fermihart.com>

@@ -1,4 +1,9 @@
 /*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
+/*
  * Golden-vector test for BBP reference decoder.
  * The vector is produced by `make bbp-golden-vectors` via tools/bbp-tool.
  */

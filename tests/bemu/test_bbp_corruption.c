@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 /* Exercise BBP corruption through Linux 0.01's exact production consumer. */
 
 #define _GNU_SOURCE

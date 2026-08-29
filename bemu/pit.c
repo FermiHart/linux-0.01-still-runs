@@ -1,3 +1,8 @@
+/*
+ * Maintainer and adaptation: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * bEMU-NANO provenance: see bemu/README.md
+ */
+
 #include "pit.h"
 
 void pit_reset(struct pit_state *pit)

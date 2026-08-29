@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """Validate the published reduced compiler-case dataset."""
 
 import hashlib
@@ -167,6 +170,8 @@ def main():
         source_name = CASES[record["case_id"]]
         if record.get("path") != f"sources/{source_name}":
             fail(f"manifest source path is stale for {record['case_id']}")
+        if record.get("repository_path") != f"tests/compiler-cases/{source_name}":
+            fail(f"manifest repository path is stale for {record['case_id']}")
         if record.get("sha256") != sha256(os.path.join(source_dir, source_name)):
             fail(f"manifest source hash is stale for {record['case_id']}")
         if record.get("embedded_comment_status") != (

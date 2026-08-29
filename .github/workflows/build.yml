@@ -1,3 +1,6 @@
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 name: linux-0.01-still-runs CI
 
 on:
@@ -38,6 +41,9 @@ jobs:
         run: make all
         env:
           NO_COLOR: 1
+
+      - name: Test authorship and provenance
+        run: make test-authorship
 
       - name: Test deterministic host faults
         run: make test-fault-catalog test-bemu-loading test-ide-faults test-fs-corruption test-artifact-truncation test-power-cut test-irq-faults test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized build/test-irq-faults-kvm

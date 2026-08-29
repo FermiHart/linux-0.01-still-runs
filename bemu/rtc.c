@@ -1,3 +1,8 @@
+/*
+ * Maintainer and adaptation: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * bEMU-NANO provenance: see bemu/README.md
+ */
+
 #define _POSIX_C_SOURCE 200809L
 #include "rtc.h"
 

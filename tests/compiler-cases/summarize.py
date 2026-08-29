@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 Generate a machine-readable summary (build/summary.json) of the compiler-case
 harness results.  The summary is used by the compiler-version matrix and by the

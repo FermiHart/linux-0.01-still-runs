@@ -1,0 +1,359 @@
+path	category	attribution	license_status
+.dockerignore	modern-project	F E R M I INFINITY H A R T	Unlicense
+.gdbinit	modern-project	F E R M I INFINITY H A R T	Unlicense
+.github/workflows/build.yml	modern-project	F E R M I INFINITY H A R T	Unlicense
+.gitignore	modern-project	F E R M I INFINITY H A R T	Unlicense
+ARCHITECTURE.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+AUTHORS.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+Dockerfile	modern-project	F E R M I INFINITY H A R T	Unlicense
+EXPERIENCE.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+LICENSE	legal-aggregation	Multiple named licensors and provenance statements	aggregated terms; not a blanket license
+MISSION.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+Makefile	modern-mixed-content	F E R M I INFINITY H A R T; original implementation only	mixed; see LICENSE and THIRD-PARTY-NOTICES.md
+README.md	modern-mixed-document	F E R M I INFINITY H A R T; original text only	mixed quotations; see THIRD-PARTY-NOTICES.md
+bbp/bbp_build.c	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/bbp_build.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/bbp_kernel.c	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/bbp_kernel.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/compat/stddef.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/compat/stdint.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/include/bbp/bbp.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/include/bbp/bbp_crc64.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/linux01_bbp.c	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/linux01_bbp.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bbp/linux01_handoff.h	modern-project	F E R M I INFINITY H A R T	BSD-3-Clause
+bemu/README.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+bemu/bemu_linux01.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	BSD-3-Clause
+bemu/cli.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/cli.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/console.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/console.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/error.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/experience.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/ide.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/ide.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/irq.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/irq.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/kernel_image.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/keyboard.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/keyboard.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/kvm.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/kvm.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/loader.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/loader.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/machine.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/machine.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/memory.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/memory.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/pic.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/pic.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/pit.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/pit.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/rtc.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/rtc.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/trace.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/trace.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/trace_clock.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/trace_clock.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/uart.c	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+bemu/uart.h	bemu-partial-provenance	F E R M I INFINITY H A R T; adaptation and maintenance	NOASSERTION; see bemu/README.md
+boot/head.s	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+boot/kernel.ld	modern-project	F E R M I INFINITY H A R T	Unlicense
+datasets/compiler-cases/v1/MANIFEST.json	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/README.md	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/SHA256SUMS.txt	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BITMAP-INLINE-ASM-I386-O0.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BITMAP-INLINE-ASM-I386-O1.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BITMAP-INLINE-ASM-I386-O2.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O0.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O1.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O2.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BUFFER-FREELIST-I386-O0.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BUFFER-FREELIST-I386-O1.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BUFFER-FREELIST-I386-O2.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BUFFER-FREELIST-X86_64-O0.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BUFFER-FREELIST-X86_64-O1.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-BUFFER-FREELIST-X86_64-O2.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-VSPRINTF-PERCENT-S-I386-O0.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-VSPRINTF-PERCENT-S-I386-O1.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-VSPRINTF-PERCENT-S-I386-O2.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O0.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O1.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/assembly/OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O2.s	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BITMAP-INLINE-ASM-I386-O0.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BITMAP-INLINE-ASM-I386-O1.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BITMAP-INLINE-ASM-I386-O2.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O0.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O1.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O2.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BUFFER-FREELIST-I386-O0.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BUFFER-FREELIST-I386-O1.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BUFFER-FREELIST-I386-O2.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BUFFER-FREELIST-X86_64-O0.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BUFFER-FREELIST-X86_64-O1.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-BUFFER-FREELIST-X86_64-O2.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-VSPRINTF-PERCENT-S-I386-O0.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-VSPRINTF-PERCENT-S-I386-O1.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-VSPRINTF-PERCENT-S-I386-O2.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O0.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O1.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/binaries/OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O2.bin	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/classifications.json	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/environment.json	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/observations.jsonl	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/sources/bitmap_inline_asm.c	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/sources/buffer_freelist.c	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/compiler-cases/v1/sources/vsprintf_percent_s.c	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/golden-traces/v1/MANIFEST.json	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/golden-traces/v1/README.md	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/golden-traces/v1/SHA256SUMS.txt	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/golden-traces/v1/alive-boot-console.trace	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/golden-traces/v1/alive-boot-machine.jsonl	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/golden-traces/v1/trace-event-v1.schema.json	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/MANIFEST.json	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/README.md	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/SHA256SUMS.txt	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/adaptation_files.csv	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/adaptations.csv	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/evidence_links.csv	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/file_deltas.csv	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+datasets/patches/historical-core.patch	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/ADRS.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/AUDIT-STATEMENTS.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/AUTHORSHIP-MAP.tsv	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/AUTHORSHIP.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/BBP.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/CONTAINER.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/FAULT-CATALOG.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/FS-EXPERIENCE.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/FS-LIMITATIONS.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/MATRIX.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/METHODOLOGY.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/OBSERVABILITY.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/PAPER.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/PORTING_LEDGER.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/REPRODUCIBILITY.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/REPRODUCTION.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/RESEARCH-QUESTIONS.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/RISKS.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/SBOM.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/TOOLCHAIN.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/baseline/BASELINE-2026-08-22.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+docs/screenshots/01-boot-motd.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/02-build-splash.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/03-launching-qemu.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/04-shell-commands.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/05-shell-hello-c.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/06-make-help.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/07-build-complete.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/08-build-stages.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+docs/screenshots/09-make-help-full.png	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+evaluation/v1/CHECKLIST.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+evaluation/v1/CLAIM-EVIDENCE.tsv	modern-project	F E R M I INFINITY H A R T	Unlicense
+evaluation/v1/README.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+evaluation/v1/THIRD-PARTY-NOTICES.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+evaluation/v1/licenses/GCC-RUNTIME-LIBRARY-EXCEPTION-3.1.txt	third-party	Free Software Foundation	GCC Runtime Library Exception 3.1 license text
+evaluation/v1/licenses/LGPL-2.1.txt	third-party	Free Software Foundation	LGPL-2.1-or-later license text
+fs/Makefile	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/bitmap.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/block_dev.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/buffer.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/char_dev.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/exec.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/fcntl.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/file_dev.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/file_table.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/inode.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/ioctl.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/namei.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/open.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/pipe.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/read_write.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/stat.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/super.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/truncate.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+fs/tty_ioctl.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+gdb/printers.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+include/a.out.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/asm/io.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/asm/memory.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/asm/segment.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/asm/system.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/const.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/ctype.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/errno.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/fcntl.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/bemu.h	modern-project	F E R M I INFINITY H A R T	Unlicense
+include/linux/config.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/fs.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/hdreg.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/head.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/kernel.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/mm.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/sched.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/sys.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/linux/tty.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/signal.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/stdarg.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/stddef.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/string.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/sys/stat.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/sys/times.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/sys/types.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/sys/utsname.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/sys/wait.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/termios.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/time.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/unistd.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+include/utime.h	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+init/main.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/Makefile	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/asm.s	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/console.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/exit.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/fork.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/hd.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/keyboard.s	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/mktime.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/panic.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/printk.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/rs_io.s	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/sched.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/serial.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/sys.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/system_call.s	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/traps.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/tty_io.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+kernel/vga_font8x8.h	third-party	Joseph Gil / SeaBIOS provenance	public-domain provenance statement
+kernel/vga_text50.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+kernel/vsprintf.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/Makefile	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/_exit.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/close.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/ctype.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/dup.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/errno.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/execve.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/open.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/setsid.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/string.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/sync.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+lib/wait.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+lib/write.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+mm/Makefile	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+mm/memory.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+mm/page.s	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+scripts/audit.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/build-compiler-case-dataset.py	identity-pinned-source	F E R M I INFINITY H A R T; see pinned dataset identity	see pinned manifest and notices
+scripts/build-patch-dataset.py	identity-pinned-source	F E R M I INFINITY H A R T; see pinned dataset identity	see pinned manifest and notices
+scripts/capture-evaluator-environment.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/check-authorship.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/check-evaluator-package.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/fsck-rootfs.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/fuzz-bemu.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/import-upstream.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/make-artifact.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/provenance.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/release-check.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/static-analysis.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/verify-artifact-reproducibility.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+scripts/verify-reproducibility.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_bbp_corruption.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_bbp_golden.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_bbp_invalid.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_bbp_trunc.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_bemu_cli.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_bemu_devices.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_ide_faults.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_ide_power_cut.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_irq_faults.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_irq_faults_kvm.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_keyboard_faults.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_memory_loader.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_rtc.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_trace_clock.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/bemu/test_trace_producer.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compare_trace.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/CLASSIFICATION.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/Makefile	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/README.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/UPSTREAM_TEMPLATE.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/audit.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/bitmap_inline_asm.c	identity-pinned-source	F E R M I INFINITY H A R T; reduction derived from Linux 0.01	see pinned manifest and notices
+tests/compiler-cases/buffer_freelist.c	identity-pinned-source	F E R M I INFINITY H A R T; reduction derived from Linux 0.01	see pinned manifest and notices
+tests/compiler-cases/bugreport.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/classify.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/compare_asm.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/matrix.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/package_dataset.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/run.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/summarize.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/compiler-cases/vsprintf_percent_s.c	identity-pinned-source	F E R M I INFINITY H A R T; reduction derived from Linux 0.01	see pinned manifest and notices
+tests/golden_trace.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/golden_trace_jsonl.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/harness_utils.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/qquick.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/replay.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_artifact_truncation.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_authorship.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_boot.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compare_assembly.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compare_trace.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_audit.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_bugreport.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_case_dataset.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_cases.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_classification.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_dataset.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_matrix.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_compiler_summary.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_evaluator_package.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_experience.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fault_catalog.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fault_test.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_corruption.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_inspect.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_large.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_link.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_mkdir.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_persistence.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_property.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_real.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_fs_write.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_golden_trace_dataset.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_harness_utils.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_large_rootfs.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_loading_limits.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_methodology.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_paper.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_patch_dataset.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_power_cut.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_record.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_reproduction_appendix.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_research_questions.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_shell.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_timeline.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_trace_format.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_trace_input.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_trace_io.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/test_trace_syscalls.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tests/timeline.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tools/bbp-tool.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tools/build-cross-compiler.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+tools/build.c	linux-0.01-historical	Linux 0.01 historical source; see file-level authors and LICENSE	LicenseRef-Linux-0.01
+tools/kernel_image.py	modern-project	F E R M I INFINITY H A R T	Unlicense
+tools/minix-inspect.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+tools/mkimage.c	modern-mixed-content	F E R M I INFINITY H A R T; original implementation only	mixed; see LICENSE and THIRD-PARTY-NOTICES.md
+tools/setup-toolchain.sh	modern-project	F E R M I INFINITY H A R T	Unlicense
+upstream/README.md	modern-project	F E R M I INFINITY H A R T	Unlicense
+upstream/SHA256SUMS	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+upstream/linux-0.01.tar.gz	generated-or-dataset	NOASSERTION; see dataset or generator provenance	see pinned manifest and notices
+userland/crt0.S	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/libc.h	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/programs/cat.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/programs/hello.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/programs/pathcheck.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/programs/yes.c	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/sh.asm	modern-project	F E R M I INFINITY H A R T	Unlicense
+userland/shell.c	modern-mixed-content	F E R M I INFINITY H A R T; original implementation only	mixed; see LICENSE and THIRD-PARTY-NOTICES.md
+userland/update.asm	modern-project	F E R M I INFINITY H A R T	Unlicense

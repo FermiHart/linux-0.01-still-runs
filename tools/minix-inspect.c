@@ -1,4 +1,9 @@
 /*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
+/*
  * minix-inspect.c — independent Minix v1 filesystem inspector.
  *
  * Reads the first partition of a raw disk image (after the MBR) and prints

@@ -5,6 +5,8 @@
  * The original bEMU contract loads a guest directly into KVM without BIOS or
  * a bootloader. This port keeps that contract and adds only the legacy devices
  * Linux 0.01 uses: PIC/PIT, COM1, CMOS, VGA registers, keyboard and CHS IDE.
+ * bEMU-NANO provenance: see bemu/README.md.
+ * Maintainer and adaptation: F E R M I INFINITY H A R T <contact@fermihart.com>
  *
  * SPDX-License-Identifier: BSD-3-Clause
  * Copyright (c) 2026, F E R M I INFINITY H A R T <contact@fermihart.com>
