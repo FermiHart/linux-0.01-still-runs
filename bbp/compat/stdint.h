@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 /* compat/stdint.h — freestanding <stdint.h> for the linux-0.01 -nostdinc build.
  *
  * The ABI-FROZEN BBP core headers do `#include <stdint.h>`. linux-0.01 is built

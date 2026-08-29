@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """Compare two bEMU JSON Lines traces under a declared normalization.
 
 Timestamps and per-run counters are ignored; the comparison focuses on event

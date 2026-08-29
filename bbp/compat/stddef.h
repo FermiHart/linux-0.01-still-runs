@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 /* compat/stddef.h — freestanding <stddef.h> for the linux-0.01 -nostdinc build.
  * size_t / NULL / offsetof via compiler builtins. ports/linux01 only; the BBP
  * core is never edited. linux-0.01's own include/stddef.h defines size_t and

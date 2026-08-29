@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Import and verify the upstream Linux 0.01 tarball.
 # This script is idempotent: running it again cleans and re-extracts.
 set -euo pipefail

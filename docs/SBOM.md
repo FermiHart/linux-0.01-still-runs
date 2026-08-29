@@ -14,10 +14,16 @@ SHA-256 of upstream tarball:
 
 ## In-tree additions
 
+The canonical modern-project author is
+`F E R M I ∞ H A R T <contact@fermihart.com>`. `AUTHORS.md` and
+`docs/AUTHORSHIP.md` distinguish original implementation, adaptation,
+historical source, identity-pinned generators, third-party material and
+generated outputs without inferring authorship from directory placement.
+
 | Component | Location | License | Purpose |
 |---|---|---|---|
 | Bear Boot Protocol (BBP) | `bbp/` | Per-file BSD-3-Clause identifiers; otherwise project terms where applicable | Firmware-free boot handoff with CRC-checked tags |
-| bEMU KVM runner | `bemu/` | Per-file BSD-3-Clause identifier and author-declared bEMU-NANO provenance; see evaluator notices | Minimal emulator that loads the kernel directly into KVM |
+| bEMU KVM runner | `bemu/` | Main runner BSD-3-Clause declaration; split modules retain adaptation identity without inferred SPDX terms while bEMU-NANO provenance is partial | Minimal emulator that loads the kernel directly into KVM |
 | Minix v1 image forge | `tools/mkimage.c` | Unlicense for original material; embedded quotation separately inventoried | Build the bootable root filesystem by hand |
 | Kernel image wrapper | `tools/kernel_image.py` | Unlicense | Add the deterministic host-side payload-length trailer |
 | Interactive shell | `userland/shell.c` | Unlicense for original material; embedded third-party text separately inventoried | Userland smoke-test shell |

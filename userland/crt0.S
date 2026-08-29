@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 /* crt0.S — Minimal C runtime for linux-0.01 userland programs.
  *
  * This is the entry point for C programs compiled as flat binaries.

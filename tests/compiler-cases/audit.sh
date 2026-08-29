@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Audit the compiler cases for common undefined-behavior classes:
 #   * aliasing        (-fstrict-aliasing + -Wstrict-aliasing)
 #   * overflow        (-fsanitize=undefined)

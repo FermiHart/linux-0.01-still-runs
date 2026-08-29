@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Generate a provenance report for the porting changes.
 # Compares the current historical-core files against the upstream Linux 0.01
 # tarball and cross-checks docs/PORTING_LEDGER.md.

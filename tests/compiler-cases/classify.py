@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """
 Generate classification.json and classification.txt for the three -O2
 sensitive compiler cases, using the evidence collected by the harness, the

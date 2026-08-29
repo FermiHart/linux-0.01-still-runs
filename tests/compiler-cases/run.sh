@@ -1,4 +1,7 @@
 #!/bin/bash
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 # Run all compiler-case binaries at -O0, -O1 and -O2, for each ABI, and
 # produce a report.
 

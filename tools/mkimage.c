@@ -1,4 +1,9 @@
 /*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * Mixed-content rights: see LICENSE and evaluation/v1/THIRD-PARTY-NOTICES.md
+ */
+
+/*
  * mkimage.c — build a bootable HD image for linux-0.01-still-runs.
  *
  * F E R M I ∞ H A R T

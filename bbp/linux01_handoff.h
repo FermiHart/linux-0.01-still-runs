@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #ifndef BBP_LINUX01_HANDOFF_H
 #define BBP_LINUX01_HANDOFF_H
 

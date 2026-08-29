@@ -16,8 +16,12 @@ blocked until the conflict is resolved.
    wave is marked complete.
 5. **Private roadmap stays private**: `.local/` and `AGENTS.md` are never
    committed.
-6. **Author identity**: every public commit uses
-   `F E R M I ∞ H A R T <contact@fermihart.com>`.
+6. **Author identity**: original modern source identifies
+   `F E R M I ∞ H A R T <contact@fermihart.com>` (spelled `INFINITY` in
+   ASCII-only files), while historical, adapted, generated and third-party
+   paths preserve their own attribution boundaries. Locally created commits
+   use the contact address; GitHub-generated merges may use the account-linked
+   noreply address documented in `AUTHORS.md`.
 
 ## Known risks
 

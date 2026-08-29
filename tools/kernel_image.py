@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+# SPDX-License-Identifier: Unlicense
+
 """Wrap a flat PA0 kernel payload in the versioned Linux 0.01 image envelope."""
 
 import argparse

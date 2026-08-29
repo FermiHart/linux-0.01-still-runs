@@ -3,6 +3,7 @@
 #   linux-0.01-still-runs  —  Makefile  [ Vesica Piscis Edition ]
 #
 #   Author    : F E R M I ∞ H A R T  <contact@fermihart.com>
+#   Mixed-content rights: see LICENSE and evaluation/v1/THIRD-PARTY-NOTICES.md
 #   Subject   : Linus Torvalds' first kernel (1991) booting on 2026 iron
 #   Codename  : Vesica Piscis      Channel: v0.1 FOREVER
 #   License   : Linux 0.01 terms / BSD-3-Clause / Unlicense (see LICENSE)
@@ -211,7 +212,7 @@ endef
 .PHONY: help all clean run run-headless kernel image bemu bemu-sanitized dirs boom doctor info \
         sizes symbols hash checksums tree stats audit provenance journey watch ci backup \
         reproducible verify-reproducible release-check artifact artifact-check verify-artifact-reproducible inspect-rootfs \
-        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs test-evaluator-package \
+        fsck-rootfs fsck-rootfs-1991 banner require-artifacts test test-quick test-shell test-experience-1991 test-experience-alive test-experiences test-large-rootfs test-authorship test-evaluator-package \
         test-fs-write test-fs-mkdir test-fs-link test-fs-large test-fs-property test-fs-persistence \
         test-fs-inspect test-fs-corruption test-fs-real test-bemu-devices test-fault-catalog test-research-questions test-methodology test-paper test-reproduction-appendix patch-dataset test-patch-dataset test-golden-trace-dataset fault-test test-bemu-loading test-artifact-truncation test-ide-faults test-ide-power-cut test-power-cut test-irq-faults test-irq-faults-kvm test-keyboard-faults test-bbp-corruption test-bbp-corruption-sanitized test-bemu-cli test-rtc test-trace-clock test-trace-producer test-trace-io test-trace-input test-trace-format test-record test-replay test-compare-trace test-timeline test-trace-syscalls test-trace-workflow test-sanitized bbp-conformance static-analysis fuzz \
         bbp-golden-vectors golden-trace golden-trace-jsonl record replay compare-trace timeline trace-workflow toolchain \
@@ -521,6 +522,7 @@ endef
 test: all
 	$(call STAGE,9/10,running bEMU boot test suite)
 	@python3 tests/test_harness_utils.py
+	@$(MAKE) --no-print-directory test-authorship
 	@$(MAKE) --no-print-directory test-fault-catalog
 	@$(MAKE) --no-print-directory test-research-questions
 	@$(MAKE) --no-print-directory test-methodology
@@ -1199,6 +1201,9 @@ audit:
 provenance:
 	@bash "$(REPO_ROOT)/scripts/provenance.sh" | tail -n 1 | xargs -I{} printf '\n  $(CG)$(G_OK)$(CR) wrote $(CWH){}$(CR)\n'
 
+test-authorship:
+	@python3 tests/test_authorship.py
+
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║                              CI / WATCH                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
@@ -1395,6 +1400,7 @@ help:
 	@printf '    $(CWH)test$(CR)           build + full boot test in bEMU\n'
 	@printf '    $(CWH)test-quick$(CR)     boot test with existing artifacts\n'
 	@printf '    $(CWH)test-shell$(CR)     shell smoke test in bEMU\n'
+	@printf '    $(CWH)test-authorship$(CR) validate author headers and path provenance\n'
 	@printf '    $(CWH)test-fault-catalog$(CR) validate fault catalog references\n'
 	@printf '    $(CWH)test-research-questions$(CR) validate research scopes and evidence\n'
 	@printf '    $(CWH)test-methodology$(CR) validate experimental methodology\n'

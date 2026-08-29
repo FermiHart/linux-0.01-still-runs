@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * Mixed-content rights: see LICENSE and evaluation/v1/THIRD-PARTY-NOTICES.md
+ */
+
 /* shell.c — Interactive shell for Linux 0.01
  *
  * Emacs-style line editing, command history, tab completion,

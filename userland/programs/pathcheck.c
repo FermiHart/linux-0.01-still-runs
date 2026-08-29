@@ -1,3 +1,8 @@
+/*
+ * Author: F E R M I INFINITY H A R T <contact@fermihart.com>
+ * SPDX-License-Identifier: Unlicense
+ */
+
 /* pathcheck.c — Minimal external command to verify PATH resolution and envp.
  *
  * Prints the first PATH= entry found in the environment vector passed by
