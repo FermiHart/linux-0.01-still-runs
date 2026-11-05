@@ -1,0 +1,4285 @@
+diff --git a/fs/bitmap.c b/fs/bitmap.c
+index 49bb81b83aabbfbc7dc151f5adb7d95404d0909a..62ddc71164fdfd430418c8ca1b604fddbaf62959 100644
+--- a/fs/bitmap.c
++++ b/fs/bitmap.c
+@@ -3,20 +3,21 @@
+ 
+ #include <linux/sched.h>
+ #include <linux/kernel.h>
++#include <linux/config.h>
+ 
+ #define clear_block(addr) \
+ __asm__("cld\n\t" \
+ 	"rep\n\t" \
+ 	"stosl" \
+-	::"a" (0),"c" (BLOCK_SIZE/4),"D" ((long) (addr)):"cx","di")
++	::"a" (0),"c" (BLOCK_SIZE/4),"D" ((long) (addr)):)
+ 
+ #define set_bit(nr,addr) ({\
+-register int res __asm__("ax"); \
++register int res; \
+ __asm__("btsl %2,%3\n\tsetb %%al":"=a" (res):"0" (0),"r" (nr),"m" (*(addr))); \
+ res;})
+ 
+ #define clear_bit(nr,addr) ({\
+-register int res __asm__("ax"); \
++register int res; \
+ __asm__("btrl %2,%3\n\tsetnb %%al":"=a" (res):"0" (0),"r" (nr),"m" (*(addr))); \
+ res;})
+ 
+@@ -33,9 +34,21 @@ __asm__("cld\n" \
+ 	"cmpl $8192,%%ecx\n\t" \
+ 	"jl 1b\n" \
+ 	"3:" \
+-	:"=c" (__res):"c" (0),"S" (addr):"ax","dx","si"); \
++	:"=c" (__res):"c" (0),"S" (addr):"ax","dx"); \
+ __res;})
+ 
++static struct super_block * mounted_super(int *dev)
++{
++	struct super_block * s;
++
++	for (s = super_block ; s < NR_SUPER+super_block ; s++)
++		if (s->s_dev) {
++			*dev = s->s_dev;
++			return s;
++		}
++	return NULL;
++}
++
+ void free_block(int dev, int block)
+ {
+ 	struct super_block * sb;
+@@ -70,11 +83,17 @@ int new_block(int dev)
+ 	struct super_block * sb;
+ 	int i,j;
+ 
+-	if (!(sb = get_super(dev)))
++	if (!dev || !(sb = get_super(dev))) {
++		dev = ROOT_DEV;
++		sb = get_super(dev);
++	}
++	if (!sb)
++		sb = mounted_super(&dev);
++	if (!sb)
+ 		panic("trying to get new block from nonexistant device");
+ 	j = 8192;
+ 	for (i=0 ; i<8 ; i++)
+-		if (bh=sb->s_zmap[i])
++		if ((bh=sb->s_zmap[i]))
+ 			if ((j=find_first_zero(bh->b_data))<8192)
+ 				break;
+ 	if (i>=8 || !bh || j>=8192)
+@@ -132,13 +151,19 @@ struct m_inode * new_inode(int dev)
+ 	struct buffer_head * bh;
+ 	int i,j;
+ 
++	if (!dev || !(sb = get_super(dev))) {
++		dev = ROOT_DEV;
++		sb = get_super(dev);
++	}
++	if (!sb)
++		sb = mounted_super(&dev);
++	if (!sb)
++		panic("new_inode with unknown device");
+ 	if (!(inode=get_empty_inode()))
+ 		return NULL;
+-	if (!(sb = get_super(dev)))
+-		panic("new_inode with unknown device");
+ 	j = 8192;
+ 	for (i=0 ; i<8 ; i++)
+-		if (bh=sb->s_imap[i])
++		if ((bh=sb->s_imap[i]))
+ 			if ((j=find_first_zero(bh->b_data))<8192)
+ 				break;
+ 	if (!bh || j >= 8192 || j+i*8192 > sb->s_ninodes) {
+diff --git a/fs/block_dev.c b/fs/block_dev.c
+index 7bbae6a25f4c4dc60b2d470a5b85675795e1e487..97edd63881ee1475468b1d047e6d6c9d55f07de5 100644
+--- a/fs/block_dev.c
++++ b/fs/block_dev.c
+@@ -19,7 +19,9 @@ int block_write(int dev, long * pos, char * buf, int count)
+ 		bh = bread(dev,block);
+ 		if (!bh)
+ 			return written?written:-EIO;
+-		chars = (count<BLOCK_SIZE) ? count : BLOCK_SIZE;
++		chars = BLOCK_SIZE-offset;
++		if (chars > count)
++			chars = count;
+ 		p = offset + bh->b_data;
+ 		offset = 0;
+ 		block++;
+@@ -47,17 +49,18 @@ int block_read(int dev, unsigned long * pos, char * buf, int count)
+ 		bh = bread(dev,block);
+ 		if (!bh)
+ 			return read?read:-EIO;
+-		chars = (count<BLOCK_SIZE) ? count : BLOCK_SIZE;
++		chars = BLOCK_SIZE-offset;
++		if (chars > count)
++			chars = count;
+ 		p = offset + bh->b_data;
+ 		offset = 0;
+ 		block++;
+ 		*pos += chars;
+ 		read += chars;
+ 		count -= chars;
+-		while (chars-->0)
+-			put_fs_byte(*(p++),buf++);
+-		bh->b_dirt = 1;
+-		brelse(bh);
++	while (chars-->0)
++		put_fs_byte(*(p++),buf++);
++	brelse(bh);
+ 	}
+ 	return read;
+ }
+diff --git a/fs/buffer.c b/fs/buffer.c
+index 312ab173afdae06dbc6a31c50e96b68bbc45ff3a..28fafd56014360d960cdb6fe04946ff77aaa9edf 100644
+--- a/fs/buffer.c
++++ b/fs/buffer.c
+@@ -100,7 +100,8 @@ static inline void insert_into_queues(struct buffer_head * bh)
+ 		return;
+ 	bh->b_next = hash(bh->b_dev,bh->b_blocknr);
+ 	hash(bh->b_dev,bh->b_blocknr) = bh;
+-	bh->b_next->b_prev = bh;
++	if (bh->b_next)
++		bh->b_next->b_prev = bh;
+ }
+ 
+ static struct buffer_head * find_buffer(int dev, int block)
+@@ -146,18 +147,29 @@ struct buffer_head * getblk(int dev,int block)
+ 	struct buffer_head * tmp;
+ 
+ repeat:
+-	if (tmp=get_hash_table(dev,block))
++	if ((tmp=get_hash_table(dev,block)))
+ 		return tmp;
+ 	tmp = free_list;
+-	do {
++	/* Walk the free list looking for an unused buffer. The original 1991 code
++	 * used `do { ... } while (tmp != free_list || (tmp=NULL))` — an
++	 * assignment-inside-condition idiom. The current rewrite keeps the same
++	 * intended semantics with an explicit cycle check. The isolated reproduction
++	 * in tests/compiler-cases/buffer_freelist.c does not fail on GCC 13.3, so
++	 * the historical claim of a GCC -O2 miscompilation remains unproven on
++	 * modern toolchains; see tests/compiler-cases/CLASSIFICATION.md. The -O1
++	 * workaround in the Makefile is retained as a conservative shield. */
++	for (;;) {
+ 		if (!tmp->b_count) {
+-			wait_on_buffer(tmp);	/* we still have to wait */
+-			if (!tmp->b_count)	/* on it, it might be dirty */
++			wait_on_buffer(tmp);
++			if (!tmp->b_count)
+ 				break;
+ 		}
+ 		tmp = tmp->b_next_free;
+-	} while (tmp != free_list || (tmp=NULL));
+-	/* Kids, don't try THIS at home ^^^^^. Magic */
++		if (tmp == free_list) {
++			tmp = NULL;
++			break;
++		}
++	}
+ 	if (!tmp) {
+ 		printk("Sleeping on free buffer ..");
+ 		sleep_on(&buffer_wait);
+diff --git a/fs/char_dev.c b/fs/char_dev.c
+index e974242f505b0f8bdf926edf44255a8a5478ed96..94e4afe0879f9b4c251f579a824da8c6375988a5 100644
+--- a/fs/char_dev.c
++++ b/fs/char_dev.c
+@@ -2,6 +2,7 @@
+ 
+ #include <linux/sched.h>
+ #include <linux/kernel.h>
++#include <linux/tty.h>
+ 
+ extern int tty_read(unsigned minor,char * buf,int count);
+ extern int tty_write(unsigned minor,char * buf,int count);
+@@ -9,7 +10,7 @@ extern int tty_write(unsigned minor,char * buf,int count);
+ static int rw_ttyx(int rw,unsigned minor,char * buf,int count);
+ static int rw_tty(int rw,unsigned minor,char * buf,int count);
+ 
+-typedef (*crw_ptr)(int rw,unsigned minor,char * buf,int count);
++typedef int (*crw_ptr)(int rw,unsigned minor,char * buf,int count);
+ 
+ #define NRDEVS ((sizeof (crw_table))/(sizeof (crw_ptr)))
+ 
+@@ -25,6 +26,8 @@ static crw_ptr crw_table[]={
+ 
+ static int rw_ttyx(int rw,unsigned minor,char * buf,int count)
+ {
++	if (minor >= NR_TTYS)
++		return -ENXIO;
+ 	return ((rw==READ)?tty_read(minor,buf,count):
+ 		tty_write(minor,buf,count));
+ }
+@@ -32,7 +35,7 @@ static int rw_ttyx(int rw,unsigned minor,char * buf,int count)
+ static int rw_tty(int rw,unsigned minor,char * buf,int count)
+ {
+ 	if (current->tty<0)
+-		return -EPERM;
++		return rw_ttyx(rw,0,buf,count);
+ 	return rw_ttyx(rw,current->tty,buf,count);
+ }
+ 
+@@ -41,10 +44,8 @@ int rw_char(int rw,int dev, char * buf, int count)
+ 	crw_ptr call_addr;
+ 
+ 	if (MAJOR(dev)>=NRDEVS)
+-		panic("rw_char: dev>NRDEV");
+-	if (!(call_addr=crw_table[MAJOR(dev)])) {
+-		printk("dev: %04x\n",dev);
+-		panic("Trying to r/w from/to nonexistent character device");
+-	}
++		return -ENXIO;
++	if (!(call_addr=crw_table[MAJOR(dev)]))
++		return -ENXIO;
+ 	return call_addr(rw,MINOR(dev),buf,count);
+ }
+diff --git a/fs/exec.c b/fs/exec.c
+index e9d505804fb412d3d40e31433ec441a32baa5a59..29931322c47b60444e4d0b473a4d9e6b8b27fa2f 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -19,15 +19,17 @@ extern int sys_close(int fd);
+ #define MAX_ARG_PAGES 32
+ 
+ #define cp_block(from,to) \
+-__asm__("pushl $0x10\n\t" \
++({ unsigned long __c = BLOCK_SIZE/4, __s = (unsigned long)(from), __d = (unsigned long)(to); \
++__asm__ __volatile__("pushl $0x10\n\t" \
+ 	"pushl $0x17\n\t" \
+ 	"pop %%es\n\t" \
+ 	"cld\n\t" \
+ 	"rep\n\t" \
+ 	"movsl\n\t" \
+ 	"pop %%es" \
+-	::"c" (BLOCK_SIZE/4),"S" (from),"D" (to) \
+-	:"cx","di","si")
++	:"+c" (__c), "+S" (__s), "+D" (__d) \
++	: \
++	:"memory"); })
+ 
+ /*
+  * read_head() reads blocks 1-6 (not 0). Block 0 has already been
+@@ -66,7 +68,7 @@ int read_ind(int dev,int ind,long size,unsigned long offset)
+ 		return -1;
+ 	table = (unsigned short *) ih->b_data;
+ 	while (size>0) {
+-		if (block=*(table++))
++		if ((block=*(table++))) {
+ 			if (!(bh=bread(dev,block))) {
+ 				brelse(ih);
+ 				return -1;
+@@ -74,6 +76,7 @@ int read_ind(int dev,int ind,long size,unsigned long offset)
+ 				cp_block(bh->b_data,offset);
+ 				brelse(bh);
+ 			}
++		}
+ 		size -= BLOCK_SIZE;
+ 		offset += BLOCK_SIZE;
+ 	}
+@@ -101,10 +104,15 @@ int read_area(struct m_inode * inode,long size)
+ 	if (!(dind = bread(inode->i_dev,i)))
+ 		return -1;
+ 	table = (unsigned short *) dind->b_data;
+-	for(count=0 ; count<512 ; count++)
+-		if ((i=read_ind(inode->i_dev,*(table++),size,
+-		    BLOCK_SIZE*(518+count))) || (size -= BLOCK_SIZE*512)<=0)
++	for(count=0 ; count<512 ; count++) {
++		i=read_ind(inode->i_dev,*(table++),size,
++			BLOCK_SIZE*(518+count*512));
++		if (i || (size -= BLOCK_SIZE*512)<=0) {
++			brelse(dind);
+ 			return i;
++		}
++	}
++	brelse(dind);
+ 	panic("Impossibly long executable");
+ }
+ 
+@@ -147,7 +155,7 @@ static int count(char ** argv)
+ 	int i=0;
+ 	char ** tmp;
+ 
+-	if (tmp = argv)
++	if ((tmp = argv))
+ 		while (get_fs_long((unsigned long *) (tmp++)))
+ 			i++;
+ 
+@@ -172,7 +180,7 @@ static unsigned long copy_strings(int argc,char ** argv,unsigned long *page,
+ 		do {
+ 			len++;
+ 		} while (get_fs_byte(tmp++));
+-		if (p-len < 0)		/* this shouldn't happen - 128kB */
++		if ((unsigned long)len > p)
+ 			return 0;
+ 		i = ((unsigned) (p-len)) >> 12;
+ 		while (i<MAX_ARG_PAGES && !page[i]) {
+@@ -191,6 +199,8 @@ static unsigned long copy_strings(int argc,char ** argv,unsigned long *page,
+ 	return p;
+ }
+ 
++static unsigned long current_base(void);
++
+ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
+ {
+ 	unsigned long code_limit,data_limit,code_base,data_base;
+@@ -199,7 +209,7 @@ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
+ 	code_limit = text_size+PAGE_SIZE -1;
+ 	code_limit &= 0xFFFFF000;
+ 	data_limit = 0x4000000;
+-	code_base = get_base(current->ldt[1]);
++	code_base = current_base();
+ 	data_base = code_base;
+ 	set_base(current->ldt[1],code_base);
+ 	set_limit(current->ldt[1],code_limit);
+@@ -216,6 +226,25 @@ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
+ 	return data_limit;
+ }
+ 
++static unsigned long current_base(void)
++{
++	unsigned long base;
++	int nr;
++
++	base = get_base(current->ldt[1]);
++	if (current == task[0])
++		return base;
++	nr = (current->tss.ldt - (FIRST_LDT_ENTRY << 3)) >> 4;
++	if (nr <= 0 || nr >= NR_TASKS)
++		return base;
++	if (base == nr * 0x4000000)
++		return base;
++	base = nr * 0x4000000;
++	set_base(current->ldt[1],base);
++	set_base(current->ldt[2],base);
++	return base;
++}
++
+ /*
+  * 'do_execve()' executes a new program.
+  */
+@@ -233,8 +262,9 @@ int do_execve(unsigned long * eip,long tmp,char * filename,
+ 		panic("execve called from supervisor mode");
+ 	for (i=0 ; i<MAX_ARG_PAGES ; i++)	/* clear page-table */
+ 		page[i]=0;
+-	if (!(inode=namei(filename)))		/* get executables inode */
++	if (!(inode=namei(filename))) {		/* get executables inode */
+ 		return -ENOENT;
++	}
+ 	if (!S_ISREG(inode->i_mode)) {	/* must be regular file */
+ 		iput(inode);
+ 		return -EACCES;
+@@ -258,13 +288,16 @@ int do_execve(unsigned long * eip,long tmp,char * filename,
+ 	ex = *((struct exec *) bh->b_data);	/* read exec-header */
+ 	brelse(bh);
+ 	if (N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
++		ex.a_text > 0x1000000 || ex.a_data > 0x1000000 || ex.a_bss > 0x1000000 ||
+ 		ex.a_text+ex.a_data+ex.a_bss>0x3000000 ||
+ 		inode->i_size < ex.a_text+ex.a_data+ex.a_syms+N_TXTOFF(ex)) {
+ 		iput(inode);
+ 		return -ENOEXEC;
+ 	}
+-	if (N_TXTOFF(ex) != BLOCK_SIZE)
+-		panic("N_TXTOFF != BLOCK_SIZE. See a.out.h.");
++	if (N_TXTOFF(ex) != BLOCK_SIZE) {
++		iput(inode);
++		return -ENOEXEC;
++	}
+ 	argc = count(argv);
+ 	envc = count(envp);
+ 	p = copy_strings(envc,envp,page,PAGE_SIZE*MAX_ARG_PAGES-4);
+@@ -282,8 +315,8 @@ int do_execve(unsigned long * eip,long tmp,char * filename,
+ 		if ((current->close_on_exec>>i)&1)
+ 			sys_close(i);
+ 	current->close_on_exec = 0;
+-	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
+-	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
++	free_page_tables(current_base(),get_limit(0x0f));
++	free_page_tables(current_base(),get_limit(0x17));
+ 	if (last_task_used_math == current)
+ 		last_task_used_math = NULL;
+ 	current->used_math = 0;
+diff --git a/fs/fcntl.c b/fs/fcntl.c
+index 169f3767141fd51539da9340462c968dac3edeee..a8291e1881fee595b3c3870fde6ee8b2f37df5fe 100644
+--- a/fs/fcntl.c
++++ b/fs/fcntl.c
+@@ -61,9 +61,9 @@ int sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
+ 			filp->f_flags &= ~(O_APPEND | O_NONBLOCK);
+ 			filp->f_flags |= arg & (O_APPEND | O_NONBLOCK);
+ 			return 0;
+-		case F_GETLK:	case F_SETLK:	case F_SETLKW:
+-			return -1;
+-		default:
+-			return -1;
++	case F_GETLK: case F_SETLK: case F_SETLKW:
++		return -ENOLCK;
++	default:
++		return -EINVAL;
+ 	}
+ }
+diff --git a/fs/file_dev.c b/fs/file_dev.c
+index da5d014ced623e5e770eacfdf59f1a5963257edb..f5939392b24b4ca6728692aa3cac10d19f14fbf3 100644
+--- a/fs/file_dev.c
++++ b/fs/file_dev.c
+@@ -16,7 +16,7 @@ int file_read(struct m_inode * inode, struct file * filp, char * buf, int count)
+ 	if ((left=count)<=0)
+ 		return 0;
+ 	while (left) {
+-		if (nr = bmap(inode,(filp->f_pos)/BLOCK_SIZE)) {
++		if ((nr = bmap(inode,(filp->f_pos)/BLOCK_SIZE))) {
+ 			if (!(bh=bread(inode->i_dev,nr)))
+ 				break;
+ 		} else
+diff --git a/fs/inode.c b/fs/inode.c
+index d06ff9057b674eaca1b9e10513eb77f9f93c6a97..079ca1254e3d47a731a88b7953abca8d2aefd742 100644
+--- a/fs/inode.c
++++ b/fs/inode.c
+@@ -57,7 +57,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
+ 		panic("_bmap: block>big");
+ 	if (block<7) {
+ 		if (create && !inode->i_zone[block])
+-			if (inode->i_zone[block]=new_block(inode->i_dev)) {
++			if ((inode->i_zone[block]=new_block(inode->i_dev))) {
+ 				inode->i_ctime=CURRENT_TIME;
+ 				inode->i_dirt=1;
+ 			}
+@@ -66,7 +66,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
+ 	block -= 7;
+ 	if (block<512) {
+ 		if (create && !inode->i_zone[7])
+-			if (inode->i_zone[7]=new_block(inode->i_dev)) {
++			if ((inode->i_zone[7]=new_block(inode->i_dev))) {
+ 				inode->i_dirt=1;
+ 				inode->i_ctime=CURRENT_TIME;
+ 			}
+@@ -76,7 +76,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
+ 			return 0;
+ 		i = ((unsigned short *) (bh->b_data))[block];
+ 		if (create && !i)
+-			if (i=new_block(inode->i_dev)) {
++			if ((i=new_block(inode->i_dev))) {
+ 				((unsigned short *) (bh->b_data))[block]=i;
+ 				bh->b_dirt=1;
+ 			}
+@@ -85,7 +85,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
+ 	}
+ 	block -= 512;
+ 	if (create && !inode->i_zone[8])
+-		if (inode->i_zone[8]=new_block(inode->i_dev)) {
++		if ((inode->i_zone[8]=new_block(inode->i_dev))) {
+ 			inode->i_dirt=1;
+ 			inode->i_ctime=CURRENT_TIME;
+ 		}
+@@ -95,7 +95,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
+ 		return 0;
+ 	i = ((unsigned short *)bh->b_data)[block>>9];
+ 	if (create && !i)
+-		if (i=new_block(inode->i_dev)) {
++		if ((i=new_block(inode->i_dev))) {
+ 			((unsigned short *) (bh->b_data))[block>>9]=i;
+ 			bh->b_dirt=1;
+ 		}
+@@ -106,7 +106,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
+ 		return 0;
+ 	i = ((unsigned short *)bh->b_data)[block&511];
+ 	if (create && !i)
+-		if (i=new_block(inode->i_dev)) {
++		if ((i=new_block(inode->i_dev))) {
+ 			((unsigned short *) (bh->b_data))[block&511]=i;
+ 			bh->b_dirt=1;
+ 		}
+@@ -152,7 +152,7 @@ repeat:
+ 		return;
+ 	}
+ 	if (inode->i_dirt) {
+-		write_inode(inode);	/* we can sleep - so do again */
++		write_inode(inode);
+ 		wait_on_inode(inode);
+ 		goto repeat;
+ 	}
+@@ -181,11 +181,12 @@ struct m_inode * get_empty_inode(void)
+ 		} while (inr != last_allocated_inode);
+ 		if (!inode) {
+ 			for (inr=0 ; inr<NR_INODE ; inr++)
+-				printk("%04x: %6d\t",inode_table[inr].i_dev,
+-					inode_table[inr].i_num);
++				printk("%04x: %6d\t",inode_table[inr].i_dev,  inode_table[inr].i_num);
+ 			panic("No free inodes in mem");
+ 		}
+-		last_allocated_inode = inr;
++		last_allocated_inode = inr + 1;
++		if (last_allocated_inode >= NR_INODE)
++			last_allocated_inode = 0;
+ 		wait_on_inode(inode);
+ 		while (inode->i_dirt) {
+ 			write_inode(inode);
+@@ -261,7 +262,7 @@ static void read_inode(struct m_inode * inode)
+ 		panic("unable to read i-node block");
+ 	*(struct d_inode *)inode =
+ 		((struct d_inode *)bh->b_data)
+-			[(inode->i_num-1)%INODES_PER_BLOCK];
++		[(inode->i_num-1)%INODES_PER_BLOCK];
+ 	brelse(bh);
+ 	unlock_inode(inode);
+ }
+diff --git a/fs/ioctl.c b/fs/ioctl.c
+index 131561be009fc43821af7871ceb4a80a4f3f03e4..f81db0e5929a0a1e4f2c84e62b970f42d6dd79f7 100644
+--- a/fs/ioctl.c
++++ b/fs/ioctl.c
+@@ -11,20 +11,21 @@ typedef int (*ioctl_ptr)(int dev,int cmd,int arg);
+ #define NRDEVS ((sizeof (ioctl_table))/(sizeof (ioctl_ptr)))
+ 
+ static ioctl_ptr ioctl_table[]={
+-	NULL,		/* nodev */
+-	NULL,		/* /dev/mem */
+-	NULL,		/* /dev/fd */
+-	NULL,		/* /dev/hd */
+-	tty_ioctl,	/* /dev/ttyx */
+-	tty_ioctl,	/* /dev/tty */
+-	NULL,		/* /dev/lp */
+-	NULL};		/* named pipes */
+-	
++	NULL, /* nodev */
++	NULL, /* /dev/mem */
++	NULL, /* /dev/fd */
++	NULL, /* /dev/hd */
++	tty_ioctl, /* /dev/ttyx */
++	tty_ioctl, /* /dev/tty */
++	NULL, /* /dev/lp */
++	NULL}; /* named pipes */
++
+ 
+ int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+-{	
++{
+ 	struct file * filp;
+ 	int dev,mode;
++	volatile int ret;
+ 
+ 	if (fd >= NR_OPEN || !(filp = current->filp[fd]))
+ 		return -EBADF;
+@@ -33,8 +34,9 @@ int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+ 		return -EINVAL;
+ 	dev = filp->f_inode->i_zone[0];
+ 	if (MAJOR(dev) >= NRDEVS)
+-		panic("unknown device for ioctl");
++		return -ENOTTY;
+ 	if (!ioctl_table[MAJOR(dev)])
+ 		return -ENOTTY;
+-	return ioctl_table[MAJOR(dev)](dev,cmd,arg);
++	ret = ioctl_table[MAJOR(dev)](dev,cmd,arg);
++	return ret;
+ }
+diff --git a/fs/namei.c b/fs/namei.c
+index 600737b9fd88ca03fef73cc96179ea9b5086ea73..3ec8713d5780133fb51c2996fba3d35959899ce2 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -1,5 +1,6 @@
+ #include <linux/sched.h>
+ #include <linux/kernel.h>
++#include <linux/config.h>
+ #include <asm/segment.h>
+ 
+ #include <string.h>
+@@ -20,6 +21,12 @@
+ #define MAY_WRITE 2
+ #define MAY_READ 4
+ 
++static void repair_inode_dev(struct m_inode * inode)
++{
++	if (inode && !get_super(inode->i_dev))
++		inode->i_dev = ROOT_DEV;
++}
++
+ /*
+  *	permission()
+  *
+@@ -52,19 +59,18 @@ static int permission(struct m_inode * inode,int mask)
+  */
+ static int match(int len,const char * name,struct dir_entry * de)
+ {
+-	register int same __asm__("ax");
++	unsigned char c;
++	int i;
+ 
+ 	if (!de || !de->inode || len > NAME_LEN)
+ 		return 0;
+ 	if (len < NAME_LEN && de->name[len])
+ 		return 0;
+-	__asm__("cld\n\t"
+-		"fs ; repe ; cmpsb\n\t"
+-		"setz %%al"
+-		:"=a" (same)
+-		:"0" (0),"S" ((long) name),"D" ((long) de->name),"c" (len)
+-		:"cx","di","si");
+-	return same;
++	for (i = 0; i < len; i++)
++		if ((c = get_fs_byte(name+i)) != de->name[i]) {
++			return 0;
++		}
++	return 1;
+ }
+ 
+ /*
+@@ -204,6 +210,14 @@ static struct m_inode * get_dir(const char * pathname)
+ 	int namelen,inr,idev;
+ 	struct dir_entry * de;
+ 
++	if (current->root && !current->root->i_count)
++		current->root->i_count = 1;
++	if (current->pwd && !current->pwd->i_count)
++		current->pwd->i_count = 1;
++	if (current->root && !current->root->i_dev)
++		current->root->i_dev = ROOT_DEV;
++	if (current->pwd && !current->pwd->i_dev)
++		current->pwd->i_dev = ROOT_DEV;
+ 	if (!current->root || !current->root->i_count)
+ 		panic("No root inode");
+ 	if (!current->pwd || !current->pwd->i_count)
+@@ -255,7 +269,7 @@ static struct m_inode * dir_namei(const char * pathname,
+ 	if (!(dir = get_dir(pathname)))
+ 		return NULL;
+ 	basename = pathname;
+-	while (c=get_fs_byte(pathname++))
++	while ((c=get_fs_byte(pathname++)))
+ 		if (c=='/')
+ 			basename=pathname;
+ 	*namelen = pathname-basename-1;
+@@ -317,8 +331,10 @@ int open_namei(const char * pathname, int flag, int mode,
+ 		flag |= O_WRONLY;
+ 	mode &= 0777 & ~current->umask;
+ 	mode |= I_REGULAR;
+-	if (!(dir = dir_namei(pathname,&namelen,&basename)))
++	if (!(dir = dir_namei(pathname,&namelen,&basename))) {
+ 		return -ENOENT;
++	}
++	repair_inode_dev(dir);
+ 	if (!namelen) {			/* special case: '/usr/' etc */
+ 		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) {
+ 			*res_inode=dir;
+@@ -337,6 +353,7 @@ int open_namei(const char * pathname, int flag, int mode,
+ 			iput(dir);
+ 			return -EACCES;
+ 		}
++		repair_inode_dev(dir);
+ 		inode = new_inode(dir->i_dev);
+ 		if (!inode) {
+ 			iput(dir);
+@@ -386,17 +403,16 @@ int sys_mkdir(const char * pathname, int mode)
+ 	struct buffer_head * bh, *dir_block;
+ 	struct dir_entry * de;
+ 
+-	if (current->euid && current->uid)
+-		return -EPERM;
+ 	if (!(dir = dir_namei(pathname,&namelen,&basename)))
+ 		return -ENOENT;
++	repair_inode_dev(dir);
+ 	if (!namelen) {
+ 		iput(dir);
+ 		return -ENOENT;
+ 	}
+ 	if (!permission(dir,MAY_WRITE)) {
+ 		iput(dir);
+-		return -EPERM;
++		return -EACCES;
+ 	}
+ 	bh = find_entry(dir,basename,namelen,&de);
+ 	if (bh) {
+@@ -404,6 +420,7 @@ int sys_mkdir(const char * pathname, int mode)
+ 		iput(dir);
+ 		return -EEXIST;
+ 	}
++	repair_inode_dev(dir);
+ 	inode = new_inode(dir->i_dev);
+ 	if (!inode) {
+ 		iput(dir);
+@@ -475,6 +492,7 @@ static int empty_dir(struct m_inode * inode)
+ 	if (de[0].inode != inode->i_num || !de[1].inode || 
+ 	    strcmp(".",de[0].name) || strcmp("..",de[1].name)) {
+ 	    	printk("warning - bad directory on dev %04x\n",inode->i_dev);
++		brelse(bh);
+ 		return 0;
+ 	}
+ 	nr = 2;
+@@ -510,8 +528,6 @@ int sys_rmdir(const char * name)
+ 	struct buffer_head * bh;
+ 	struct dir_entry * de;
+ 
+-	if (current->euid && current->uid)
+-		return -EPERM;
+ 	if (!(dir = dir_namei(name,&namelen,&basename)))
+ 		return -ENOENT;
+ 	if (!namelen) {
+@@ -526,7 +542,7 @@ int sys_rmdir(const char * name)
+ 	if (!permission(dir,MAY_WRITE)) {
+ 		iput(dir);
+ 		brelse(bh);
+-		return -EPERM;
++		return -EACCES;
+ 	}
+ 	if (!(inode = iget(dir->i_dev, de->inode))) {
+ 		iput(dir);
+diff --git a/fs/open.c b/fs/open.c
+index 691869074fa12f213ce70e6eb92b14f72610e5c7..bfc9c8e8f7f40ee0524474e66c9cba3761f6b80e 100644
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -13,15 +13,35 @@
+ int sys_utime(char * filename, struct utimbuf * times)
+ {
+ 	struct m_inode * inode;
++	int mode;
+ 	long actime,modtime;
+ 
+ 	if (!(inode=namei(filename)))
+ 		return -ENOENT;
+ 	if (times) {
++		if (current->euid && current->euid != inode->i_uid) {
++			iput(inode);
++			return -EPERM;
++		}
++		if (verify_area(times,sizeof *times)) {
++			iput(inode);
++			return -EFAULT;
++		}
+ 		actime = get_fs_long((unsigned long *) &times->actime);
+ 		modtime = get_fs_long((unsigned long *) &times->modtime);
+-	} else
++	} else {
++		mode = inode->i_mode;
++		if (current->euid == inode->i_uid)
++			mode >>= 6;
++		else if (current->egid == inode->i_gid)
++			mode >>= 3;
++		if (current->euid && current->euid != inode->i_uid &&
++		    !(mode & 2)) {
++			iput(inode);
++			return -EACCES;
++		}
+ 		actime = modtime = CURRENT_TIME;
++	}
+ 	inode->i_atime = actime;
+ 	inode->i_mtime = modtime;
+ 	inode->i_dirt = 1;
+@@ -39,15 +59,16 @@ int sys_access(const char * filename,int mode)
+ 		return -EACCES;
+ 	res = inode->i_mode & 0777;
+ 	iput(inode);
+-	if (!(current->euid && current->uid))
++	if (!(current->euid && current->uid)) {
+ 		if (res & 0111)
+ 			res = 0777;
+ 		else
+ 			res = 0666;
++	}
+ 	if (current->euid == inode->i_uid)
+ 		res >>= 6;
+ 	else if (current->egid == inode->i_gid)
+-		res >>= 6;
++		res >>= 3;
+ 	if ((res & 0007 & mode) == mode)
+ 		return 0;
+ 	return -EACCES;
+@@ -89,12 +110,13 @@ int sys_chmod(const char * filename,int mode)
+ 
+ 	if (!(inode=namei(filename)))
+ 		return -ENOENT;
+-	if (current->uid && current->euid)
++	if (current->uid && current->euid) {
+ 		if (current->uid!=inode->i_uid && current->euid!=inode->i_uid) {
+ 			iput(inode);
+ 			return -EACCES;
+-		} else 
++		} else
+ 			mode = (mode & 0777) | (inode->i_mode & 07000);
++	}
+ 	inode->i_mode = (mode & 07777) | (inode->i_mode & ~07777);
+ 	inode->i_dirt = 1;
+ 	iput(inode);
+@@ -128,34 +150,46 @@ int sys_open(const char * filename,int flag,int mode)
+ 	for(fd=0 ; fd<NR_OPEN ; fd++)
+ 		if (!current->filp[fd])
+ 			break;
+-	if (fd>=NR_OPEN)
++	if (fd>=NR_OPEN) {
+ 		return -EINVAL;
++	}
+ 	current->close_on_exec &= ~(1<<fd);
+ 	f=0+file_table;
+ 	for (i=0 ; i<NR_FILE ; i++,f++)
+ 		if (!f->f_count) break;
+-	if (i>=NR_FILE)
++	if (i>=NR_FILE) {
+ 		return -EINVAL;
++	}
+ 	(current->filp[fd]=f)->f_count++;
+ 	if ((i=open_namei(filename,flag,mode,&inode))<0) {
+ 		current->filp[fd]=NULL;
+ 		f->f_count=0;
++		if (current->pid == 1)
++			printk("\033[31mFAIL\033[0m(%s)=\033[33m%d\033[0m\n\r", filename, i);
+ 		return i;
+ 	}
+ /* ttys are somewhat special (ttyxx major==4, tty major==5) */
+-	if (S_ISCHR(inode->i_mode))
++	if (S_ISCHR(inode->i_mode)) {
+ 		if (MAJOR(inode->i_zone[0])==4) {
++			if (MINOR(inode->i_zone[0]) >= NR_TTYS) {
++				iput(inode);
++				current->filp[fd]=NULL;
++				f->f_count=0;
++				return -ENXIO;
++			}
+ 			if (current->leader && current->tty<0) {
+ 				current->tty = MINOR(inode->i_zone[0]);
+ 				tty_table[current->tty].pgrp = current->pgrp;
+ 			}
+-		} else if (MAJOR(inode->i_zone[0])==5)
++		} else if (MAJOR(inode->i_zone[0])==5) {
+ 			if (current->tty<0) {
+ 				iput(inode);
+ 				current->filp[fd]=NULL;
+ 				f->f_count=0;
+ 				return -EPERM;
+ 			}
++		}
++	}
+ 	f->f_mode = inode->i_mode;
+ 	f->f_flags = flag;
+ 	f->f_count = 1;
+diff --git a/fs/pipe.c b/fs/pipe.c
+index 7e03e136d8fa43f3b2899a590123310c154c797f..d9f8e4f2ba04a38bf4e1e42f25d8a7244fa51bc4 100644
+--- a/fs/pipe.c
++++ b/fs/pipe.c
+@@ -1,6 +1,8 @@
+ #include <signal.h>
++#include <errno.h>
+ 
+ #include <linux/sched.h>
++#include <linux/kernel.h>
+ #include <linux/mm.h>	/* for get_free_page */
+ #include <asm/segment.h>
+ 
+@@ -56,6 +58,8 @@ int sys_pipe(unsigned long * fildes)
+ 	int fd[2];
+ 	int i,j;
+ 
++	if (!fildes || verify_area(fildes,2*sizeof(*fildes)))
++		return -EFAULT;
+ 	j=0;
+ 	for(i=0;j<2 && i<NR_FILE;i++)
+ 		if (!file_table[i].f_count)
+diff --git a/fs/read_write.c b/fs/read_write.c
+index 93faac2e25284c72057e7407b3480647e2cbfd37..2c1f3b15443f1a38d979e6f0832ada9c05ab5d88 100644
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -21,10 +21,9 @@ int sys_lseek(unsigned int fd,off_t offset, int origin)
+ 	struct file * file;
+ 	int tmp;
+ 
+-	if (fd >= NR_OPEN || !(file=current->filp[fd]) || !(file->f_inode)
+-	   || !IS_BLOCKDEV(MAJOR(file->f_inode->i_dev)))
++	if (fd >= NR_OPEN || !(file=current->filp[fd]) || !(file->f_inode))
+ 		return -EBADF;
+-	if (file->f_inode->i_pipe)
++	if (S_ISFIFO(file->f_inode->i_mode) || file->f_inode->i_pipe)
+ 		return -ESPIPE;
+ 	switch (origin) {
+ 		case 0:
+@@ -55,10 +54,11 @@ int sys_read(unsigned int fd,char * buf,int count)
+ 		return -EINVAL;
+ 	if (!count)
+ 		return 0;
+-	verify_area(buf,count);
++	if (verify_area(buf,count))
++		return -EFAULT;
+ 	inode = file->f_inode;
+ 	if (inode->i_pipe)
+-		return (file->f_mode&1)?read_pipe(inode,buf,count):-1;
++		return (file->f_mode&1)?read_pipe(inode,buf,count):-EBADF;
+ 	if (S_ISCHR(inode->i_mode))
+ 		return rw_char(READ,inode->i_zone[0],buf,count);
+ 	if (S_ISBLK(inode->i_mode))
+@@ -85,7 +85,7 @@ int sys_write(unsigned int fd,char * buf,int count)
+ 		return 0;
+ 	inode=file->f_inode;
+ 	if (inode->i_pipe)
+-		return (file->f_mode&2)?write_pipe(inode,buf,count):-1;
++		return (file->f_mode&2)?write_pipe(inode,buf,count):-EBADF;
+ 	if (S_ISCHR(inode->i_mode))
+ 		return rw_char(WRITE,inode->i_zone[0],buf,count);
+ 	if (S_ISBLK(inode->i_mode))
+diff --git a/fs/stat.c b/fs/stat.c
+index 4bec71d4e5b229a1ee91a0a51a14a2a11e582df4..4c496c17ab78c4bad73e80d0124902a421d26a5e 100644
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -1,4 +1,5 @@
+ #include <errno.h>
++#include <string.h>
+ #include <sys/stat.h>
+ 
+ #include <linux/fs.h>
+@@ -11,7 +12,9 @@ static int cp_stat(struct m_inode * inode, struct stat * statbuf)
+ 	struct stat tmp;
+ 	int i;
+ 
+-	verify_area(statbuf,sizeof (* statbuf));
++	if (verify_area(statbuf,sizeof (* statbuf)))
++		return -EFAULT;
++	memset(&tmp,0,sizeof tmp);
+ 	tmp.st_dev = inode->i_dev;
+ 	tmp.st_ino = inode->i_num;
+ 	tmp.st_mode = inode->i_mode;
+diff --git a/fs/super.c b/fs/super.c
+index d832289a56008c82bc3e9583ed7a2b6ae4a7c1ab..61a4ff200b0a93a1fc4750b305f3fa3e18f9e99c 100644
+--- a/fs/super.c
++++ b/fs/super.c
+@@ -4,10 +4,18 @@
+ #include <linux/config.h>
+ #include <linux/sched.h>
+ #include <linux/kernel.h>
++#include <linux/fs.h>
++
++extern struct m_inode inode_table[];
+ 
+ /* set_bit uses setb, as gas doesn't recognize setc */
+ #define set_bit(bitnr,addr) ({ \
+-register int __res __asm__("ax"); \
++register int __res; \
++__asm__("bt %2,%3;setb %%al":"=a" (__res):"a" (0),"r" (bitnr),"m" (*(addr))); \
++__res; })
++
++#define test_bit(bitnr,addr) ({ \
++register int __res; \
+ __asm__("bt %2,%3;setb %%al":"=a" (__res):"a" (0),"r" (bitnr),"m" (*(addr))); \
+ __res; })
+ 
+@@ -16,35 +24,60 @@ struct super_block super_block[NR_SUPER];
+ struct super_block * do_mount(int dev)
+ {
+ 	struct super_block * p;
++	struct super_block * disk;
+ 	struct buffer_head * bh;
+-	int i,block;
++	unsigned long inode_blocks, zone_bits;
++	int i,block,bad;
+ 
+ 	for(p = &super_block[0] ; p < &super_block[NR_SUPER] ; p++ )
+ 		if (!(p->s_dev))
+ 			break;
+-	p->s_dev = -1;		/* mark it in use */
+ 	if (p >= &super_block[NR_SUPER])
+ 		return NULL;
+-	if (!(bh = bread(dev,1)))
+-		return NULL;
+-	*p = *((struct super_block *) bh->b_data);
+-	brelse(bh);
+-	if (p->s_magic != SUPER_MAGIC) {
++	p->s_dev = -1;		/* mark it in use */
++	if (!(bh = bread(dev,1))) {
+ 		p->s_dev = 0;
+ 		return NULL;
+ 	}
++	disk = (struct super_block *) bh->b_data;
++	p->s_ninodes = disk->s_ninodes;
++	p->s_nzones = disk->s_nzones;
++	p->s_imap_blocks = disk->s_imap_blocks;
++	p->s_zmap_blocks = disk->s_zmap_blocks;
++	p->s_firstdatazone = disk->s_firstdatazone;
++	p->s_log_zone_size = disk->s_log_zone_size;
++	p->s_max_size = disk->s_max_size;
++	p->s_magic = disk->s_magic;
++	brelse(bh);
+ 	for (i=0;i<I_MAP_SLOTS;i++)
+ 		p->s_imap[i] = NULL;
+ 	for (i=0;i<Z_MAP_SLOTS;i++)
+ 		p->s_zmap[i] = NULL;
++	inode_blocks = (p->s_ninodes + INODES_PER_BLOCK - 1) /
++		INODES_PER_BLOCK;
++	bad = p->s_magic != SUPER_MAGIC || !p->s_ninodes ||
++		!p->s_imap_blocks || p->s_imap_blocks > I_MAP_SLOTS ||
++		!p->s_zmap_blocks || p->s_zmap_blocks > Z_MAP_SLOTS ||
++		p->s_log_zone_size ||
++		(unsigned long)p->s_ninodes + 1 >
++			(unsigned long)p->s_imap_blocks * BLOCK_SIZE * 8 ||
++		p->s_firstdatazone < 2 + p->s_imap_blocks +
++			p->s_zmap_blocks + inode_blocks ||
++		p->s_firstdatazone >= p->s_nzones;
++	zone_bits = (unsigned long)p->s_nzones - p->s_firstdatazone + 1;
++	if (bad || zone_bits >
++	    (unsigned long)p->s_zmap_blocks * BLOCK_SIZE * 8) {
++		p->s_dev = 0;
++		return NULL;
++	}
+ 	block=2;
+ 	for (i=0 ; i < p->s_imap_blocks ; i++)
+-		if (p->s_imap[i]=bread(dev,block))
++		if ((p->s_imap[i]=bread(dev,block)))
+ 			block++;
+ 		else
+ 			break;
+ 	for (i=0 ; i < p->s_zmap_blocks ; i++)
+-		if (p->s_zmap[i]=bread(dev,block))
++		if ((p->s_zmap[i]=bread(dev,block)))
+ 			block++;
+ 		else
+ 			break;
+@@ -83,20 +116,22 @@ void mount_root(void)
+ 		panic("Unable to mount root");
+ 	if (!(mi=iget(ROOT_DEV,1)))
+ 		panic("Unable to read root i-node");
+-	mi->i_count += 3 ;	/* NOTE! it is logically used 4 times, not 1 */
++	mi->i_count += 3 ; /* NOTE! it is logically used 4 times, not 1 */
+ 	p->s_isup = p->s_imount = mi;
+ 	current->pwd = mi;
+ 	current->root = mi;
+ 	free=0;
+-	i=p->s_nzones;
+-	while (-- i >= 0)
+-		if (!set_bit(i&8191,p->s_zmap[i>>13]->b_data))
++	i=p->s_nzones-p->s_firstdatazone;
++	while (i > 0) {
++		if (!test_bit(i&8191,p->s_zmap[i>>13]->b_data))
+ 			free++;
+-	printk("%d/%d free blocks\n\r",free,p->s_nzones);
++		i--;
++	}
++	printk("\033[32m%d\033[0m/\033[37m%d\033[0m free blocks\n\r",free,p->s_nzones);
+ 	free=0;
+ 	i=p->s_ninodes+1;
+ 	while (-- i >= 0)
+-		if (!set_bit(i&8191,p->s_imap[i>>13]->b_data))
++		if (!test_bit(i&8191,p->s_imap[i>>13]->b_data))
+ 			free++;
+-	printk("%d/%d free inodes\n\r",free,p->s_ninodes);
++	printk("\033[32m%d\033[0m/\033[37m%d\033[0m free inodes\n\r",free,p->s_ninodes);
+ }
+diff --git a/fs/truncate.c b/fs/truncate.c
+index fd82db8ed6c8d34dd5c360d4680852adf091f111..8b5127585ca7919df13bba73394a36e69f3c574a 100644
+--- a/fs/truncate.c
++++ b/fs/truncate.c
+@@ -10,7 +10,7 @@ static void free_ind(int dev,int block)
+ 
+ 	if (!block)
+ 		return;
+-	if (bh=bread(dev,block)) {
++	if ((bh=bread(dev,block))) {
+ 		p = (unsigned short *) bh->b_data;
+ 		for (i=0;i<512;i++,p++)
+ 			if (*p)
+@@ -28,7 +28,7 @@ static void free_dind(int dev,int block)
+ 
+ 	if (!block)
+ 		return;
+-	if (bh=bread(dev,block)) {
++	if ((bh=bread(dev,block))) {
+ 		p = (unsigned short *) bh->b_data;
+ 		for (i=0;i<512;i++,p++)
+ 			if (*p)
+diff --git a/fs/tty_ioctl.c b/fs/tty_ioctl.c
+index b4d9bf762007280038abc9dd6f9e085c3b03d9d4..bb201acddf10b661ba7601e3ad4c6b456ac562bf 100644
+--- a/fs/tty_ioctl.c
++++ b/fs/tty_ioctl.c
+@@ -8,28 +8,29 @@
+ #include <asm/segment.h>
+ #include <asm/system.h>
+ 
+-static void flush(struct tty_queue * queue)
++static void flush(struct tty_queue * queue,int reset_data)
+ {
+ 	cli();
+ 	queue->head = queue->tail;
++	if (reset_data)
++		queue->data = 0;
+ 	sti();
+ }
+ 
+ static void wait_until_sent(struct tty_struct * tty)
+ {
+-	/* do nothing - not implemented */
+ }
+ 
+ static void send_break(struct tty_struct * tty)
+ {
+-	/* do nothing - not implemented */
+ }
+ 
+ static int get_termios(struct tty_struct * tty, struct termios * termios)
+ {
+ 	int i;
+ 
+-	verify_area(termios, sizeof (*termios));
++	if (verify_area(termios, sizeof (*termios)))
++		return -EFAULT;
+ 	for (i=0 ; i< (sizeof (*termios)) ; i++)
+ 		put_fs_byte( ((char *)&tty->termios)[i] , i+(char *)termios );
+ 	return 0;
+@@ -39,8 +40,12 @@ static int set_termios(struct tty_struct * tty, struct termios * termios)
+ {
+ 	int i;
+ 
++	if (verify_area(termios, sizeof(*termios)))
++		return -EFAULT;
++	cli();
+ 	for (i=0 ; i< (sizeof (*termios)) ; i++)
+ 		((char *)&tty->termios)[i]=get_fs_byte(i+(char *)termios);
++	sti();
+ 	return 0;
+ }
+ 
+@@ -49,7 +54,10 @@ static int get_termio(struct tty_struct * tty, struct termio * termio)
+ 	int i;
+ 	struct termio tmp_termio;
+ 
+-	verify_area(termio, sizeof (*termio));
++	if (verify_area(termio, sizeof (*termio)))
++		return -EFAULT;
++	for (i=0 ; i<sizeof tmp_termio ; i++)
++		((char *)&tmp_termio)[i]=0;
+ 	tmp_termio.c_iflag = tty->termios.c_iflag;
+ 	tmp_termio.c_oflag = tty->termios.c_oflag;
+ 	tmp_termio.c_cflag = tty->termios.c_cflag;
+@@ -67,15 +75,19 @@ static int set_termio(struct tty_struct * tty, struct termio * termio)
+ 	int i;
+ 	struct termio tmp_termio;
+ 
++	if (verify_area(termio, sizeof(*termio)))
++		return -EFAULT;
+ 	for (i=0 ; i< (sizeof (*termio)) ; i++)
+ 		((char *)&tmp_termio)[i]=get_fs_byte(i+(char *)termio);
+-	*(unsigned short *)&tty->termios.c_iflag = tmp_termio.c_iflag;
+-	*(unsigned short *)&tty->termios.c_oflag = tmp_termio.c_oflag;
+-	*(unsigned short *)&tty->termios.c_cflag = tmp_termio.c_cflag;
+-	*(unsigned short *)&tty->termios.c_lflag = tmp_termio.c_lflag;
++	cli();
++	tty->termios.c_iflag = tmp_termio.c_iflag;
++	tty->termios.c_oflag = tmp_termio.c_oflag;
++	tty->termios.c_cflag = tmp_termio.c_cflag;
++	tty->termios.c_lflag = tmp_termio.c_lflag;
+ 	tty->termios.c_line = tmp_termio.c_line;
+ 	for(i=0 ; i < NCC ; i++)
+ 		tty->termios.c_cc[i] = tmp_termio.c_cc[i];
++	sti();
+ 	return 0;
+ }
+ 
+@@ -85,82 +97,93 @@ int tty_ioctl(int dev, int cmd, int arg)
+ 	if (MAJOR(dev) == 5) {
+ 		dev=current->tty;
+ 		if (dev<0)
+-			panic("tty_ioctl: dev<0");
++			dev=0;
+ 	} else
+ 		dev=MINOR(dev);
++	if (dev < 0 || dev >= NR_TTYS)
++		return -ENXIO;
+ 	tty = dev + tty_table;
+ 	switch (cmd) {
+-		case TCGETS:
+-			return get_termios(tty,(struct termios *) arg);
+-		case TCSETSF:
+-			flush(&tty->read_q); /* fallthrough */
+-		case TCSETSW:
+-			wait_until_sent(tty); /* fallthrough */
+-		case TCSETS:
+-			return set_termios(tty,(struct termios *) arg);
+-		case TCGETA:
+-			return get_termio(tty,(struct termio *) arg);
+-		case TCSETAF:
+-			flush(&tty->read_q); /* fallthrough */
+-		case TCSETAW:
+-			wait_until_sent(tty); /* fallthrough */
+-		case TCSETA:
+-			return set_termio(tty,(struct termio *) arg);
+-		case TCSBRK:
+-			if (!arg) {
+-				wait_until_sent(tty);
+-				send_break(tty);
+-			}
+-			return 0;
+-		case TCXONC:
+-			return -EINVAL; /* not implemented */
+-		case TCFLSH:
+-			if (arg==0)
+-				flush(&tty->read_q);
+-			else if (arg==1)
+-				flush(&tty->write_q);
+-			else if (arg==2) {
+-				flush(&tty->read_q);
+-				flush(&tty->write_q);
+-			} else
+-				return -EINVAL;
+-			return 0;
+-		case TIOCEXCL:
+-			return -EINVAL; /* not implemented */
+-		case TIOCNXCL:
+-			return -EINVAL; /* not implemented */
+-		case TIOCSCTTY:
+-			return -EINVAL; /* set controlling term NI */
+-		case TIOCGPGRP:
+-			verify_area((void *) arg,4);
+-			put_fs_long(tty->pgrp,(unsigned long *) arg);
+-			return 0;
+-		case TIOCSPGRP:
+-			tty->pgrp=get_fs_long((unsigned long *) arg);
+-			return 0;
+-		case TIOCOUTQ:
+-			verify_area((void *) arg,4);
+-			put_fs_long(CHARS(tty->write_q),(unsigned long *) arg);
+-			return 0;
+-		case TIOCSTI:
+-			return -EINVAL; /* not implemented */
+-		case TIOCGWINSZ:
+-			return -EINVAL; /* not implemented */
+-		case TIOCSWINSZ:
+-			return -EINVAL; /* not implemented */
+-		case TIOCMGET:
+-			return -EINVAL; /* not implemented */
+-		case TIOCMBIS:
+-			return -EINVAL; /* not implemented */
+-		case TIOCMBIC:
+-			return -EINVAL; /* not implemented */
+-		case TIOCMSET:
+-			return -EINVAL; /* not implemented */
+-		case TIOCGSOFTCAR:
+-			return -EINVAL; /* not implemented */
+-		case TIOCSSOFTCAR:
+-			return -EINVAL; /* not implemented */
+-		default:
++	case TCGETS:
++		return get_termios(tty,(struct termios *) arg);
++	case TCSETSF:
++		flush(&tty->read_q,0);
++		flush(&tty->secondary,1); /* fallthrough */
++	case TCSETSW:
++		wait_until_sent(tty); /* fallthrough */
++	case TCSETS:
++		return set_termios(tty,(struct termios *) arg);
++	case TCGETA:
++		return get_termio(tty,(struct termio *) arg);
++	case TCSETAF:
++		flush(&tty->read_q,0);
++		flush(&tty->secondary,1);
++		flush(&tty->write_q,0); /* fallthrough */
++	case TCSETAW:
++		wait_until_sent(tty); /* fallthrough */
++	case TCSETA:
++		return set_termio(tty,(struct termio *) arg);
++	case TCSBRK:
++		if (!arg) {
++			wait_until_sent(tty);
++			send_break(tty);
++		}
++		return 0;
++	case TCXONC:
++		return -EINVAL;
++	case TCFLSH:
++		if (arg==0) {
++			flush(&tty->read_q,0);
++			flush(&tty->secondary,1);
++		} else if (arg==1)
++			flush(&tty->write_q,0);
++		else if (arg==2) {
++			flush(&tty->read_q,0);
++			flush(&tty->secondary,1);
++			flush(&tty->write_q,0);
++		} else
+ 			return -EINVAL;
++		return 0;
++	case TIOCEXCL:
++		return -EINVAL;
++	case TIOCNXCL:
++		return -EINVAL;
++	case TIOCSCTTY:
++		return -EINVAL;
++	case TIOCGPGRP:
++		if (verify_area((void *) arg,4))
++			return -EFAULT;
++		put_fs_long(tty->pgrp,(unsigned long *) arg);
++		return 0;
++	case TIOCSPGRP:
++		if (verify_area((void *) arg,4))
++			return -EFAULT;
++		tty->pgrp=get_fs_long((unsigned long *) arg);
++		return 0;
++	case TIOCOUTQ:
++		if (verify_area((void *) arg,4))
++			return -EFAULT;
++		put_fs_long(CHARS(tty->write_q),(unsigned long *) arg);
++		return 0;
++	case TIOCSTI:
++		return -EINVAL;
++	case TIOCGWINSZ:
++		return -EINVAL;
++	case TIOCSWINSZ:
++		return -EINVAL;
++	case TIOCMGET:
++		return -EINVAL;
++	case TIOCMBIS:
++		return -EINVAL;
++	case TIOCMBIC:
++		return -EINVAL;
++	case TIOCMSET:
++		return -EINVAL;
++	case TIOCGSOFTCAR:
++		return -EINVAL;
++	case TIOCSSOFTCAR:
++		return -EINVAL;
++	default:
++		return -EINVAL;
+ 	}
+ }
+diff --git a/include/asm/memory.h b/include/asm/memory.h
+index 4b0a98e7be4c1f3ae25be85a086791fd4000aa5d..5b8b524f396a1799c619f8eaeff6108bd15534d7 100644
+--- a/include/asm/memory.h
++++ b/include/asm/memory.h
+@@ -7,8 +7,11 @@
+  */
+ #define memcpy(dest,src,n) ({ \
+ void * _res = dest; \
+-__asm__ ("cld;rep;movsb" \
+-	::"D" ((long)(_res)),"S" ((long)(src)),"c" ((long) (n)) \
+-	:"di","si","cx"); \
++unsigned long _dst = (unsigned long)(_res); \
++unsigned long _src = (unsigned long)(src); \
++unsigned long _cnt = (unsigned long)(n); \
++__asm__ volatile ("cld;rep;movsb" \
++	:"+D" (_dst),"+S" (_src),"+c" (_cnt) \
++	: :"memory","cc"); \
+ _res; \
+ })
+diff --git a/include/asm/segment.h b/include/asm/segment.h
+index 1a53b085032d66feafacc386f7c0badcbdd5eaba..5f2565d0c0a19fe08cc269c7b3592158ff0fc181 100644
+--- a/include/asm/segment.h
++++ b/include/asm/segment.h
+@@ -1,8 +1,8 @@
+ extern inline unsigned char get_fs_byte(const char * addr)
+ {
+-	unsigned register char _v;
++	register unsigned char _v;
+ 
+-	__asm__ ("movb %%fs:%1,%0":"=r" (_v):"m" (*addr));
++	__asm__ volatile ("movb %%fs:%1,%0":"=q" (_v):"m" (*addr));
+ 	return _v;
+ }
+ 
+@@ -10,7 +10,7 @@ extern inline unsigned short get_fs_word(const unsigned short *addr)
+ {
+ 	unsigned short _v;
+ 
+-	__asm__ ("movw %%fs:%1,%0":"=r" (_v):"m" (*addr));
++	__asm__ volatile ("movw %%fs:%1,%0":"=r" (_v):"m" (*addr));
+ 	return _v;
+ }
+ 
+@@ -18,21 +18,21 @@ extern inline unsigned long get_fs_long(const unsigned long *addr)
+ {
+ 	unsigned long _v;
+ 
+-	__asm__ ("movl %%fs:%1,%0":"=r" (_v):"m" (*addr)); \
++	__asm__ volatile ("movl %%fs:%1,%0":"=r" (_v):"m" (*addr));
+ 	return _v;
+ }
+ 
+ extern inline void put_fs_byte(char val,char *addr)
+ {
+-__asm__ ("movb %0,%%fs:%1"::"r" (val),"m" (*addr));
++	__asm__ volatile ("movb %1,%%fs:%0":"=m" (*addr):"q" (val):"memory");
+ }
+ 
+ extern inline void put_fs_word(short val,short * addr)
+ {
+-__asm__ ("movw %0,%%fs:%1"::"r" (val),"m" (*addr));
++	__asm__ volatile ("movw %1,%%fs:%0":"=m" (*addr):"r" (val):"memory");
+ }
+ 
+ extern inline void put_fs_long(unsigned long val,unsigned long * addr)
+ {
+-__asm__ ("movl %0,%%fs:%1"::"r" (val),"m" (*addr));
++	__asm__ volatile ("movl %1,%%fs:%0":"=m" (*addr):"r" (val):"memory");
+ }
+diff --git a/include/ctype.h b/include/ctype.h
+index 4043d6ede769ba1b6ba2af4ef4fd184308347372..c3eb95b8871440443c4ed969c916d4923d1ad1fd 100644
+--- a/include/ctype.h
++++ b/include/ctype.h
+@@ -13,22 +13,22 @@
+ extern unsigned char _ctype[];
+ extern char _ctmp;
+ 
+-#define isalnum(c) ((_ctype+1)[c]&(_U|_L|_D))
+-#define isalpha(c) ((_ctype+1)[c]&(_U|_L))
+-#define iscntrl(c) ((_ctype+1)[c]&(_C))
+-#define isdigit(c) ((_ctype+1)[c]&(_D))
+-#define isgraph(c) ((_ctype+1)[c]&(_P|_U|_L|_D))
+-#define islower(c) ((_ctype+1)[c]&(_L))
+-#define isprint(c) ((_ctype+1)[c]&(_P|_U|_L|_D|_SP))
+-#define ispunct(c) ((_ctype+1)[c]&(_P))
+-#define isspace(c) ((_ctype+1)[c]&(_S))
+-#define isupper(c) ((_ctype+1)[c]&(_U))
+-#define isxdigit(c) ((_ctype+1)[c]&(_D|_X))
++#define isalnum(c) ((_ctype+1)[(unsigned char)(c)]&(_U|_L|_D))
++#define isalpha(c) ((_ctype+1)[(unsigned char)(c)]&(_U|_L))
++#define iscntrl(c) ((_ctype+1)[(unsigned char)(c)]&(_C))
++#define isdigit(c) ((_ctype+1)[(unsigned char)(c)]&(_D))
++#define isgraph(c) ((_ctype+1)[(unsigned char)(c)]&(_P|_U|_L|_D))
++#define islower(c) ((_ctype+1)[(unsigned char)(c)]&(_L))
++#define isprint(c) ((_ctype+1)[(unsigned char)(c)]&(_P|_U|_L|_D|_SP))
++#define ispunct(c) ((_ctype+1)[(unsigned char)(c)]&(_P))
++#define isspace(c) ((_ctype+1)[(unsigned char)(c)]&(_S))
++#define isupper(c) ((_ctype+1)[(unsigned char)(c)]&(_U))
++#define isxdigit(c) ((_ctype+1)[(unsigned char)(c)]&(_D|_X))
+ 
+ #define isascii(c) (((unsigned) c)<=0x7f)
+ #define toascii(c) (((unsigned) c)&0x7f)
+ 
+-#define tolower(c) (_ctmp=c,isupper(_ctmp)?_ctmp+('a'+'A'):_ctmp)
+-#define toupper(c) (_ctmp=c,islower(_ctmp)?_ctmp+('A'-'a'):_ctmp)
++#define tolower(c) (_ctmp=(unsigned char)(c),isupper(_ctmp)?_ctmp+('a'-'A'):_ctmp)
++#define toupper(c) (_ctmp=(unsigned char)(c),islower(_ctmp)?_ctmp+('A'-'a'):_ctmp)
+ 
+ #endif
+diff --git a/include/linux/config.h b/include/linux/config.h
+index c84cacc5539f10a0f41f24a219c3c284bd28349f..b4f6e80e58d7cd9e1eb314b89999bbafb6987942 100644
+--- a/include/linux/config.h
++++ b/include/linux/config.h
+@@ -26,7 +26,7 @@
+ 
+ /* Root device at bootup. */
+ #if	defined(LINUS_HD)
+-#define ROOT_DEV 0x306
++#define ROOT_DEV 0x301     /* hd0 partition 1 — modern port (was 0x306) */
+ #elif	defined(LASU_HD)
+ #define ROOT_DEV 0x302
+ #else
+@@ -45,7 +45,8 @@
+ #if	defined(LASU_HD)
+ #define HD_TYPE { 7,35,915,65536,920,0 }
+ #elif	defined(LINUS_HD)
+-#define HD_TYPE { 5,17,980,300,980,0 },{ 5,17,980,300,980,0 }
++/* Modern port: one bEMU IDE drive with fixed 977/5/17 CHS geometry. */
++#define HD_TYPE { 5,17,977,300,977,0 }
+ #else
+ #error "must define a hard-disk type"
+ #endif
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index e5db89282fd991c4fd02a40562fa8be6ad666573..aa4bf62f2662a6d6c2fd274f816d75f5907a7719 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -106,8 +106,7 @@ struct m_inode {
+ #define PIPE_SIZE(inode) ((PIPE_HEAD(inode)-PIPE_TAIL(inode))&(PAGE_SIZE-1))
+ #define PIPE_EMPTY(inode) (PIPE_HEAD(inode)==PIPE_TAIL(inode))
+ #define PIPE_FULL(inode) (PIPE_SIZE(inode)==(PAGE_SIZE-1))
+-#define INC_PIPE(head) \
+-__asm__("incl %0\n\tandl $4095,%0"::"m" (head))
++#define INC_PIPE(head) ((head) = ((head)+1) & (PAGE_SIZE-1))
+ 
+ struct file {
+ 	unsigned short f_mode;
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index 9e533a7151967c695a6e0638ff4841897549b1cf..0f49b2ec471e8f7d2562b196bc2bf8c441bd7c75 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -1,8 +1,8 @@
+ /*
+  * 'kernel.h' contains some often-used function prototypes etc
+  */
+-void verify_area(void * addr,int count);
+-volatile void panic(const char * str);
++int verify_area(void * addr,int count);
++__attribute__((noreturn)) void panic(const char * str);
+ int printf(const char * fmt, ...);
+ int printk(const char * fmt, ...);
+ int tty_write(unsigned ch,char * buf,int count);
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index bf6b63956b2139f0d9cba09caec22e12b60d3d78..09896e7675aa8163e17df80c80fc4daa9fd8e4b2 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -31,7 +31,7 @@ extern int free_page_tables(unsigned long from, long size);
+ extern void sched_init(void);
+ extern void schedule(void);
+ extern void trap_init(void);
+-extern void panic(const char * str);
++extern __attribute__((noreturn)) void panic(const char * str);
+ extern int tty_write(unsigned minor,char * buf,int count);
+ 
+ typedef int (*fn_ptr)();
+@@ -171,7 +171,7 @@ __asm__("cmpl %%ecx,_current\n\t" \
+ 	"je 1f\n\t" \
+ 	"xchgl %%ecx,_current\n\t" \
+ 	"movw %%dx,%1\n\t" \
+-	"ljmp %0\n\t" \
++	"ljmp *%0\n\t" \
+ 	"cmpl %%ecx,%2\n\t" \
+ 	"jne 1f\n\t" \
+ 	"clts\n" \
+@@ -182,28 +182,34 @@ __asm__("cmpl %%ecx,_current\n\t" \
+ 
+ #define PAGE_ALIGN(n) (((n)+0xfff)&0xfffff000)
+ 
+-#define _set_base(addr,base) \
++/* Modern GCC: edx is both clobbered by rorl and listed as input "d".
++ * Fix: declare it as a dummy output ("+d" via tmp) so GCC accounts for
++ * the modification. Semantics preserved.
++ */
++#define _set_base(addr,base) do { \
++unsigned long __sb_tmp = (unsigned long)(base); \
+ __asm__("movw %%dx,%0\n\t" \
+ 	"rorl $16,%%edx\n\t" \
+ 	"movb %%dl,%1\n\t" \
+ 	"movb %%dh,%2" \
+-	::"m" (*((addr)+2)), \
+-	  "m" (*((addr)+4)), \
+-	  "m" (*((addr)+7)), \
+-	  "d" (base) \
+-	:"dx")
+-
+-#define _set_limit(addr,limit) \
++	:"=m" (*((addr)+2)), \
++	 "=m" (*((addr)+4)), \
++	 "=m" (*((addr)+7)), \
++	 "+d" (__sb_tmp)); \
++} while(0)
++
++#define _set_limit(addr,limit) do { \
++unsigned long __sl_tmp = (unsigned long)(limit); \
+ __asm__("movw %%dx,%0\n\t" \
+ 	"rorl $16,%%edx\n\t" \
+ 	"movb %1,%%dh\n\t" \
+ 	"andb $0xf0,%%dh\n\t" \
+ 	"orb %%dh,%%dl\n\t" \
+ 	"movb %%dl,%1" \
+-	::"m" (*(addr)), \
+-	  "m" (*((addr)+6)), \
+-	  "d" (limit) \
+-	:"dx")
++	:"=m" (*(addr)), \
++	 "+m" (*((addr)+6)), \
++	 "+d" (__sl_tmp)); \
++} while(0)
+ 
+ #define set_base(ldt,base) _set_base( ((char *)&(ldt)) , base )
+ #define set_limit(ldt,limit) _set_limit( ((char *)&(ldt)) , (limit-1)>>12 )
+@@ -214,7 +220,7 @@ __asm__("movb %3,%%dh\n\t" \
+ 	"movb %2,%%dl\n\t" \
+ 	"shll $16,%%edx\n\t" \
+ 	"movw %1,%%dx" \
+-	:"=d" (__base) \
++	:"=&d" (__base) \
+ 	:"m" (*((addr)+2)), \
+ 	 "m" (*((addr)+4)), \
+ 	 "m" (*((addr)+7))); \
+diff --git a/include/linux/tty.h b/include/linux/tty.h
+index 1d103e0fc3a6886b6ad8af8d69b90ac002ec4cfb..bb1ae43c7de2e36e16f7938d4e25238f4c192749 100644
+--- a/include/linux/tty.h
++++ b/include/linux/tty.h
+@@ -12,6 +12,7 @@
+ #include <termios.h>
+ 
+ #define TTY_BUF_SIZE 1024
++#define NR_TTYS 3
+ 
+ struct tty_queue {
+ 	unsigned long data;
+@@ -68,6 +69,7 @@ int tty_write(unsigned c, char * buf, int n);
+ 
+ void rs_write(struct tty_struct * tty);
+ void con_write(struct tty_struct * tty);
++void serial_console_write(int c);
+ 
+ void copy_to_cooked(struct tty_struct * tty);
+ 
+diff --git a/include/stdarg.h b/include/stdarg.h
+old mode 100755
+new mode 100644
+diff --git a/include/string.h b/include/string.h
+index 05a6d9cfa1a7f55da6c91df3555244b364c87b0a..1407ad91a2dea42faa5a9bf5b1ae46b99182f6a9 100644
+--- a/include/string.h
++++ b/include/string.h
+@@ -12,394 +12,258 @@ typedef unsigned int size_t;
+ 
+ extern char * strerror(int errno);
+ 
+-/*
+- * This string-include defines all string functions as inline
+- * functions. Use gcc. It also assumes ds=es=data space, this should be
+- * normal. Most of the string-functions are rather heavily hand-optimized,
+- * see especially strtok,strstr,str[c]spn. They should work, but are not
+- * very easy to understand. Everything is done entirely within the register
+- * set, making the functions fast and clean. String instructions have been
+- * used through-out, making for "slightly" unclear code :-)
+- *
+- *		(C) 1991 Linus Torvalds
+- */
+- 
+-extern inline char * strcpy(char * dest,const char *src)
++extern inline char * strcpy(char * dest,const char * src)
+ {
+-__asm__("cld\n"
+-	"1:\tlodsb\n\t"
+-	"stosb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b"
+-	::"S" (src),"D" (dest):"si","di","ax");
+-return dest;
++	char * ret=dest;
++
++	while ((*dest++=*src++))
++		;
++	return ret;
+ }
+ 
+-extern inline char * strncpy(char * dest,const char *src,int count)
++extern inline char * strncpy(char * dest,const char * src,int count)
+ {
+-__asm__("cld\n"
+-	"1:\tdecl %2\n\t"
+-	"js 2f\n\t"
+-	"lodsb\n\t"
+-	"stosb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b\n\t"
+-	"rep\n\t"
+-	"stosb\n"
+-	"2:"
+-	::"S" (src),"D" (dest),"c" (count):"si","di","ax","cx");
+-return dest;
++	char * ret=dest;
++
++	while (count>0 && *src) {
++		*dest++=*src++;
++		count--;
++	}
++	while (count-- > 0)
++		*dest++=0;
++	return ret;
+ }
+ 
+ extern inline char * strcat(char * dest,const char * src)
+ {
+-__asm__("cld\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"decl %1\n"
+-	"1:\tlodsb\n\t"
+-	"stosb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b"
+-	::"S" (src),"D" (dest),"a" (0),"c" (0xffffffff):"si","di","ax","cx");
+-return dest;
++	char * ret=dest;
++
++	while (*dest)
++		dest++;
++	while ((*dest++=*src++))
++		;
++	return ret;
+ }
+ 
+ extern inline char * strncat(char * dest,const char * src,int count)
+ {
+-__asm__("cld\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"decl %1\n\t"
+-	"movl %4,%3\n"
+-	"1:\tdecl %3\n\t"
+-	"js 2f\n\t"
+-	"lodsb\n\t"
+-	"stosb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b\n"
+-	"2:\txorl %2,%2\n\t"
+-	"stosb"
+-	::"S" (src),"D" (dest),"a" (0),"c" (0xffffffff),"g" (count)
+-	:"si","di","ax","cx");
+-return dest;
++	char * ret=dest;
++
++	while (*dest)
++		dest++;
++	while (count-- > 0 && *src)
++		*dest++=*src++;
++	*dest=0;
++	return ret;
+ }
+ 
+ extern inline int strcmp(const char * cs,const char * ct)
+ {
+-register int __res __asm__("ax");
+-__asm__("cld\n"
+-	"1:\tlodsb\n\t"
+-	"scasb\n\t"
+-	"jne 2f\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b\n\t"
+-	"xorl %%eax,%%eax\n\t"
+-	"jmp 3f\n"
+-	"2:\tmovl $1,%%eax\n\t"
+-	"jl 3f\n\t"
+-	"negl %%eax\n"
+-	"3:"
+-	:"=a" (__res):"D" (cs),"S" (ct):"si","di");
+-return __res;
++	while (*cs && *cs == *ct) {
++		cs++;
++		ct++;
++	}
++	return (int)(unsigned char)*cs-(int)(unsigned char)*ct;
+ }
+ 
+ extern inline int strncmp(const char * cs,const char * ct,int count)
+ {
+-register int __res __asm__("ax");
+-__asm__("cld\n"
+-	"1:\tdecl %3\n\t"
+-	"js 2f\n\t"
+-	"lodsb\n\t"
+-	"scasb\n\t"
+-	"jne 3f\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b\n"
+-	"2:\txorl %%eax,%%eax\n\t"
+-	"jmp 4f\n"
+-	"3:\tmovl $1,%%eax\n\t"
+-	"jl 4f\n\t"
+-	"negl %%eax\n"
+-	"4:"
+-	:"=a" (__res):"D" (cs),"S" (ct),"c" (count):"si","di","cx");
+-return __res;
++	while (count-- > 0) {
++		if (*cs != *ct)
++			return (int)(unsigned char)*cs-(int)(unsigned char)*ct;
++		if (!*cs)
++			return 0;
++		cs++;
++		ct++;
++	}
++	return 0;
+ }
+ 
+ extern inline char * strchr(const char * s,char c)
+ {
+-register char * __res __asm__("ax");
+-__asm__("cld\n\t"
+-	"movb %%al,%%ah\n"
+-	"1:\tlodsb\n\t"
+-	"cmpb %%ah,%%al\n\t"
+-	"je 2f\n\t"
+-	"testb %%al,%%al\n\t"
+-	"jne 1b\n\t"
+-	"movl $1,%1\n"
+-	"2:\tmovl %1,%0\n\t"
+-	"decl %0"
+-	:"=a" (__res):"S" (s),"0" (c):"si");
+-return __res;
++	do {
++		if (*s == c)
++			return (char *)s;
++	} while (*s++);
++	return NULL;
+ }
+ 
+ extern inline char * strrchr(const char * s,char c)
+ {
+-register char * __res __asm__("dx");
+-__asm__("cld\n\t"
+-	"movb %%al,%%ah\n"
+-	"1:\tlodsb\n\t"
+-	"cmpb %%ah,%%al\n\t"
+-	"jne 2f\n\t"
+-	"movl %%esi,%0\n\t"
+-	"decl %0\n"
+-	"2:\ttestb %%al,%%al\n\t"
+-	"jne 1b"
+-	:"=d" (__res):"0" (0),"S" (s),"a" (c):"ax","si");
+-return __res;
++	const char * ret=NULL;
++
++	do {
++		if (*s == c)
++			ret=s;
++	} while (*s++);
++	return (char *)ret;
+ }
+ 
+-extern inline int strspn(const char * cs, const char * ct)
++extern inline int strspn(const char * cs,const char * ct)
+ {
+-register char * __res __asm__("si");
+-__asm__("cld\n\t"
+-	"movl %4,%%edi\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"notl %%ecx\n\t"
+-	"decl %%ecx\n\t"
+-	"movl %%ecx,%%edx\n"
+-	"1:\tlodsb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"je 2f\n\t"
+-	"movl %4,%%edi\n\t"
+-	"movl %%edx,%%ecx\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"je 1b\n"
+-	"2:\tdecl %0"
+-	:"=S" (__res):"a" (0),"c" (0xffffffff),"0" (cs),"g" (ct)
+-	:"ax","cx","dx","di");
+-return __res-cs;
++	const char * start=cs;
++	const char * p;
++
++	while (*cs) {
++		for (p=ct ; *p && *p != *cs ; p++)
++			;
++		if (!*p)
++			break;
++		cs++;
++	}
++	return cs-start;
+ }
+ 
+-extern inline int strcspn(const char * cs, const char * ct)
++extern inline int strcspn(const char * cs,const char * ct)
+ {
+-register char * __res __asm__("si");
+-__asm__("cld\n\t"
+-	"movl %4,%%edi\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"notl %%ecx\n\t"
+-	"decl %%ecx\n\t"
+-	"movl %%ecx,%%edx\n"
+-	"1:\tlodsb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"je 2f\n\t"
+-	"movl %4,%%edi\n\t"
+-	"movl %%edx,%%ecx\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"jne 1b\n"
+-	"2:\tdecl %0"
+-	:"=S" (__res):"a" (0),"c" (0xffffffff),"0" (cs),"g" (ct)
+-	:"ax","cx","dx","di");
+-return __res-cs;
++	const char * start=cs;
++	const char * p;
++
++	while (*cs) {
++		for (p=ct ; *p && *p != *cs ; p++)
++			;
++		if (*p)
++			break;
++		cs++;
++	}
++	return cs-start;
+ }
+ 
+ extern inline char * strpbrk(const char * cs,const char * ct)
+ {
+-register char * __res __asm__("si");
+-__asm__("cld\n\t"
+-	"movl %4,%%edi\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"notl %%ecx\n\t"
+-	"decl %%ecx\n\t"
+-	"movl %%ecx,%%edx\n"
+-	"1:\tlodsb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"je 2f\n\t"
+-	"movl %4,%%edi\n\t"
+-	"movl %%edx,%%ecx\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"jne 1b\n\t"
+-	"decl %0\n\t"
+-	"jmp 3f\n"
+-	"2:\txorl %0,%0\n"
+-	"3:"
+-	:"=S" (__res):"a" (0),"c" (0xffffffff),"0" (cs),"g" (ct)
+-	:"ax","cx","dx","di");
+-return __res;
++	const char * p;
++
++	while (*cs) {
++		for (p=ct ; *p ; p++)
++			if (*p == *cs)
++				return (char *)cs;
++		cs++;
++	}
++	return NULL;
+ }
+ 
+ extern inline char * strstr(const char * cs,const char * ct)
+ {
+-register char * __res __asm__("ax");
+-__asm__("cld\n\t" \
+-	"movl %4,%%edi\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"notl %%ecx\n\t"
+-	"decl %%ecx\n\t"	/* NOTE! This also sets Z if searchstring='' */
+-	"movl %%ecx,%%edx\n"
+-	"1:\tmovl %4,%%edi\n\t"
+-	"movl %%esi,%%eax\n\t"
+-	"movl %%edx,%%ecx\n\t"
+-	"repe\n\t"
+-	"cmpsb\n\t"
+-	"je 2f\n\t"		/* also works for empty string, see above */
+-	"xchgl %%eax,%%esi\n\t"
+-	"incl %%esi\n\t"
+-	"cmpb $0,-1(%%eax)\n\t"
+-	"jne 1b\n\t"
+-	"xorl %%eax,%%eax\n\t"
+-	"2:"
+-	:"=a" (__res):"0" (0),"c" (0xffffffff),"S" (cs),"g" (ct)
+-	:"cx","dx","di","si");
+-return __res;
++	const char * a,*b;
++
++	if (!*ct)
++		return (char *)cs;
++	while (*cs) {
++		a=cs;
++		b=ct;
++		while (*a && *b && *a == *b) {
++			a++;
++			b++;
++		}
++		if (!*b)
++			return (char *)cs;
++		cs++;
++	}
++	return NULL;
+ }
+ 
+ extern inline int strlen(const char * s)
+ {
+-register int __res __asm__("cx");
+-__asm__("cld\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"notl %0\n\t"
+-	"decl %0"
+-	:"=c" (__res):"D" (s),"a" (0),"0" (0xffffffff):"di");
+-return __res;
++	const char * start=s;
++
++	while (*s)
++		s++;
++	return s-start;
+ }
+ 
+ extern char * ___strtok;
+ 
+ extern inline char * strtok(char * s,const char * ct)
+ {
+-register char * __res __asm__("si");
+-__asm__("testl %1,%1\n\t"
+-	"jne 1f\n\t"
+-	"testl %0,%0\n\t"
+-	"je 8f\n\t"
+-	"movl %0,%1\n"
+-	"1:\txorl %0,%0\n\t"
+-	"movl $-1,%%ecx\n\t"
+-	"xorl %%eax,%%eax\n\t"
+-	"cld\n\t"
+-	"movl %4,%%edi\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"notl %%ecx\n\t"
+-	"decl %%ecx\n\t"
+-	"je 7f\n\t"			/* empty delimeter-string */
+-	"movl %%ecx,%%edx\n"
+-	"2:\tlodsb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"je 7f\n\t"
+-	"movl %4,%%edi\n\t"
+-	"movl %%edx,%%ecx\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"je 2b\n\t"
+-	"decl %1\n\t"
+-	"cmpb $0,(%1)\n\t"
+-	"je 7f\n\t"
+-	"movl %1,%0\n"
+-	"3:\tlodsb\n\t"
+-	"testb %%al,%%al\n\t"
+-	"je 5f\n\t"
+-	"movl %4,%%edi\n\t"
+-	"movl %%edx,%%ecx\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"jne 3b\n\t"
+-	"decl %1\n\t"
+-	"cmpb $0,(%1)\n\t"
+-	"je 5f\n\t"
+-	"movb $0,(%1)\n\t"
+-	"incl %1\n\t"
+-	"jmp 6f\n"
+-	"5:\txorl %1,%1\n"
+-	"6:\tcmpb $0,(%0)\n\t"
+-	"jne 7f\n\t"
+-	"xorl %0,%0\n"
+-	"7:\ttestl %0,%0\n\t"
+-	"jne 8f\n\t"
+-	"movl %0,%1\n"
+-	"8:"
+-	:"=b" (__res),"=S" (___strtok)
+-	:"0" (___strtok),"1" (s),"g" (ct)
+-	:"ax","cx","dx","di");
+-return __res;
++	char * token;
++
++	if (!s)
++		s=___strtok;
++	if (!s)
++		return NULL;
++	while (*s && strchr(ct,*s))
++		s++;
++	if (!*s) {
++		___strtok=NULL;
++		return NULL;
++	}
++	token=s;
++	while (*s && !strchr(ct,*s))
++		s++;
++	if (*s) {
++		*s++=0;
++		___strtok=s;
++	} else
++		___strtok=NULL;
++	return token;
+ }
+ 
+-extern inline void * memcpy(void * dest,const void * src, int n)
++extern inline void * memcpy(void * dest,const void * src,int n)
+ {
+-__asm__("cld\n\t"
+-	"rep\n\t"
+-	"movsb"
+-	::"c" (n),"S" (src),"D" (dest)
+-	:"cx","si","di");
+-return dest;
++	char * d=dest;
++	const char * s=src;
++	void * ret=dest;
++
++	while (n-- > 0)
++		*d++=*s++;
++	return ret;
+ }
+ 
+-extern inline void * memmove(void * dest,const void * src, int n)
++extern inline void * memmove(void * dest,const void * src,int n)
+ {
+-if (dest<src)
+-__asm__("cld\n\t"
+-	"rep\n\t"
+-	"movsb"
+-	::"c" (n),"S" (src),"D" (dest)
+-	:"cx","si","di");
+-else
+-__asm__("std\n\t"
+-	"rep\n\t"
+-	"movsb"
+-	::"c" (n),"S" (src+n-1),"D" (dest+n-1)
+-	:"cx","si","di");
+-return dest;
++	char * d=dest;
++	const char * s=src;
++	void * ret=dest;
++
++	if (n <= 0)
++		return ret;
++	if (d < s) {
++		while (n-- > 0)
++			*d++=*s++;
++	} else if (d > s) {
++		d += n;
++		s += n;
++		while (n-- > 0)
++			*--d=*--s;
++	}
++	return ret;
+ }
+ 
+ extern inline int memcmp(const void * cs,const void * ct,int count)
+ {
+-register int __res __asm__("ax");
+-__asm__("cld\n\t"
+-	"repe\n\t"
+-	"cmpsb\n\t"
+-	"je 1f\n\t"
+-	"movl $1,%%eax\n\t"
+-	"jl 1f\n\t"
+-	"negl %%eax\n"
+-	"1:"
+-	:"=a" (__res):"0" (0),"D" (cs),"S" (ct),"c" (count)
+-	:"si","di","cx");
+-return __res;
++	const unsigned char * a=cs;
++	const unsigned char * b=ct;
++
++	while (count-- > 0) {
++		if (*a != *b)
++			return (int)*a-(int)*b;
++		a++;
++		b++;
++	}
++	return 0;
+ }
+ 
+ extern inline void * memchr(const void * cs,char c,int count)
+ {
+-register void * __res __asm__("di");
+-if (!count)
++	const unsigned char * p=cs;
++	unsigned char ch=c;
++
++	while (count-- > 0) {
++		if (*p == ch)
++			return (void *)p;
++		p++;
++	}
+ 	return NULL;
+-__asm__("cld\n\t"
+-	"repne\n\t"
+-	"scasb\n\t"
+-	"je 1f\n\t"
+-	"movl $1,%0\n"
+-	"1:\tdecl %0"
+-	:"=D" (__res):"a" (c),"D" (cs),"c" (count)
+-	:"cx");
+-return __res;
+ }
+ 
+ extern inline void * memset(void * s,char c,int count)
+ {
+-__asm__("cld\n\t"
+-	"rep\n\t"
+-	"stosb"
+-	::"a" (c),"D" (s),"c" (count)
+-	:"cx","di");
+-return s;
++	unsigned char * p=s;
++	void * ret=s;
++
++	while (count-- > 0)
++		*p++=(unsigned char)c;
++	return ret;
+ }
+ 
+ #endif
+diff --git a/include/sys/wait.h b/include/sys/wait.h
+index 53190c215945dff3aeac835cb388eb0705ce1cd8..23efcf1644cc2631ca7f8b3df0eb51f20927d518 100644
+--- a/include/sys/wait.h
++++ b/include/sys/wait.h
+@@ -10,7 +10,7 @@
+ #define WNOHANG		1
+ #define WUNTRACED	2
+ 
+-#define WIFEXITED(s)	(!((s)&0xFF)
++#define WIFEXITED(s)	(!((s)&0xFF))
+ #define WIFSTOPPED(s)	(((s)&0xFF)==0x7F)
+ #define WEXITSTATUS(s)	(((s)>>8)&0xFF)
+ #define WTERMSIG(s)	((s)&0x7F)
+diff --git a/include/unistd.h b/include/unistd.h
+index eb10771eb07f0535b0be139d326a283cfc65ff69..08e4e5c9634f2aebdc094cbe6e3b082a462cc942 100644
+--- a/include/unistd.h
++++ b/include/unistd.h
+@@ -198,8 +198,8 @@ int execvp(const char * file, char ** argv);
+ int execl(const char * pathname, char * arg0, ...);
+ int execlp(const char * file, char * arg0, ...);
+ int execle(const char * pathname, char * arg0, ...);
+-volatile void exit(int status);
+-volatile void _exit(int status);
++__attribute__((noreturn)) void exit(int status);
++__attribute__((noreturn)) void _exit(int status);
+ int fcntl(int fildes, int cmd, ...);
+ int fork(void);
+ int getpid(void);
+diff --git a/init/main.c b/init/main.c
+index 11921192869133b49af03f4a11f16ed1c584a9aa..427bda8ac5c1388a7c4e7164c9ec28d438aa44dc 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -14,10 +14,36 @@
+  * won't be any messing with the stack from main(), but we define
+  * some others too.
+  */
+-static inline _syscall0(int,fork)
+-static inline _syscall0(int,pause)
+-static inline _syscall0(int,setup)
+-static inline _syscall0(int,sync)
++/*
++ * Modern GCC refuses `static` redeclaration after the non-static prototypes
++ * unistd.h gives us. The 1991 code expects the wrapper to be local; we keep
++ * that intent with `inline` + a per-symbol alias so the linker sees the
++ * original name once.
++ */
++/*
++ * Modern GCC refuses `static` redeclaration after the non-static prototypes
++ * unistd.h gives us. The 1991 intent was: inline wrappers that don't touch
++ * the stack post-fork. We open-code the int $0x80 calls directly.
++ */
++inline int fork(void)
++{
++    int __res;
++    __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_fork));
++    return __res;
++}
++inline int pause(void)
++{
++    int __res;
++    __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_pause));
++    return __res;
++}
++static inline int setup(void)
++{
++    int __res;
++    __asm__ volatile("int $0x80" : "=a" (__res) : "0" (__NR_setup));
++    return __res;
++}
++extern int sync(void);
+ 
+ #include <linux/tty.h>
+ #include <linux/sched.h>
+@@ -33,6 +59,8 @@ static inline _syscall0(int,sync)
+ 
+ #include <linux/fs.h>
+ 
++#include "../bbp/linux01_bbp.h"   /* Bear Boot Protocol — native linux-0.01 port */
++
+ static char printbuf[1024];
+ 
+ extern int vsprintf();
+@@ -73,24 +101,34 @@ static void time_init(void)
+ 	BCD_TO_BIN(time.tm_mday);
+ 	BCD_TO_BIN(time.tm_mon);
+ 	BCD_TO_BIN(time.tm_year);
++	/* CMOS returns 2-digit year. Y2K rollover: 00-69 = 20xx, 70-99 = 19xx.
++	 * kernel_mktime expects tm_year as years-since-1900 (so 2026 -> 126). */
++	if (time.tm_year < 70)
++		time.tm_year += 100;
+ 	startup_time = kernel_mktime(&time);
+ }
+ 
++extern void vga_set_50_rows(void);
++
+ void main(void)		/* This really IS void, no error here. */
+ {			/* The startup routine assumes (well, ...) this */
+ /*
+  * Interrupts are still disabled. Do necessary setups, then
+  * enable them
+  */
++	vga_set_50_rows();	/* before tty_init -> con_init: bump VGA to
++				 * 80x50 by selecting the BIOS 8x8 font, so
++				 * con_init initializes with LINES=50. */
+ 	time_init();
+ 	tty_init();
+ 	trap_init();
+ 	sched_init();
+ 	buffer_init();
+ 	hd_init();
++	bbp_linux01_init();	/* Validate bEMU's CRC-checksummed BBP handoff. */
+ 	sti();
+ 	move_to_user_mode();
+-	if (!fork()) {		/* we count on this going ok */
++	if (!fork()) {
+ 		init();
+ 	}
+ /*
+@@ -115,30 +153,37 @@ static int printf(const char *fmt, ...)
+ }
+ 
+ static char * argv[] = { "-",NULL };
+-static char * envp[] = { "HOME=/usr/root", NULL };
++static char * alive_envp[] = { "HOME=/home/fermihart", "PATH=/bin:/usr/bin:.", "EXPERIENCE=alive", NULL };
++static char * historical_envp[] = { "HOME=/", "PATH=/bin:/usr/bin:.", "EXPERIENCE=1991", NULL };
+ 
+ void init(void)
+ {
+ 	int i,j;
++	char **shell_envp;
++	const char *experience;
+ 
++	experience = bbp_linux01_experience();
++	shell_envp = experience && experience[0] == '1' ? historical_envp : alive_envp;
+ 	setup();
+-	if (!fork())
+-		_exit(execve("/bin/update",NULL,NULL));
++/*	if (!fork())
++		_exit(execve("/bin/update",NULL,NULL));  */
++	for (i=0;i<NR_OPEN;i++)
++		close(i);
+ 	(void) open("/dev/tty0",O_RDWR,0);
+ 	(void) dup(0);
+ 	(void) dup(0);
+-	printf("%d buffers = %d bytes buffer space\n\r",NR_BUFFERS,
++	printf("\033[36m%d buffers\033[0m = \033[37m%d bytes\033[0m buffer space\n\r",NR_BUFFERS,
+ 		NR_BUFFERS*BLOCK_SIZE);
+-	printf(" Ok.\n\r");
++	printf(" \033[32mOk.\033[0m\n\r");
+ 	if ((i=fork())<0)
+-		printf("Fork failed in init\r\n");
++		printf("\033[31mFork failed in init\033[0m\r\n");
+ 	else if (!i) {
+ 		close(0);close(1);close(2);
+ 		setsid();
+ 		(void) open("/dev/tty0",O_RDWR,0);
+ 		(void) dup(0);
+ 		(void) dup(0);
+-		_exit(execve("/bin/sh",argv,envp));
++		_exit(execve("/bin/shell",argv,shell_envp));
+ 	}
+ 	j=wait(&i);
+ 	printf("child %d died with code %04x\n",j,i);
+diff --git a/kernel/asm.s b/kernel/asm.s
+index 6fe19816ae37cd90d96feccb32018e0118de8154..ef7b0902c79ab4f62c09634e1353cfb51a4a6aaf 100644
+--- a/kernel/asm.s
++++ b/kernel/asm.s
+@@ -13,6 +13,7 @@
+ _divide_error:
+ 	pushl $_do_divide_error
+ no_error_code:
++	cld				# interrupted code may have set DF
+ 	xchgl %eax,(%esp)
+ 	pushl %ebx
+ 	pushl %ecx
+@@ -45,7 +46,7 @@ no_error_code:
+ 	iret
+ 
+ _debug:
+-	pushl $_do_int3		# _do_debug
++	pushl $_do_debug
+ 	jmp no_error_code
+ 
+ _nmi:
+@@ -73,6 +74,7 @@ math_emulate:
+ 	pushl $_do_device_not_available
+ 	jmp no_error_code
+ _device_not_available:
++	cld				# interrupted code may have set DF
+ 	pushl %eax
+ 	movl %cr0,%eax
+ 	bt $2,%eax			# EM (math emulation bit)
+@@ -108,6 +110,7 @@ _coprocessor_error:
+ _double_fault:
+ 	pushl $_do_double_fault
+ error_code:
++	cld				# interrupted code may have set DF
+ 	xchgl %eax,4(%esp)		# error code <-> %eax
+ 	xchgl %ebx,(%esp)		# &function <-> %ebx
+ 	pushl %ecx
+@@ -154,4 +157,3 @@ _stack_segment:
+ _general_protection:
+ 	pushl $_do_general_protection
+ 	jmp error_code
+-
+diff --git a/kernel/console.c b/kernel/console.c
+index 9e00b31e803f37e3f0c52b7685822bddd2459c83..b517ea8e686e453f5d2a6bcbed48fda7f53464c5 100644
+--- a/kernel/console.c
++++ b/kernel/console.c
+@@ -22,7 +22,9 @@
+ 
+ #define SCREEN_START 0xb8000
+ #define SCREEN_END   0xc0000
+-#define LINES 25
++#define LINES 50	/* was 25 — we switch VGA to 8x8 font at boot
++			 * (see kernel/vga_text50.c), doubling row count
++			 * while staying in standard VGA text mode. */
+ #define COLUMNS 80
+ #define NPAR 16
+ 
+@@ -33,11 +35,37 @@ static unsigned long scr_end=SCREEN_START+LINES*COLUMNS*2;
+ static unsigned long pos;
+ static unsigned long x,y;
+ static unsigned long top=0,bottom=LINES;
+-static unsigned long lines=LINES,columns=COLUMNS;
++unsigned long lines=LINES,columns=COLUMNS;
+ static unsigned long state=0;
+ static unsigned long npar,par[NPAR];
+ static unsigned long ques=0;
+-static unsigned char attr=0x07;
++unsigned char attr=0x07;
++
++static inline void copy_screen(unsigned long dest,unsigned long src,
++	unsigned long count)
++{
++	__asm__ volatile("cld; rep; movsl"
++		: "+D" (dest), "+S" (src), "+c" (count)
++		:
++		: "memory", "cc");
++}
++
++static inline void copy_screen_down(unsigned long dest,unsigned long src,
++	unsigned long count)
++{
++	__asm__ volatile("std; rep; movsl; cld"
++		: "+D" (dest), "+S" (src), "+c" (count)
++		:
++		: "memory", "cc");
++}
++
++static inline void clear_screen(unsigned long dest,unsigned long count)
++{
++	__asm__ volatile("cld; rep; stosw"
++		: "+D" (dest), "+c" (count)
++		: "a" (0x0720)
++		: "memory", "cc");
++}
+ 
+ /*
+  * this is what the terminal answers to a ESC-Z or csi0c
+@@ -66,64 +94,38 @@ static inline void set_origin(void)
+ 
+ static void scrup(void)
+ {
++	unsigned long cols2 = columns<<1;
++
+ 	if (!top && bottom==lines) {
+-		origin += columns<<1;
+-		pos += columns<<1;
+-		scr_end += columns<<1;
++		origin += cols2;
++		pos += cols2;
++		scr_end += cols2;
+ 		if (scr_end>SCREEN_END) {
+-			__asm__("cld\n\t"
+-				"rep\n\t"
+-				"movsl\n\t"
+-				"movl _columns,%1\n\t"
+-				"rep\n\t"
+-				"stosw"
+-				::"a" (0x0720),
+-				"c" ((lines-1)*columns>>1),
+-				"D" (SCREEN_START),
+-				"S" (origin)
+-				:"cx","di","si");
++			copy_screen(SCREEN_START,origin,
++				(lines-1)*(columns>>1));
++			clear_screen(SCREEN_START+(lines-1)*cols2,columns);
+ 			scr_end -= origin-SCREEN_START;
+ 			pos -= origin-SCREEN_START;
+ 			origin = SCREEN_START;
+ 		} else {
+-			__asm__("cld\n\t"
+-				"rep\n\t"
+-				"stosl"
+-				::"a" (0x07200720),
+-				"c" (columns>>1),
+-				"D" (scr_end-(columns<<1))
+-				:"cx","di");
++			clear_screen(scr_end-cols2,columns);
+ 		}
+ 		set_origin();
+ 	} else {
+-		__asm__("cld\n\t"
+-			"rep\n\t"
+-			"movsl\n\t"
+-			"movl _columns,%%ecx\n\t"
+-			"rep\n\t"
+-			"stosw"
+-			::"a" (0x0720),
+-			"c" ((bottom-top-1)*columns>>1),
+-			"D" (origin+(columns<<1)*top),
+-			"S" (origin+(columns<<1)*(top+1))
+-			:"cx","di","si");
++		copy_screen(origin+cols2*top,origin+cols2*(top+1),
++			(bottom-top-1)*(columns>>1));
++		clear_screen(origin+cols2*(bottom-1),columns);
+ 	}
+ }
+ 
+ static void scrdown(void)
+ {
+-	__asm__("std\n\t"
+-		"rep\n\t"
+-		"movsl\n\t"
+-		"addl $2,%%edi\n\t"	/* %edi has been decremented by 4 */
+-		"movl _columns,%%ecx\n\t"
+-		"rep\n\t"
+-		"stosw"
+-		::"a" (0x0720),
+-		"c" ((bottom-top-1)*columns>>1),
+-		"D" (origin+(columns<<1)*bottom-4),
+-		"S" (origin+(columns<<1)*(bottom-1)-4)
+-		:"ax","cx","di","si");
++	unsigned long cols2 = columns<<1;
++
++	copy_screen_down(origin+cols2*bottom-4,
++		origin+cols2*(bottom-1)-4,
++		(bottom-top-1)*(columns>>1));
++	clear_screen(origin+cols2*top,columns);
+ }
+ 
+ static void lf(void)
+@@ -163,8 +165,8 @@ static void del(void)
+ 
+ static void csi_J(int par)
+ {
+-	long count __asm__("cx");
+-	long start __asm__("di");
++	long count;
++	long start;
+ 
+ 	switch (par) {
+ 		case 0:	/* erase from cursor to end of display */
+@@ -182,18 +184,13 @@ static void csi_J(int par)
+ 		default:
+ 			return;
+ 	}
+-	__asm__("cld\n\t"
+-		"rep\n\t"
+-		"stosw\n\t"
+-		::"c" (count),
+-		"D" (start),"a" (0x0720)
+-		:"cx","di");
++	clear_screen(start,count);
+ }
+ 
+ static void csi_K(int par)
+ {
+-	long count __asm__("cx");
+-	long start __asm__("di");
++	long count;
++	long start;
+ 
+ 	switch (par) {
+ 		case 0:	/* erase from cursor to end of line */
+@@ -213,12 +210,7 @@ static void csi_K(int par)
+ 		default:
+ 			return;
+ 	}
+-	__asm__("cld\n\t"
+-		"rep\n\t"
+-		"stosw\n\t"
+-		::"c" (count),
+-		"D" (start),"a" (0x0720)
+-		:"cx","di");
++	clear_screen(start,count);
+ }
+ 
+ void csi_m(void)
+@@ -232,6 +224,15 @@ void csi_m(void)
+ 			case 4:attr=0x0f;break;
+ 			case 7:attr=0x70;break;
+ 			case 27:attr=0x07;break;
++			case 30:attr=(attr&0xf0)|0x00;break;
++			case 31:attr=(attr&0xf0)|0x04;break;
++			case 32:attr=(attr&0xf0)|0x02;break;
++			case 33:attr=(attr&0xf0)|0x06;break;
++			case 34:attr=(attr&0xf0)|0x01;break;
++			case 35:attr=(attr&0xf0)|0x05;break;
++			case 36:attr=(attr&0xf0)|0x03;break;
++			case 37:attr=(attr&0xf0)|0x07;break;
++			case 39:attr=(attr&0xf0)|0x07;break;
+ 		}
+ }
+ 
+@@ -373,30 +374,34 @@ void con_write(struct tty_struct * tty)
+ {
+ 	int nr;
+ 	char c;
+-
+ 	nr = CHARS(tty->write_q);
+ 	while (nr--) {
+-		GETCH(tty->write_q,c);
+-		switch(state) {
++GETCH(tty->write_q,c);
++serial_console_write(c);
++switch(state) {
+ 			case 0:
+-				if (c>31 && c<127) {
++				/* Allow CP437 extended chars (128-255) too, since we
++				 * load the full IBM PC ROM glyph set into plane 2 —
++				 * lets the ∞ at byte 0xEC, box-drawing chars, etc.
++				 * render on the VGA console. Cast prevents the signed
++				 * `char` from making 128-255 read as negative. */
++				if (((unsigned char)c) > 31 && c != 127) {
+ 					if (x>=columns) {
+ 						x -= columns;
+ 						pos -= columns<<1;
+ 						lf();
+ 					}
+-					__asm__("movb _attr,%%ah\n\t"
+-						"movw %%ax,%1\n\t"
+-						::"a" (c),"m" (*(short *)pos)
+-						:"ax");
+-					pos += 2;
+-					x++;
+-				} else if (c==27)
++					*(unsigned short *)pos =
++						((unsigned short)attr<<8)|(unsigned char)c;
++pos += 2;
++x++;
++} else if (c==27)
+ 					state=1;
+-				else if (c==10 || c==11 || c==12)
+-					lf();
+-				else if (c==13)
+-					cr();
++else if (c==10 || c==11 || c==12) {
++lf();
++} else if (c==13) {
++cr();
++				}
+ 				else if (c==ERASE_CHAR(tty))
+ 					del();
+ 				else if (c==8) {
+@@ -428,9 +433,9 @@ void con_write(struct tty_struct * tty)
+ 					lf();
+ 				else if (c=='Z')
+ 					respond(tty);
+-				else if (x=='7')
++				else if (c=='7')
+ 					save_cur();
+-				else if (x=='8')
++				else if (c=='8')
+ 					restore_cur();
+ 				break;
+ 			case 2:
+@@ -438,7 +443,7 @@ void con_write(struct tty_struct * tty)
+ 					par[npar]=0;
+ 				npar=0;
+ 				state=3;
+-				if (ques=(c=='?'))
++				if ((ques=(c=='?')))
+ 					break;
+ 			case 3:
+ 				if (c==';' && npar<NPAR-1) {
+diff --git a/kernel/exit.c b/kernel/exit.c
+index 3402c3312076b61df3c9b9efb492bf7a9c77d789..be723b6b1464150e2d4557235613d29c7a8687ee 100644
+--- a/kernel/exit.c
++++ b/kernel/exit.c
+@@ -10,6 +10,25 @@
+ int sys_pause(void);
+ int sys_close(int fd);
+ 
++static unsigned long current_base(void)
++{
++	unsigned long base;
++	int nr;
++
++	base = get_base(current->ldt[1]);
++	if (current == task[0])
++		return base;
++	nr = (current->tss.ldt - (FIRST_LDT_ENTRY << 3)) >> 4;
++	if (nr <= 0 || nr >= NR_TASKS)
++		return base;
++	if (base == nr * 0x4000000)
++		return base;
++	base = nr * 0x4000000;
++	set_base(current->ldt[1],base);
++	set_base(current->ldt[2],base);
++	return base;
++}
++
+ void release(struct task_struct * p)
+ {
+ 	int i;
+@@ -38,35 +57,42 @@ static inline void send_sig(long sig,struct task_struct * p,int priv)
+ 		p->signal |= (1<<(sig-1));
+ }
+ 
+-void do_kill(long pid,long sig,int priv)
++int do_kill(long pid,long sig,int priv)
+ {
+ 	struct task_struct **p = NR_TASKS + task;
++	int found = 0;
+ 
+ 	if (!pid) while (--p > &FIRST_TASK) {
+-		if (*p && (*p)->pgrp == current->pid)
++		if (*p && (*p)->pgrp == current->pid) {
+ 			send_sig(sig,*p,priv);
++			found++;
++		}
+ 	} else if (pid>0) while (--p > &FIRST_TASK) {
+-		if (*p && (*p)->pid == pid)
++		if (*p && (*p)->pid == pid) {
+ 			send_sig(sig,*p,priv);
++			found++;
++		}
+ 	} else if (pid == -1) while (--p > &FIRST_TASK)
+ 		send_sig(sig,*p,priv);
+ 	else while (--p > &FIRST_TASK)
+-		if (*p && (*p)->pgrp == -pid)
++		if (*p && (*p)->pgrp == -pid) {
+ 			send_sig(sig,*p,priv);
++			found++;
++		}
++	return found ? 0 : -ESRCH;
+ }
+ 
+ int sys_kill(int pid,int sig)
+ {
+-	do_kill(pid,sig,!(current->uid || current->euid));
+-	return 0;
++	return do_kill(pid,sig,!(current->uid || current->euid));
+ }
+ 
+ int do_exit(long code)
+ {
+ 	int i;
+ 
+-	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
+-	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
++	free_page_tables(current_base(),get_limit(0x0f));
++	free_page_tables(current_base(),get_limit(0x17));
+ 	for (i=0 ; i<NR_TASKS ; i++)
+ 		if (task[i] && task[i]->father == current->pid)
+ 			task[i]->father = 0;
+@@ -77,7 +103,7 @@ int do_exit(long code)
+ 	current->pwd=NULL;
+ 	iput(current->root);
+ 	current->root=NULL;
+-	if (current->leader && current->tty >= 0)
++	if (current->leader && current->tty >= 0 && current->tty < NR_TTYS)
+ 		tty_table[current->tty].pgrp = 0;
+ 	if (last_task_used_math == current)
+ 		last_task_used_math = NULL;
+@@ -101,7 +127,8 @@ int sys_waitpid(pid_t pid,int * stat_addr, int options)
+ 	int flag=0;
+ 	struct task_struct ** p;
+ 
+-	verify_area(stat_addr,4);
++	if (stat_addr && verify_area(stat_addr,4))
++		return -EFAULT;
+ repeat:
+ 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+ 		if (*p && *p != current &&
+@@ -111,8 +138,9 @@ repeat:
+ 			if ((*p)->father == current->pid) {
+ 				flag=1;
+ 				if ((*p)->state==TASK_ZOMBIE) {
+-					put_fs_long((*p)->exit_code,
+-						(unsigned long *) stat_addr);
++					if (stat_addr)
++						put_fs_long((*p)->exit_code,
++							(unsigned long *) stat_addr);
+ 					current->cutime += (*p)->utime;
+ 					current->cstime += (*p)->stime;
+ 					flag = (*p)->pid;
+@@ -131,5 +159,3 @@ repeat:
+ 	}
+ 	return -ECHILD;
+ }
+-
+-
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 70f9dddebe28cf10738758d5de343431f1c56d0a..189175ff8a5139457cd570a7ef58fb39a774fc6d 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -15,19 +15,31 @@ extern void write_verify(unsigned long address);
+ 
+ long last_pid=0;
+ 
+-void verify_area(void * addr,int size)
++int verify_area(void * addr,int size)
+ {
+-	unsigned long start;
++	unsigned long base,end,limit,start;
+ 
+ 	start = (unsigned long) addr;
++	if (!start || size < 0)
++		return -EFAULT;
++	if (!size)
++		return 0;
++	limit = get_limit(0x17);
++	if (start >= limit || (unsigned long)size > limit-start)
++		return -EFAULT;
++	end = start + size - 1;
++	base = get_base(current->ldt[2]);
++	if (start > ~0UL-base || end > ~0UL-base)
++		return -EFAULT;
+ 	size += start & 0xfff;
+ 	start &= 0xfffff000;
+-	start += get_base(current->ldt[2]);
++	start += base;
+ 	while (size>0) {
+ 		size -= 4096;
+ 		write_verify(start);
+ 		start += 4096;
+ 	}
++	return 0;
+ }
+ 
+ int copy_mem(int nr,struct task_struct * p)
+@@ -109,7 +121,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
+ 		return -EAGAIN;
+ 	}
+ 	for (i=0; i<NR_OPEN;i++)
+-		if (f=p->filp[i])
++		if ((f=p->filp[i]))
+ 			f->f_count++;
+ 	if (current->pwd)
+ 		current->pwd->i_count++;
+diff --git a/kernel/hd.c b/kernel/hd.c
+index d3e614089d767a8840c9bc17b0ae5cf6192c372f..04a09519fa8402b5db98ff044bc50600eedefa71 100644
+--- a/kernel/hd.c
++++ b/kernel/hd.c
+@@ -50,10 +50,10 @@ static struct hd_request {
+ } request[NR_REQUEST];
+ 
+ #define IN_ORDER(s1,s2) \
+-((s1)->hd<(s2)->hd || (s1)->hd==(s2)->hd && \
+-((s1)->cyl<(s2)->cyl || (s1)->cyl==(s2)->cyl && \
+-((s1)->head<(s2)->head || (s1)->head==(s2)->head && \
+-((s1)->sector<(s2)->sector))))
++((s1)->hd<(s2)->hd || ((s1)->hd==(s2)->hd && \
++((s1)->cyl<(s2)->cyl || ((s1)->cyl==(s2)->cyl && \
++((s1)->head<(s2)->head || ((s1)->head==(s2)->head && \
++((s1)->sector<(s2)->sector)))))))
+ 
+ static struct hd_request * this_request = NULL;
+ 
+@@ -61,15 +61,30 @@ static int sorting=0;
+ 
+ static void do_request(void);
+ static void reset_controller(void);
++static void reset_controller_quiet(void);
+ static void rw_abs_hd(int rw,unsigned int nr,unsigned int sec,unsigned int head,
+ 	unsigned int cyl,struct buffer_head * bh);
++static void read_abs_hd(unsigned int drive,unsigned int sec,unsigned int head,
++	unsigned int cyl,struct buffer_head * bh);
+ void hd_init(void);
+ 
+-#define port_read(port,buf,nr) \
+-__asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr):"cx","di")
+-
+-#define port_write(port,buf,nr) \
+-__asm__("cld;rep;outsw"::"d" (port),"S" (buf),"c" (nr):"cx","si")
++#define port_read(port,buf,nr) do { \
++	unsigned long __pr_buf = (unsigned long)(buf); \
++	unsigned long __pr_count = (nr); \
++	__asm__ volatile("cld;rep;insw" \
++		: "+D" (__pr_buf), "+c" (__pr_count) \
++		: "d" (port) \
++		: "memory"); \
++} while (0)
++
++#define port_write(port,buf,nr) do { \
++	unsigned long __pw_buf = (unsigned long)(buf); \
++	unsigned long __pw_count = (nr); \
++	__asm__ volatile("cld;rep;outsw" \
++		: "+S" (__pw_buf), "+c" (__pw_count) \
++		: "d" (port) \
++		: "memory"); \
++} while (0)
+ 
+ extern void hd_interrupt(void);
+ 
+@@ -129,13 +144,13 @@ int sys_setup(void)
+ 	for (drive=0 ; drive<NR_HD ; drive++) {
+ 		rw_abs_hd(READ,drive,1,0,0,(struct buffer_head *) start_buffer);
+ 		if (!start_buffer->b_uptodate) {
+-			printk("Unable to read partition table of drive %d\n\r",
++			printk("\033[31mUnable to read partition table\033[0m of drive \033[33m%d\033[0m\n\r",
+ 				drive);
+ 			panic("");
+ 		}
+ 		if (start_buffer->b_data[510] != 0x55 || (unsigned char)
+ 		    start_buffer->b_data[511] != 0xAA) {
+-			printk("Bad partition table on drive %d\n\r",drive);
++			printk("\033[31mBad partition table\033[0m on drive \033[33m%d\033[0m\n\r",drive);
+ 			panic("");
+ 		}
+ 		p = 0x1BE + (void *)start_buffer->b_data;
+@@ -144,8 +159,9 @@ int sys_setup(void)
+ 			hd[i+5*drive].nr_sects = p->nr_sects;
+ 		}
+ 	}
+-	printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
++	printk("\033[36mPartition table%s\033[0m \033[32mok.\033[0m\n\r",(NR_HD>1)?"s":"");
+ 	mount_root();
++	printk("\033[35msys_setup\033[0m \033[32mreturning\033[0m\n\r");
+ 	return (0);
+ }
+ 
+@@ -163,6 +179,58 @@ static int controller_ready(void)
+ 	return (retries);
+ }
+ 
++static void read_abs_hd(unsigned int drive,unsigned int sec,unsigned int head,
++	unsigned int cyl,struct buffer_head * bh)
++{
++	int attempt,i,retries,status;
++
++	/* Wait for a queued write before taking exclusive polling control. */
++	cli();
++	while (this_request)
++		sleep_on(&wait_for_request);
++	sti();
++	for (attempt=0; attempt<MAX_ERRORS; attempt++) {
++		outb(_CTL | 2,HD_CMD);	/* nIEN: do not race the IRQ handler */
++		if (!controller_ready())
++			goto retry;
++		outb_p(_WPCOM,HD_PRECOMP);
++		outb_p(2,HD_NSECTOR);
++		outb_p(sec,HD_SECTOR);
++		outb_p(cyl,HD_LCYL);
++		outb_p(cyl>>8,HD_HCYL);
++		outb_p(0xA0|(drive<<4)|head,HD_CURRENT);
++		outb(WIN_READ,HD_COMMAND);
++
++		for (i=0; i<2; i++) {
++			retries=100000;
++			do {
++				status=inb(HD_STATUS);
++				if (status & ERR_STAT)
++					goto retry;
++			} while (--retries &&
++				 ((status & (BUSY_STAT | DRQ_STAT)) != DRQ_STAT));
++			if (!retries)
++				goto retry;
++			port_read(HD_DATA,bh->b_data+512*i,256);
++		}
++		status=inb(HD_STATUS);
++		if (status & (BUSY_STAT | DRQ_STAT | ERR_STAT))
++			goto retry;
++		bh->b_uptodate=1;
++		bh->b_dirt=0;
++		outb(_CTL,HD_CMD);
++		unlock_buffer(bh);
++		return;
++
++retry:
++		(void) inb(HD_STATUS);
++		reset_controller_quiet();
++	}
++	bh->b_uptodate=0;
++	outb(_CTL,HD_CMD);
++	unlock_buffer(bh);
++}
++
+ static int win_result(void)
+ {
+ 	int i=inb(HD_STATUS);
+@@ -205,7 +273,7 @@ static int drive_busy(void)
+ 			break;
+ 	i = inb(HD_STATUS);
+ 	i &= BUSY_STAT | READY_STAT | SEEK_STAT;
+-	if (i == READY_STAT | SEEK_STAT)
++	if (i == (READY_STAT | SEEK_STAT))
+ 		return(0);
+ 	printk("HD controller times out\n\r");
+ 	return(1);
+@@ -221,10 +289,21 @@ static void reset_controller(void)
+ 	for(i = 0; i < 10000 && drive_busy(); i++) /* nothing */;
+ 	if (drive_busy())
+ 		printk("HD-controller still busy\n\r");
+-	if((i = inb(ERR_STAT)) != 1)
++	if((i = inb(HD_ERROR)) != 1)
+ 		printk("HD-controller reset failed: %02x\n\r",i);
+ }
+ 
++static void reset_controller_quiet(void)
++{
++	int i;
++
++	outb(4 | 2,HD_CMD);
++	for(i = 0; i < 1000; i++) nop();
++	outb(2,HD_CMD);
++	for(i = 0; i < 10000 && drive_busy(); i++) /* nothing */;
++	(void) inb(HD_STATUS);
++}
++
+ static void reset_hd(int nr)
+ {
+ 	reset_controller();
+@@ -252,7 +331,7 @@ static void bad_rw_intr(void)
+ 
+ static void read_intr(void)
+ {
+-	if (win_result()) {
++	if (win_result() || !(inb(HD_STATUS) & DRQ_STAT)) {
+ 		bad_rw_intr();
+ 		return;
+ 	}
+@@ -355,12 +434,6 @@ static void add_request(struct hd_request * req)
+ 		}
+ 	}
+ 	sorting=0;
+-/*
+- * NOTE! As a result of sorting, the interrupts may have died down,
+- * as they aren't redone due to locking with sorting=1. They might
+- * also never have started, if this is the first request in the queue,
+- * so we restart them if necessary.
+- */
+ 	if (!do_hd)
+ 		do_request();
+ }
+@@ -373,7 +446,12 @@ void rw_abs_hd(int rw,unsigned int nr,unsigned int sec,unsigned int head,
+ 	if (rw!=READ && rw!=WRITE)
+ 		panic("Bad hd command, must be R/W");
+ 	lock_buffer(bh);
++	if (rw == READ) {
++		read_abs_hd(nr,sec,head,cyl,bh);
++		return;
++	}
+ repeat:
++	cli();
+ 	for (req=0+request ; req<NR_REQUEST+request ; req++)
+ 		if (req->hd<0)
+ 			break;
+@@ -382,6 +460,7 @@ repeat:
+ 		goto repeat;
+ 	}
+ 	req->hd=nr;
++	sti();
+ 	req->nsector=2;
+ 	req->sector=sec;
+ 	req->head=head;
+@@ -407,7 +486,9 @@ void hd_init(void)
+ 		hd[i*5].nr_sects = hd_info[i].head*
+ 				hd_info[i].sect*hd_info[i].cyl;
+ 	}
++	reset_controller_quiet();
+ 	set_trap_gate(0x2E,&hd_interrupt);
+ 	outb_p(inb_p(0x21)&0xfb,0x21);
+ 	outb(inb_p(0xA1)&0xbf,0xA1);
++	outb(_CTL,HD_CMD);
+ }
+diff --git a/kernel/keyboard.s b/kernel/keyboard.s
+index ba54be507d08fec22de46d5f847e275c48f6582d..ce2071199aa982698b230e8ad1f2d6d5918a7210 100644
+--- a/kernel/keyboard.s
++++ b/kernel/keyboard.s
+@@ -25,6 +25,7 @@ e0:	.byte 0
+  *  ascii character(s).
+  */
+ _keyboard_interrupt:
++	cld				# interrupted user code may have set DF
+ 	pushl %eax
+ 	pushl %ebx
+ 	pushl %ecx
+@@ -34,13 +35,13 @@ _keyboard_interrupt:
+ 	movl $0x10,%eax
+ 	mov %ax,%ds
+ 	mov %ax,%es
+-	xorl %al,%al		/* %eax is scan code */
++	xorl %eax,%eax		/* GAS modern rejects `xorl %al,%al`; full reg */
+ 	inb $0x60,%al
+ 	cmpb $0xe0,%al
+ 	je set_e0
+ 	cmpb $0xe1,%al
+ 	je set_e1
+-	call key_table(,%eax,4)
++	call *key_table(,%eax,4)
+ 	movb $0,e0
+ e0_e1:	inb $0x61,%al
+ 	jmp 1f
+@@ -221,14 +222,14 @@ func_table:
+ 
+ key_map:
+ 	.byte 0,27
+-	.ascii "1234567890+'"
++	.ascii "1234567890-="
+ 	.byte 127,9
+-	.ascii "qwertyuiop}"
+-	.byte 0,10,0
+-	.ascii "asdfghjkl|{"
++	.ascii "qwertyuiop[]"
++	.byte 10,0
++	.ascii "asdfghjkl;'"
+ 	.byte 0,0
+-	.ascii "'zxcvbnm,.-"
+-	.byte 0,'*,0,32		/* 36-39 */
++	.ascii "`zxcvbnm,./"
++	.byte 0,'*,0,32	/* 36-39 */
+ 	.fill 16,1,0		/* 3A-49 */
+ 	.byte '-,0,0,0,'+	/* 4A-4E */
+ 	.byte 0,0,0,0,0,0,0	/* 4F-55 */
+@@ -237,14 +238,14 @@ key_map:
+ 
+ shift_map:
+ 	.byte 0,27
+-	.ascii "!\"#$%&/()=?`"
++	.ascii "!@#$%^&*()_+"
+ 	.byte 127,9
+-	.ascii "QWERTYUIOP]^"
++	.ascii "QWERTYUIOP{}"
+ 	.byte 10,0
+-	.ascii "ASDFGHJKL\\["
++	.ascii "ASDFGHJKL:\""
+ 	.byte 0,0
+-	.ascii "*ZXCVBNM;:_"
+-	.byte 0,'*,0,32		/* 36-39 */
++	.ascii "~ZXCVBNM<>?"
++	.byte 0,'*,0,32	/* 36-39 */
+ 	.fill 16,1,0		/* 3A-49 */
+ 	.byte '-,0,0,0,'+	/* 4A-4E */
+ 	.byte 0,0,0,0,0,0,0	/* 4F-55 */
+diff --git a/kernel/panic.c b/kernel/panic.c
+index feab0ccb2333c2e7ffc787d713ba5aadd8bdd37c..61005b98d53fcb6f4b55eeeb8d1922fd9cc78dd5 100644
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -3,9 +3,12 @@
+  * to indicate a major problem.
+  */
+ #include <linux/kernel.h>
++#include <asm/system.h>
+ 
+-volatile void panic(const char * s)
++__attribute__((noreturn)) void panic(const char * s)
+ {
+-	printk("Kernel panic: %s\n\r",s);
+-	for(;;);
++	printk("\033[31mKernel panic:\033[0m %s\n\r",s);
++	cli();
++	for(;;)
++		__asm__("hlt");
+ }
+diff --git a/kernel/printk.c b/kernel/printk.c
+index 7a70dc3ca0f53a0e4884465664134e49493843a3..cf2586d2854c1c50277d1461e25e1dee11ad9bf8 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -7,6 +7,9 @@
+ #include <stddef.h>
+ 
+ #include <linux/kernel.h>
++#include <linux/tty.h>
++
++extern int vsprintf(char *buf, const char *fmt, va_list args);
+ 
+ static char buf[1024];
+ 
+@@ -18,6 +21,10 @@ int printk(const char *fmt, ...)
+ 	va_start(args, fmt);
+ 	i=vsprintf(buf,fmt,args);
+ 	va_end(args);
++	/* No serial_puts here: tty_write below already routes through con_write
++	 * which forwards every byte to serial via serial_console_write. Calling
++	 * both paths doubled every printk byte on the serial line, saturating
++	 * the UART at 2400 baud and back-pressuring the shell's tty write_q. */
+ 	__asm__("push %%fs\n\t"
+ 		"push %%ds\n\t"
+ 		"pop %%fs\n\t"
+diff --git a/kernel/rs_io.s b/kernel/rs_io.s
+index 62f075fc7e4622c7b662960233982b77af5e1856..0b64243bf8ad8ba0c62c8ed6a6f99cfe5b7d016e 100644
+--- a/kernel/rs_io.s
++++ b/kernel/rs_io.s
+@@ -32,6 +32,7 @@ _rs1_interrupt:
+ _rs2_interrupt:
+ 	pushl $_table_list+16
+ rs_int:
++	cld				# interrupted user code may have set DF
+ 	pushl %edx
+ 	pushl %ecx
+ 	pushl %ebx
+@@ -56,7 +57,7 @@ rep_int:
+ 	movl 24(%esp),%ecx
+ 	pushl %edx
+ 	subl $2,%edx
+-	call jmp_table(,%eax,2)		/* NOTE! not *4, bit0 is 0 already */
++	call *jmp_table(,%eax,2)		/* NOTE! not *4, bit0 is 0 already */
+ 	popl %edx
+ 	jmp rep_int
+ end:	movb $0x20,%al
+diff --git a/kernel/sched.c b/kernel/sched.c
+index 03399faa2a77570c0ad25fafa66cefb89b3659c0..47440c6a9331096796261db56aeafc94b80239f7 100644
+--- a/kernel/sched.c
++++ b/kernel/sched.c
+@@ -11,6 +11,7 @@
+ #include <asm/system.h>
+ #include <asm/io.h>
+ #include <asm/segment.h>
++#include <errno.h>
+ 
+ #define LATCH (1193180/HZ)
+ 
+@@ -90,10 +91,11 @@ void schedule(void)
+ 		i = NR_TASKS;
+ 		p = &task[NR_TASKS];
+ 		while (--i) {
+-			if (!*--p)
++			struct task_struct *t = *--p;
++			if (!t)
+ 				continue;
+-			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
+-				c = (*p)->counter, next = i;
++			if (t->state == TASK_RUNNING && t->counter > c)
++				c = t->counter, next = i;
+ 		}
+ 		if (c) break;
+ 		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+@@ -123,6 +125,8 @@ void sleep_on(struct task_struct **p)
+ 	*p = current;
+ 	current->state = TASK_UNINTERRUPTIBLE;
+ 	schedule();
++	if (*p == current)
++		*p = tmp;
+ 	if (tmp)
+ 		tmp->state=0;
+ }
+@@ -143,7 +147,8 @@ repeat:	current->state = TASK_INTERRUPTIBLE;
+ 		(**p).state=0;
+ 		goto repeat;
+ 	}
+-	*p=NULL;
++	if (*p == current)
++		*p = tmp;
+ 	if (tmp)
+ 		tmp->state=0;
+ }
+@@ -170,8 +175,10 @@ void do_timer(long cpl)
+ 
+ int sys_alarm(long seconds)
+ {
++	int old = (current->alarm > jiffies) ?
++		(current->alarm - jiffies + HZ - 1) / HZ : 0;
+ 	current->alarm = (seconds>0)?(jiffies+HZ*seconds):0;
+-	return seconds;
++	return old;
+ }
+ 
+ int sys_getpid(void)
+@@ -206,6 +213,8 @@ int sys_getegid(void)
+ 
+ int sys_nice(long increment)
+ {
++	if (increment < 0 && current->euid != 0)
++		return -EPERM;
+ 	if (current->priority-increment>0)
+ 		current->priority -= increment;
+ 	return 0;
+diff --git a/kernel/serial.c b/kernel/serial.c
+index f5425133747b102d168aad6c5a96108ec62afd5b..95d2f42d0167b5bddebee876c0d8805ac8649552 100644
+--- a/kernel/serial.c
++++ b/kernel/serial.c
+@@ -4,6 +4,7 @@
+  * This module implements the rs232 io functions
+  *	void rs_write(struct tty_struct * queue);
+  *	void rs_init(void);
++ *	void serial_console_write(int c);
+  * and all interrupts pertaining to serial IO.
+  */
+ 
+@@ -20,7 +21,13 @@ extern void rs2_interrupt(void);
+ static void init(int port)
+ {
+ 	outb_p(0x80,port+3);	/* set DLAB of line control reg */
+-	outb_p(0x30,port);	/* LS of divisor (48 -> 2400 bps */
++	outb_p(0x01,port);	/* LS of divisor (1 -> 115200 bps).
++				 * Original 1991 used 0x30 (2400 bps). At 2400
++				 * with polled busy-wait writes and printk going
++				 * through both serial_puts AND tty_write paths,
++				 * the write_q saturated after ~25 commands and
++				 * the shell blocked in puts(prompt). 115200 fits
++				 * bEMU's host UART and eliminates the backpressure. */
+ 	outb_p(0x00,port+1);	/* MS of divisor */
+ 	outb_p(0x03,port+3);	/* reset DLAB */
+ 	outb_p(0x0b,port+4);	/* set DTR,RTS, OUT_2 */
+@@ -51,3 +58,21 @@ void rs_write(struct tty_struct * tty)
+ 		outb(inb_p(tty->write_q.data+1)|0x02,tty->write_q.data+1);
+ 	sti();
+ }
++
++/* Polled serial output to COM1 for console echo.
++ * Saves/restores interrupt flags so it's safe from any context. */
++void serial_console_write(int c)
++{
++	unsigned long __flags;
++	__asm__ __volatile__("pushfl; popl %0" : "=g" (__flags));
++	cli();
++	while (!(inb_p(0x3FD) & 0x20))
++		;
++	outb_p(c, 0x3F8);
++	if (c == 0x0A) {
++		while (!(inb_p(0x3FD) & 0x20))
++			;
++		outb_p(0x0D, 0x3F8);
++	}
++	__asm__ __volatile__("pushl %0; popfl" :: "g" (__flags));
++}
+diff --git a/kernel/sys.c b/kernel/sys.c
+index f18ee7ed65b2e90e4705447ef9962e60aa1986c4..d7603c6af990d5508a82d130565e28a97d65e0ba 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -3,10 +3,23 @@
+ #include <linux/sched.h>
+ #include <linux/tty.h>
+ #include <linux/kernel.h>
++#include <linux/fs.h>
+ #include <asm/segment.h>
++#include <asm/io.h>
++#include <asm/system.h>
+ #include <sys/times.h>
+ #include <sys/utsname.h>
+ 
++struct ps_slot {
++	int pid, ppid, state, counter, priority, uid, tty;
++	long utime, stime;
++};
++
++struct ps_snapshot {
++	int count;
++	struct ps_slot slot[16];
++};
++
+ int sys_ftime()
+ {
+ 	return -ENOSYS;
+@@ -34,7 +47,35 @@ int sys_umount()
+ 
+ int sys_ustat(int dev,struct ustat * ubuf)
+ {
+-	return -1;
++	struct super_block * s;
++	int i, free_blocks, free_inodes;
++
++	if (!ubuf)
++		return -1;
++	if (verify_area(ubuf,sizeof *ubuf))
++		return -EFAULT;
++	if (!dev && current->root)
++		dev = current->root->i_dev;
++	for (s = super_block ; s < super_block + NR_SUPER ; s++)
++		if (s->s_dev == dev)
++			break;
++	if (s >= super_block + NR_SUPER || !s->s_dev)
++		return -1;
++	free_blocks = 0;
++	for (i = 1 ; i <= s->s_nzones-s->s_firstdatazone ; i++)
++		if (!(s->s_zmap[i>>13]->b_data[(i&8191)>>3] & (1 << (i&7))))
++			free_blocks++;
++	free_inodes = 0;
++	for (i = 0 ; i <= s->s_ninodes ; i++)
++		if (!(s->s_imap[i>>13]->b_data[(i&8191)>>3] & (1 << (i&7))))
++			free_inodes++;
++	put_fs_long(free_blocks,(unsigned long *)&ubuf->f_tfree);
++	put_fs_word(free_inodes,(short *)&ubuf->f_tinode);
++	for (i = 0 ; i < 6 ; i++) {
++		put_fs_byte(i < 5 ? "root"[i] : 0, ubuf->f_fname + i);
++		put_fs_byte(0, ubuf->f_fpack + i);
++	}
++	return 0;
+ }
+ 
+ int sys_ptrace()
+@@ -57,9 +98,31 @@ int sys_rename()
+ 	return -ENOSYS;
+ }
+ 
+-int sys_prof()
++int sys_prof(struct ps_snapshot * ubuf)
+ {
+-	return -ENOSYS;
++	int i, n = 0;
++	struct task_struct * p;
++
++	if (!ubuf)
++		return -1;
++	if (verify_area(ubuf,sizeof *ubuf))
++		return -EFAULT;
++	for (i = 0 ; i < NR_TASKS && n < 16 ; i++) {
++		if (!(p = task[i]))
++			continue;
++		put_fs_long(p->pid,(unsigned long *)&ubuf->slot[n].pid);
++		put_fs_long(p->father,(unsigned long *)&ubuf->slot[n].ppid);
++		put_fs_long(p->state,(unsigned long *)&ubuf->slot[n].state);
++		put_fs_long(p->counter,(unsigned long *)&ubuf->slot[n].counter);
++		put_fs_long(p->priority,(unsigned long *)&ubuf->slot[n].priority);
++		put_fs_long(p->uid,(unsigned long *)&ubuf->slot[n].uid);
++		put_fs_long(p->tty,(unsigned long *)&ubuf->slot[n].tty);
++		put_fs_long(p->utime,(unsigned long *)&ubuf->slot[n].utime);
++		put_fs_long(p->stime,(unsigned long *)&ubuf->slot[n].stime);
++		n++;
++	}
++	put_fs_long(n,(unsigned long *)&ubuf->count);
++	return n;
+ }
+ 
+ int sys_setgid(int gid)
+@@ -79,9 +142,19 @@ int sys_acct()
+ 	return -ENOSYS;
+ }
+ 
+-int sys_phys()
++int sys_phys(int cmd)
+ {
+-	return -ENOSYS;
++	if (current->euid != 0)
++		return -EPERM;
++	cli();
++	if (cmd == 1) {
++		unsigned char good = 0x02;
++		while (good & 0x02)
++			good = inb_p(0x64);
++		outb(0xfe,0x64);
++	}
++	for (;;)
++		__asm__("hlt");
+ }
+ 
+ int sys_lock()
+@@ -105,7 +178,8 @@ int sys_time(long * tloc)
+ 
+ 	i = CURRENT_TIME;
+ 	if (tloc) {
+-		verify_area(tloc,4);
++		if (verify_area(tloc,4))
++			return -EFAULT;
+ 		put_fs_long(i,(unsigned long *)tloc);
+ 	}
+ 	return i;
+@@ -135,7 +209,8 @@ int sys_times(struct tms * tbuf)
+ {
+ 	if (!tbuf)
+ 		return jiffies;
+-	verify_area(tbuf,sizeof *tbuf);
++	if (verify_area(tbuf,sizeof *tbuf))
++		return -EFAULT;
+ 	put_fs_long(current->utime,(unsigned long *)&tbuf->tms_utime);
+ 	put_fs_long(current->stime,(unsigned long *)&tbuf->tms_stime);
+ 	put_fs_long(current->cutime,(unsigned long *)&tbuf->tms_cutime);
+@@ -201,7 +276,8 @@ int sys_uname(struct utsname * name)
+ 	int i;
+ 
+ 	if (!name) return -1;
+-	verify_area(name,sizeof *name);
++	if (verify_area(name,sizeof *name))
++		return -EFAULT;
+ 	for(i=0;i<sizeof *name;i++)
+ 		put_fs_byte(((char *) &thisname)[i],i+(char *) name);
+ 	return (0);
+diff --git a/kernel/system_call.s b/kernel/system_call.s
+index df4f072ef5807a80103a85091f0c985e2e335079..8843e9049b755c73ba37103850ceb2be04227e72 100644
+--- a/kernel/system_call.s
++++ b/kernel/system_call.s
+@@ -59,6 +59,7 @@ reschedule:
+ 	jmp _schedule
+ .align 2
+ _system_call:
++	cld				# the i386 C ABI requires DF clear
+ 	cmpl $nr_system_calls-1,%eax
+ 	ja bad_sys_call
+ 	push %ds
+@@ -72,7 +73,7 @@ _system_call:
+ 	mov %dx,%es
+ 	movl $0x17,%edx		# fs points to local data space
+ 	mov %dx,%fs
+-	call _sys_call_table(,%eax,4)
++	call *_sys_call_table(,%eax,4)
+ 	pushl %eax
+ 	movl _current,%eax
+ 	cmpl $0,state(%eax)		# state
+@@ -107,6 +108,8 @@ ret_from_sys_call:
+ 	pushl $28
+ 	pushl %edx
+ 	call _verify_area
++	testl %eax,%eax
++	jne bad_signal_stack
+ 	popl %edx
+ 	addl $4,%esp
+ 	popl %ecx
+@@ -123,7 +126,7 @@ ret_from_sys_call:
+ 	movl EFLAGS(%esp),%eax
+ 	movl %eax,%fs:20(%edx)		# old eflags
+ 	movl %ebx,%fs:24(%edx)		# old return addr
+-3:	popl %eax
++	3:	popl %eax
+ 	popl %ebx
+ 	popl %ecx
+ 	popl %edx
+@@ -132,6 +135,16 @@ ret_from_sys_call:
+ 	pop %ds
+ 	iret
+ 
++bad_signal_stack:
++	popl %edx
++	addl $4,%esp
++	popl %ecx
++	popl %eax
++	pushl $11			# SIGSEGV: no writable signal frame
++	call _do_exit
++	addl $4,%esp
++	jmp 3b
++
+ default_signal:
+ 	incl %ecx
+ 	cmpl $SIG_CHLD,%ecx
+@@ -143,6 +156,7 @@ default_signal:
+ 
+ .align 2
+ _timer_interrupt:
++	cld				# interrupted user code may have set DF
+ 	push %ds		# save ds,es and put kernel data space
+ 	push %es		# into them. %fs is used by _system_call
+ 	push %fs
+@@ -188,6 +202,7 @@ _sys_fork:
+ 1:	ret
+ 
+ _hd_interrupt:
++	cld				# interrupted user code may have set DF
+ 	pushl %eax
+ 	pushl %ecx
+ 	pushl %edx
+@@ -200,10 +215,10 @@ _hd_interrupt:
+ 	movl $0x17,%eax
+ 	mov %ax,%fs
+ 	movb $0x20,%al
+-	outb %al,$0x20		# EOI to interrupt controller #1
++	outb %al,$0xA0		# EOI to slave interrupt controller
+ 	jmp 1f			# give port chance to breathe
+ 1:	jmp 1f
+-1:	outb %al,$0xA0		# same to controller #2
++1:	outb %al,$0x20		# then acknowledge the master controller
+ 	movl _do_hd,%eax
+ 	testl %eax,%eax
+ 	jne 1f
+@@ -216,4 +231,3 @@ _hd_interrupt:
+ 	popl %ecx
+ 	popl %eax
+ 	iret
+-
+diff --git a/kernel/traps.c b/kernel/traps.c
+index b6e8bdb176c17c15efad4fcc0593a1a45ffbebb7..3628deefeb4a45599dd754d2f1e1ef29983817cc 100644
+--- a/kernel/traps.c
++++ b/kernel/traps.c
+@@ -67,7 +67,9 @@ static void die(char * str,long esp_ptr,long nr)
+ 			printk("%p ",get_seg_long(0x17,i+(long *)esp[3]));
+ 		printk("\n");
+ 	}
+-	str(i);
++	for(i=0;i<NR_TASKS;i++)
++		if (task[i] == current)
++			break;
+ 	printk("Pid: %d, process nr: %d\n\r",current->pid,0xffff & i);
+ 	for(i=0;i<10;i++)
+ 		printk("%02x ",0xff & get_seg_byte(esp[1],(i+(char *)esp[0])));
+@@ -196,4 +198,3 @@ void trap_init(void)
+ 		"movl %%eax,%%db7"
+ 		:::"ax");*/
+ }
+-
+diff --git a/kernel/tty_io.c b/kernel/tty_io.c
+index 68a390ccc9e2f379516b3f1f1049a61dc5889fa8..913cca46e8bdbebee11641768e7650b4e7cae8e3 100644
+--- a/kernel/tty_io.c
++++ b/kernel/tty_io.c
+@@ -39,10 +39,10 @@
+ 
+ struct tty_struct tty_table[] = {
+ 	{
+-		{0,
++		{ICRNL,
+ 		OPOST|ONLCR,	/* change outgoing NL to CRNL */
+ 		0,
+-		ICANON | ECHO | ECHOCTL | ECHOKE,
++		ISIG | ICANON | ECHO | ECHOCTL | ECHOKE,
+ 		0,		/* console termio */
+ 		INIT_C_CC},
+ 		0,			/* initial pgrp */
+@@ -111,8 +111,11 @@ void tty_intr(struct tty_struct * tty, int signal)
+ static void sleep_if_empty(struct tty_queue * queue)
+ {
+ 	cli();
+-	while (!current->signal && EMPTY(*queue))
++	while (!current->signal && EMPTY(*queue)) {
++		sti();
+ 		interruptible_sleep_on(&queue->proc_list);
++		cli();
++	}
+ 	sti();
+ }
+ 
+@@ -166,16 +169,16 @@ void copy_to_cooked(struct tty_struct * tty)
+ 				continue;
+ 			}
+ 		}
+-		if (!L_ISIG(tty)) {
++		if (L_ISIG(tty)) {
+ 			if (c==INTR_CHAR(tty)) {
+ 				tty_intr(tty,SIGINT);
+ 				continue;
+ 			}
+ 		}
+-		if (c==10 || c==EOF_CHAR(tty))
++		if (c==10 || c==13 || c==EOF_CHAR(tty))
+ 			tty->secondary.data++;
+-		if (L_ECHO(tty)) {
+-			if (c==10) {
++	if (L_ECHO(tty)) {
++		if (c==10) {
+ 				PUTCH(10,tty->write_q);
+ 				PUTCH(13,tty->write_q);
+ 			} else if (c<32) {
+@@ -199,14 +202,14 @@ int tty_read(unsigned channel, char * buf, int nr)
+ 	int minimum,time,flag=0;
+ 	long oldalarm;
+ 
+-	if (channel>2 || nr<0) return -1;
++	if (channel>=NR_TTYS || nr<0) return -ENXIO;
+ 	tty = &tty_table[channel];
+ 	oldalarm = current->alarm;
+ 	time = (unsigned) 10*tty->termios.c_cc[VTIME];
+ 	minimum = (unsigned) tty->termios.c_cc[VMIN];
+ 	if (time && !minimum) {
+ 		minimum=1;
+-		if (flag=(!oldalarm || time+jiffies<oldalarm))
++		if ((flag=(!oldalarm || time+jiffies<oldalarm)))
+ 			current->alarm = time+jiffies;
+ 	}
+ 	if (minimum>nr)
+@@ -225,7 +228,7 @@ int tty_read(unsigned channel, char * buf, int nr)
+ 		}
+ 		do {
+ 			GETCH(tty->secondary,c);
+-			if (c==EOF_CHAR(tty) || c==10)
++			if (c==EOF_CHAR(tty) || c==10 || c==13)
+ 				tty->secondary.data--;
+ 			if (c==EOF_CHAR(tty) && L_CANON(tty))
+ 				return (b-buf);
+@@ -235,11 +238,12 @@ int tty_read(unsigned channel, char * buf, int nr)
+ 					break;
+ 			}
+ 		} while (nr>0 && !EMPTY(tty->secondary));
+-		if (time && !L_CANON(tty))
+-			if (flag=(!oldalarm || time+jiffies<oldalarm))
++		if (time && !L_CANON(tty)) {
++			if ((flag=(!oldalarm || time+jiffies<oldalarm)))
+ 				current->alarm = time+jiffies;
+ 			else
+ 				current->alarm = oldalarm;
++		}
+ 		if (L_CANON(tty)) {
+ 			if (b-buf)
+ 				break;
+@@ -254,11 +258,11 @@ int tty_read(unsigned channel, char * buf, int nr)
+ 
+ int tty_write(unsigned channel, char * buf, int nr)
+ {
+-	static cr_flag=0;
++	static int cr_flag=0;
+ 	struct tty_struct * tty;
+ 	char c, *b=buf;
+ 
+-	if (channel>2 || nr<0) return -1;
++	if (channel>=NR_TTYS || nr<0) return -ENXIO;
+ 	tty = channel + tty_table;
+ 	while (nr>0) {
+ 		sleep_if_full(&tty->write_q);
+@@ -302,5 +306,7 @@ int tty_write(unsigned channel, char * buf, int nr)
+  */
+ void do_tty_interrupt(int tty)
+ {
++	if (tty < 0 || tty >= NR_TTYS)
++		return;
+ 	copy_to_cooked(tty_table+tty);
+ }
+diff --git a/kernel/vga_font8x8.h b/kernel/vga_font8x8.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c0e50d59052b9ccbc60f029b82e71808f7ad3c3
+--- /dev/null
++++ b/kernel/vga_font8x8.h
+@@ -0,0 +1,273 @@
++/*
++ * vga_font8x8.h — PC-compatible 8x8 font bitmap, 256 glyphs * 8 rows.
++ *
++ * Derived from SeaBIOS vgasrc/vgafonts.c. Its source notice attributes the
++ * font package to Joseph Gil and states that individual fonts are public
++ * domain. See LICENSE for the pinned provenance URL.
++ *
++ * Each entry is one row, MSB = leftmost pixel.
++ */
++
++#ifndef _VGA_FONT8X8_H
++#define _VGA_FONT8X8_H
++
++static const unsigned char vga_font8x8[256][8] = {
++	/* 0x00 '\x00' */ { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x01 '\x01' */ { 0x7e, 0x81, 0xa5, 0x81, 0xbd, 0x99, 0x81, 0x7e },
++	/* 0x02 '\x02' */ { 0x7e, 0xff, 0xdb, 0xff, 0xc3, 0xe7, 0xff, 0x7e },
++	/* 0x03 '\x03' */ { 0x6c, 0xfe, 0xfe, 0xfe, 0x7c, 0x38, 0x10, 0x00 },
++	/* 0x04 '\x04' */ { 0x10, 0x38, 0x7c, 0xfe, 0x7c, 0x38, 0x10, 0x00 },
++	/* 0x05 '\x05' */ { 0x38, 0x7c, 0x38, 0xfe, 0xfe, 0x7c, 0x38, 0x7c },
++	/* 0x06 '\x06' */ { 0x10, 0x10, 0x38, 0x7c, 0xfe, 0x7c, 0x38, 0x7c },
++	/* 0x07 '\x07' */ { 0x00, 0x00, 0x18, 0x3c, 0x3c, 0x18, 0x00, 0x00 },
++	/* 0x08 '\x08' */ { 0xff, 0xff, 0xe7, 0xc3, 0xc3, 0xe7, 0xff, 0xff },
++	/* 0x09 '\x09' */ { 0x00, 0x3c, 0x66, 0x42, 0x42, 0x66, 0x3c, 0x00 },
++	/* 0x0a '\x0a' */ { 0xff, 0xc3, 0x99, 0xbd, 0xbd, 0x99, 0xc3, 0xff },
++	/* 0x0b '\x0b' */ { 0x0f, 0x07, 0x0f, 0x7d, 0xcc, 0xcc, 0xcc, 0x78 },
++	/* 0x0c '\x0c' */ { 0x3c, 0x66, 0x66, 0x66, 0x3c, 0x18, 0x7e, 0x18 },
++	/* 0x0d '\x0d' */ { 0x3f, 0x33, 0x3f, 0x30, 0x30, 0x70, 0xf0, 0xe0 },
++	/* 0x0e '\x0e' */ { 0x7f, 0x63, 0x7f, 0x63, 0x63, 0x67, 0xe6, 0xc0 },
++	/* 0x0f '\x0f' */ { 0x99, 0x5a, 0x3c, 0xe7, 0xe7, 0x3c, 0x5a, 0x99 },
++	/* 0x10 '\x10' */ { 0x80, 0xe0, 0xf8, 0xfe, 0xf8, 0xe0, 0x80, 0x00 },
++	/* 0x11 '\x11' */ { 0x02, 0x0e, 0x3e, 0xfe, 0x3e, 0x0e, 0x02, 0x00 },
++	/* 0x12 '\x12' */ { 0x18, 0x3c, 0x7e, 0x18, 0x18, 0x7e, 0x3c, 0x18 },
++	/* 0x13 '\x13' */ { 0x66, 0x66, 0x66, 0x66, 0x66, 0x00, 0x66, 0x00 },
++	/* 0x14 '\x14' */ { 0x7f, 0xdb, 0xdb, 0x7b, 0x1b, 0x1b, 0x1b, 0x00 },
++	/* 0x15 '\x15' */ { 0x3e, 0x63, 0x38, 0x6c, 0x6c, 0x38, 0xcc, 0x78 },
++	/* 0x16 '\x16' */ { 0x00, 0x00, 0x00, 0x00, 0x7e, 0x7e, 0x7e, 0x00 },
++	/* 0x17 '\x17' */ { 0x18, 0x3c, 0x7e, 0x18, 0x7e, 0x3c, 0x18, 0xff },
++	/* 0x18 '\x18' */ { 0x18, 0x3c, 0x7e, 0x18, 0x18, 0x18, 0x18, 0x00 },
++	/* 0x19 '\x19' */ { 0x18, 0x18, 0x18, 0x18, 0x7e, 0x3c, 0x18, 0x00 },
++	/* 0x1a '\x1a' */ { 0x00, 0x18, 0x0c, 0xfe, 0x0c, 0x18, 0x00, 0x00 },
++	/* 0x1b '\x1b' */ { 0x00, 0x30, 0x60, 0xfe, 0x60, 0x30, 0x00, 0x00 },
++	/* 0x1c '\x1c' */ { 0x00, 0x00, 0xc0, 0xc0, 0xc0, 0xfe, 0x00, 0x00 },
++	/* 0x1d '\x1d' */ { 0x00, 0x24, 0x66, 0xff, 0x66, 0x24, 0x00, 0x00 },
++	/* 0x1e '\x1e' */ { 0x00, 0x18, 0x3c, 0x7e, 0xff, 0xff, 0x00, 0x00 },
++	/* 0x1f '\x1f' */ { 0x00, 0xff, 0xff, 0x7e, 0x3c, 0x18, 0x00, 0x00 },
++	/* 0x20 ' ' */ { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x21 '!' */ { 0x30, 0x78, 0x78, 0x30, 0x30, 0x00, 0x30, 0x00 },
++	/* 0x22 '"' */ { 0x6c, 0x6c, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x23 '#' */ { 0x6c, 0x6c, 0xfe, 0x6c, 0xfe, 0x6c, 0x6c, 0x00 },
++	/* 0x24 '$' */ { 0x30, 0x7c, 0xc0, 0x78, 0x0c, 0xf8, 0x30, 0x00 },
++	/* 0x25 '%' */ { 0x00, 0xc6, 0xcc, 0x18, 0x30, 0x66, 0xc6, 0x00 },
++	/* 0x26 '&' */ { 0x38, 0x6c, 0x38, 0x76, 0xdc, 0xcc, 0x76, 0x00 },
++	/* 0x27 ''' */ { 0x60, 0x60, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x28 '(' */ { 0x18, 0x30, 0x60, 0x60, 0x60, 0x30, 0x18, 0x00 },
++	/* 0x29 ')' */ { 0x60, 0x30, 0x18, 0x18, 0x18, 0x30, 0x60, 0x00 },
++	/* 0x2a '*' */ { 0x00, 0x66, 0x3c, 0xff, 0x3c, 0x66, 0x00, 0x00 },
++	/* 0x2b '+' */ { 0x00, 0x30, 0x30, 0xfc, 0x30, 0x30, 0x00, 0x00 },
++	/* 0x2c ',' */ { 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x30, 0x60 },
++	/* 0x2d '-' */ { 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x2e '.' */ { 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x30, 0x00 },
++	/* 0x2f '/' */ { 0x06, 0x0c, 0x18, 0x30, 0x60, 0xc0, 0x80, 0x00 },
++	/* 0x30 '0' */ { 0x7c, 0xc6, 0xce, 0xde, 0xf6, 0xe6, 0x7c, 0x00 },
++	/* 0x31 '1' */ { 0x30, 0x70, 0x30, 0x30, 0x30, 0x30, 0xfc, 0x00 },
++	/* 0x32 '2' */ { 0x78, 0xcc, 0x0c, 0x38, 0x60, 0xcc, 0xfc, 0x00 },
++	/* 0x33 '3' */ { 0x78, 0xcc, 0x0c, 0x38, 0x0c, 0xcc, 0x78, 0x00 },
++	/* 0x34 '4' */ { 0x1c, 0x3c, 0x6c, 0xcc, 0xfe, 0x0c, 0x1e, 0x00 },
++	/* 0x35 '5' */ { 0xfc, 0xc0, 0xf8, 0x0c, 0x0c, 0xcc, 0x78, 0x00 },
++	/* 0x36 '6' */ { 0x38, 0x60, 0xc0, 0xf8, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x37 '7' */ { 0xfc, 0xcc, 0x0c, 0x18, 0x30, 0x30, 0x30, 0x00 },
++	/* 0x38 '8' */ { 0x78, 0xcc, 0xcc, 0x78, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x39 '9' */ { 0x78, 0xcc, 0xcc, 0x7c, 0x0c, 0x18, 0x70, 0x00 },
++	/* 0x3a ':' */ { 0x00, 0x30, 0x30, 0x00, 0x00, 0x30, 0x30, 0x00 },
++	/* 0x3b ';' */ { 0x00, 0x30, 0x30, 0x00, 0x00, 0x30, 0x30, 0x60 },
++	/* 0x3c '<' */ { 0x18, 0x30, 0x60, 0xc0, 0x60, 0x30, 0x18, 0x00 },
++	/* 0x3d '=' */ { 0x00, 0x00, 0xfc, 0x00, 0x00, 0xfc, 0x00, 0x00 },
++	/* 0x3e '>' */ { 0x60, 0x30, 0x18, 0x0c, 0x18, 0x30, 0x60, 0x00 },
++	/* 0x3f '?' */ { 0x78, 0xcc, 0x0c, 0x18, 0x30, 0x00, 0x30, 0x00 },
++	/* 0x40 '@' */ { 0x7c, 0xc6, 0xde, 0xde, 0xde, 0xc0, 0x78, 0x00 },
++	/* 0x41 'A' */ { 0x30, 0x78, 0xcc, 0xcc, 0xfc, 0xcc, 0xcc, 0x00 },
++	/* 0x42 'B' */ { 0xfc, 0x66, 0x66, 0x7c, 0x66, 0x66, 0xfc, 0x00 },
++	/* 0x43 'C' */ { 0x3c, 0x66, 0xc0, 0xc0, 0xc0, 0x66, 0x3c, 0x00 },
++	/* 0x44 'D' */ { 0xf8, 0x6c, 0x66, 0x66, 0x66, 0x6c, 0xf8, 0x00 },
++	/* 0x45 'E' */ { 0xfe, 0x62, 0x68, 0x78, 0x68, 0x62, 0xfe, 0x00 },
++	/* 0x46 'F' */ { 0xfe, 0x62, 0x68, 0x78, 0x68, 0x60, 0xf0, 0x00 },
++	/* 0x47 'G' */ { 0x3c, 0x66, 0xc0, 0xc0, 0xce, 0x66, 0x3e, 0x00 },
++	/* 0x48 'H' */ { 0xcc, 0xcc, 0xcc, 0xfc, 0xcc, 0xcc, 0xcc, 0x00 },
++	/* 0x49 'I' */ { 0x78, 0x30, 0x30, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x4a 'J' */ { 0x1e, 0x0c, 0x0c, 0x0c, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x4b 'K' */ { 0xe6, 0x66, 0x6c, 0x78, 0x6c, 0x66, 0xe6, 0x00 },
++	/* 0x4c 'L' */ { 0xf0, 0x60, 0x60, 0x60, 0x62, 0x66, 0xfe, 0x00 },
++	/* 0x4d 'M' */ { 0xc6, 0xee, 0xfe, 0xfe, 0xd6, 0xc6, 0xc6, 0x00 },
++	/* 0x4e 'N' */ { 0xc6, 0xe6, 0xf6, 0xde, 0xce, 0xc6, 0xc6, 0x00 },
++	/* 0x4f 'O' */ { 0x38, 0x6c, 0xc6, 0xc6, 0xc6, 0x6c, 0x38, 0x00 },
++	/* 0x50 'P' */ { 0xfc, 0x66, 0x66, 0x7c, 0x60, 0x60, 0xf0, 0x00 },
++	/* 0x51 'Q' */ { 0x78, 0xcc, 0xcc, 0xcc, 0xdc, 0x78, 0x1c, 0x00 },
++	/* 0x52 'R' */ { 0xfc, 0x66, 0x66, 0x7c, 0x6c, 0x66, 0xe6, 0x00 },
++	/* 0x53 'S' */ { 0x78, 0xcc, 0xe0, 0x70, 0x1c, 0xcc, 0x78, 0x00 },
++	/* 0x54 'T' */ { 0xfc, 0xb4, 0x30, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x55 'U' */ { 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xfc, 0x00 },
++	/* 0x56 'V' */ { 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0x78, 0x30, 0x00 },
++	/* 0x57 'W' */ { 0xc6, 0xc6, 0xc6, 0xd6, 0xfe, 0xee, 0xc6, 0x00 },
++	/* 0x58 'X' */ { 0xc6, 0xc6, 0x6c, 0x38, 0x38, 0x6c, 0xc6, 0x00 },
++	/* 0x59 'Y' */ { 0xcc, 0xcc, 0xcc, 0x78, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x5a 'Z' */ { 0xfe, 0xc6, 0x8c, 0x18, 0x32, 0x66, 0xfe, 0x00 },
++	/* 0x5b '[' */ { 0x78, 0x60, 0x60, 0x60, 0x60, 0x60, 0x78, 0x00 },
++	/* 0x5c '\x5c' */ { 0xc0, 0x60, 0x30, 0x18, 0x0c, 0x06, 0x02, 0x00 },
++	/* 0x5d ']' */ { 0x78, 0x18, 0x18, 0x18, 0x18, 0x18, 0x78, 0x00 },
++	/* 0x5e '^' */ { 0x10, 0x38, 0x6c, 0xc6, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x5f '_' */ { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff },
++	/* 0x60 '`' */ { 0x30, 0x30, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x61 'a' */ { 0x00, 0x00, 0x78, 0x0c, 0x7c, 0xcc, 0x76, 0x00 },
++	/* 0x62 'b' */ { 0xe0, 0x60, 0x60, 0x7c, 0x66, 0x66, 0xdc, 0x00 },
++	/* 0x63 'c' */ { 0x00, 0x00, 0x78, 0xcc, 0xc0, 0xcc, 0x78, 0x00 },
++	/* 0x64 'd' */ { 0x1c, 0x0c, 0x0c, 0x7c, 0xcc, 0xcc, 0x76, 0x00 },
++	/* 0x65 'e' */ { 0x00, 0x00, 0x78, 0xcc, 0xfc, 0xc0, 0x78, 0x00 },
++	/* 0x66 'f' */ { 0x38, 0x6c, 0x60, 0xf0, 0x60, 0x60, 0xf0, 0x00 },
++	/* 0x67 'g' */ { 0x00, 0x00, 0x76, 0xcc, 0xcc, 0x7c, 0x0c, 0xf8 },
++	/* 0x68 'h' */ { 0xe0, 0x60, 0x6c, 0x76, 0x66, 0x66, 0xe6, 0x00 },
++	/* 0x69 'i' */ { 0x30, 0x00, 0x70, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x6a 'j' */ { 0x0c, 0x00, 0x0c, 0x0c, 0x0c, 0xcc, 0xcc, 0x78 },
++	/* 0x6b 'k' */ { 0xe0, 0x60, 0x66, 0x6c, 0x78, 0x6c, 0xe6, 0x00 },
++	/* 0x6c 'l' */ { 0x70, 0x30, 0x30, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x6d 'm' */ { 0x00, 0x00, 0xcc, 0xfe, 0xfe, 0xd6, 0xc6, 0x00 },
++	/* 0x6e 'n' */ { 0x00, 0x00, 0xf8, 0xcc, 0xcc, 0xcc, 0xcc, 0x00 },
++	/* 0x6f 'o' */ { 0x00, 0x00, 0x78, 0xcc, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x70 'p' */ { 0x00, 0x00, 0xdc, 0x66, 0x66, 0x7c, 0x60, 0xf0 },
++	/* 0x71 'q' */ { 0x00, 0x00, 0x76, 0xcc, 0xcc, 0x7c, 0x0c, 0x1e },
++	/* 0x72 'r' */ { 0x00, 0x00, 0xdc, 0x76, 0x66, 0x60, 0xf0, 0x00 },
++	/* 0x73 's' */ { 0x00, 0x00, 0x7c, 0xc0, 0x78, 0x0c, 0xf8, 0x00 },
++	/* 0x74 't' */ { 0x10, 0x30, 0x7c, 0x30, 0x30, 0x34, 0x18, 0x00 },
++	/* 0x75 'u' */ { 0x00, 0x00, 0xcc, 0xcc, 0xcc, 0xcc, 0x76, 0x00 },
++	/* 0x76 'v' */ { 0x00, 0x00, 0xcc, 0xcc, 0xcc, 0x78, 0x30, 0x00 },
++	/* 0x77 'w' */ { 0x00, 0x00, 0xc6, 0xd6, 0xfe, 0xfe, 0x6c, 0x00 },
++	/* 0x78 'x' */ { 0x00, 0x00, 0xc6, 0x6c, 0x38, 0x6c, 0xc6, 0x00 },
++	/* 0x79 'y' */ { 0x00, 0x00, 0xcc, 0xcc, 0xcc, 0x7c, 0x0c, 0xf8 },
++	/* 0x7a 'z' */ { 0x00, 0x00, 0xfc, 0x98, 0x30, 0x64, 0xfc, 0x00 },
++	/* 0x7b '{' */ { 0x1c, 0x30, 0x30, 0xe0, 0x30, 0x30, 0x1c, 0x00 },
++	/* 0x7c '|' */ { 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0x18, 0x00 },
++	/* 0x7d '}' */ { 0xe0, 0x30, 0x30, 0x1c, 0x30, 0x30, 0xe0, 0x00 },
++	/* 0x7e '~' */ { 0x76, 0xdc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
++	/* 0x7f '\x7f' */ { 0x00, 0x10, 0x38, 0x6c, 0xc6, 0xc6, 0xfe, 0x00 },
++	/* 0x80 '\x80' */ { 0x78, 0xcc, 0xc0, 0xcc, 0x78, 0x18, 0x0c, 0x78 },
++	/* 0x81 '\x81' */ { 0x00, 0xcc, 0x00, 0xcc, 0xcc, 0xcc, 0x7e, 0x00 },
++	/* 0x82 '\x82' */ { 0x1c, 0x00, 0x78, 0xcc, 0xfc, 0xc0, 0x78, 0x00 },
++	/* 0x83 '\x83' */ { 0x7e, 0xc3, 0x3c, 0x06, 0x3e, 0x66, 0x3f, 0x00 },
++	/* 0x84 '\x84' */ { 0xcc, 0x00, 0x78, 0x0c, 0x7c, 0xcc, 0x7e, 0x00 },
++	/* 0x85 '\x85' */ { 0xe0, 0x00, 0x78, 0x0c, 0x7c, 0xcc, 0x7e, 0x00 },
++	/* 0x86 '\x86' */ { 0x30, 0x30, 0x78, 0x0c, 0x7c, 0xcc, 0x7e, 0x00 },
++	/* 0x87 '\x87' */ { 0x00, 0x00, 0x78, 0xc0, 0xc0, 0x78, 0x0c, 0x38 },
++	/* 0x88 '\x88' */ { 0x7e, 0xc3, 0x3c, 0x66, 0x7e, 0x60, 0x3c, 0x00 },
++	/* 0x89 '\x89' */ { 0xcc, 0x00, 0x78, 0xcc, 0xfc, 0xc0, 0x78, 0x00 },
++	/* 0x8a '\x8a' */ { 0xe0, 0x00, 0x78, 0xcc, 0xfc, 0xc0, 0x78, 0x00 },
++	/* 0x8b '\x8b' */ { 0xcc, 0x00, 0x70, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x8c '\x8c' */ { 0x7c, 0xc6, 0x38, 0x18, 0x18, 0x18, 0x3c, 0x00 },
++	/* 0x8d '\x8d' */ { 0xe0, 0x00, 0x70, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0x8e '\x8e' */ { 0xc6, 0x38, 0x6c, 0xc6, 0xfe, 0xc6, 0xc6, 0x00 },
++	/* 0x8f '\x8f' */ { 0x30, 0x30, 0x00, 0x78, 0xcc, 0xfc, 0xcc, 0x00 },
++	/* 0x90 '\x90' */ { 0x1c, 0x00, 0xfc, 0x60, 0x78, 0x60, 0xfc, 0x00 },
++	/* 0x91 '\x91' */ { 0x00, 0x00, 0x7f, 0x0c, 0x7f, 0xcc, 0x7f, 0x00 },
++	/* 0x92 '\x92' */ { 0x3e, 0x6c, 0xcc, 0xfe, 0xcc, 0xcc, 0xce, 0x00 },
++	/* 0x93 '\x93' */ { 0x78, 0xcc, 0x00, 0x78, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x94 '\x94' */ { 0x00, 0xcc, 0x00, 0x78, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x95 '\x95' */ { 0x00, 0xe0, 0x00, 0x78, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x96 '\x96' */ { 0x78, 0xcc, 0x00, 0xcc, 0xcc, 0xcc, 0x7e, 0x00 },
++	/* 0x97 '\x97' */ { 0x00, 0xe0, 0x00, 0xcc, 0xcc, 0xcc, 0x7e, 0x00 },
++	/* 0x98 '\x98' */ { 0x00, 0xcc, 0x00, 0xcc, 0xcc, 0x7c, 0x0c, 0xf8 },
++	/* 0x99 '\x99' */ { 0xc3, 0x18, 0x3c, 0x66, 0x66, 0x3c, 0x18, 0x00 },
++	/* 0x9a '\x9a' */ { 0xcc, 0x00, 0xcc, 0xcc, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0x9b '\x9b' */ { 0x18, 0x18, 0x7e, 0xc0, 0xc0, 0x7e, 0x18, 0x18 },
++	/* 0x9c '\x9c' */ { 0x38, 0x6c, 0x64, 0xf0, 0x60, 0xe6, 0xfc, 0x00 },
++	/* 0x9d '\x9d' */ { 0xcc, 0xcc, 0x78, 0xfc, 0x30, 0xfc, 0x30, 0x30 },
++	/* 0x9e '\x9e' */ { 0xf8, 0xcc, 0xcc, 0xfa, 0xc6, 0xcf, 0xc6, 0xc7 },
++	/* 0x9f '\x9f' */ { 0x0e, 0x1b, 0x18, 0x3c, 0x18, 0x18, 0xd8, 0x70 },
++	/* 0xa0 '\xa0' */ { 0x1c, 0x00, 0x78, 0x0c, 0x7c, 0xcc, 0x7e, 0x00 },
++	/* 0xa1 '\xa1' */ { 0x38, 0x00, 0x70, 0x30, 0x30, 0x30, 0x78, 0x00 },
++	/* 0xa2 '\xa2' */ { 0x00, 0x1c, 0x00, 0x78, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0xa3 '\xa3' */ { 0x00, 0x1c, 0x00, 0xcc, 0xcc, 0xcc, 0x7e, 0x00 },
++	/* 0xa4 '\xa4' */ { 0x00, 0xf8, 0x00, 0xf8, 0xcc, 0xcc, 0xcc, 0x00 },
++	/* 0xa5 '\xa5' */ { 0xfc, 0x00, 0xcc, 0xec, 0xfc, 0xdc, 0xcc, 0x00 },
++	/* 0xa6 '\xa6' */ { 0x3c, 0x6c, 0x6c, 0x3e, 0x00, 0x7e, 0x00, 0x00 },
++	/* 0xa7 '\xa7' */ { 0x38, 0x6c, 0x6c, 0x38, 0x00, 0x7c, 0x00, 0x00 },
++	/* 0xa8 '\xa8' */ { 0x30, 0x00, 0x30, 0x60, 0xc0, 0xcc, 0x78, 0x00 },
++	/* 0xa9 '\xa9' */ { 0x00, 0x00, 0x00, 0xfc, 0xc0, 0xc0, 0x00, 0x00 },
++	/* 0xaa '\xaa' */ { 0x00, 0x00, 0x00, 0xfc, 0x0c, 0x0c, 0x00, 0x00 },
++	/* 0xab '\xab' */ { 0xc3, 0xc6, 0xcc, 0xde, 0x33, 0x66, 0xcc, 0x0f },
++	/* 0xac '\xac' */ { 0xc3, 0xc6, 0xcc, 0xdb, 0x37, 0x6f, 0xcf, 0x03 },
++	/* 0xad '\xad' */ { 0x18, 0x18, 0x00, 0x18, 0x18, 0x18, 0x18, 0x00 },
++	/* 0xae '\xae' */ { 0x00, 0x33, 0x66, 0xcc, 0x66, 0x33, 0x00, 0x00 },
++	/* 0xaf '\xaf' */ { 0x00, 0xcc, 0x66, 0x33, 0x66, 0xcc, 0x00, 0x00 },
++	/* 0xb0 '\xb0' */ { 0x22, 0x88, 0x22, 0x88, 0x22, 0x88, 0x22, 0x88 },
++	/* 0xb1 '\xb1' */ { 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa },
++	/* 0xb2 '\xb2' */ { 0xdb, 0x77, 0xdb, 0xee, 0xdb, 0x77, 0xdb, 0xee },
++	/* 0xb3 '\xb3' */ { 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 },
++	/* 0xb4 '\xb4' */ { 0x18, 0x18, 0x18, 0x18, 0xf8, 0x18, 0x18, 0x18 },
++	/* 0xb5 '\xb5' */ { 0x18, 0x18, 0xf8, 0x18, 0xf8, 0x18, 0x18, 0x18 },
++	/* 0xb6 '\xb6' */ { 0x36, 0x36, 0x36, 0x36, 0xf6, 0x36, 0x36, 0x36 },
++	/* 0xb7 '\xb7' */ { 0x00, 0x00, 0x00, 0x00, 0xfe, 0x36, 0x36, 0x36 },
++	/* 0xb8 '\xb8' */ { 0x00, 0x00, 0xf8, 0x18, 0xf8, 0x18, 0x18, 0x18 },
++	/* 0xb9 '\xb9' */ { 0x36, 0x36, 0xf6, 0x06, 0xf6, 0x36, 0x36, 0x36 },
++	/* 0xba '\xba' */ { 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36 },
++	/* 0xbb '\xbb' */ { 0x00, 0x00, 0xfe, 0x06, 0xf6, 0x36, 0x36, 0x36 },
++	/* 0xbc '\xbc' */ { 0x36, 0x36, 0xf6, 0x06, 0xfe, 0x00, 0x00, 0x00 },
++	/* 0xbd '\xbd' */ { 0x36, 0x36, 0x36, 0x36, 0xfe, 0x00, 0x00, 0x00 },
++	/* 0xbe '\xbe' */ { 0x18, 0x18, 0xf8, 0x18, 0xf8, 0x00, 0x00, 0x00 },
++	/* 0xbf '\xbf' */ { 0x00, 0x00, 0x00, 0x00, 0xf8, 0x18, 0x18, 0x18 },
++	/* 0xc0 '\xc0' */ { 0x18, 0x18, 0x18, 0x18, 0x1f, 0x00, 0x00, 0x00 },
++	/* 0xc1 '\xc1' */ { 0x18, 0x18, 0x18, 0x18, 0xff, 0x00, 0x00, 0x00 },
++	/* 0xc2 '\xc2' */ { 0x00, 0x00, 0x00, 0x00, 0xff, 0x18, 0x18, 0x18 },
++	/* 0xc3 '\xc3' */ { 0x18, 0x18, 0x18, 0x18, 0x1f, 0x18, 0x18, 0x18 },
++	/* 0xc4 '\xc4' */ { 0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00 },
++	/* 0xc5 '\xc5' */ { 0x18, 0x18, 0x18, 0x18, 0xff, 0x18, 0x18, 0x18 },
++	/* 0xc6 '\xc6' */ { 0x18, 0x18, 0x1f, 0x18, 0x1f, 0x18, 0x18, 0x18 },
++	/* 0xc7 '\xc7' */ { 0x36, 0x36, 0x36, 0x36, 0x37, 0x36, 0x36, 0x36 },
++	/* 0xc8 '\xc8' */ { 0x36, 0x36, 0x37, 0x30, 0x3f, 0x00, 0x00, 0x00 },
++	/* 0xc9 '\xc9' */ { 0x00, 0x00, 0x3f, 0x30, 0x37, 0x36, 0x36, 0x36 },
++	/* 0xca '\xca' */ { 0x36, 0x36, 0xf7, 0x00, 0xff, 0x00, 0x00, 0x00 },
++	/* 0xcb '\xcb' */ { 0x00, 0x00, 0xff, 0x00, 0xf7, 0x36, 0x36, 0x36 },
++	/* 0xcc '\xcc' */ { 0x36, 0x36, 0x37, 0x30, 0x37, 0x36, 0x36, 0x36 },
++	/* 0xcd '\xcd' */ { 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0x00, 0x00 },
++	/* 0xce '\xce' */ { 0x36, 0x36, 0xf7, 0x00, 0xf7, 0x36, 0x36, 0x36 },
++	/* 0xcf '\xcf' */ { 0x18, 0x18, 0xff, 0x00, 0xff, 0x00, 0x00, 0x00 },
++	/* 0xd0 '\xd0' */ { 0x36, 0x36, 0x36, 0x36, 0xff, 0x00, 0x00, 0x00 },
++	/* 0xd1 '\xd1' */ { 0x00, 0x00, 0xff, 0x00, 0xff, 0x18, 0x18, 0x18 },
++	/* 0xd2 '\xd2' */ { 0x00, 0x00, 0x00, 0x00, 0xff, 0x36, 0x36, 0x36 },
++	/* 0xd3 '\xd3' */ { 0x36, 0x36, 0x36, 0x36, 0x3f, 0x00, 0x00, 0x00 },
++	/* 0xd4 '\xd4' */ { 0x18, 0x18, 0x1f, 0x18, 0x1f, 0x00, 0x00, 0x00 },
++	/* 0xd5 '\xd5' */ { 0x00, 0x00, 0x1f, 0x18, 0x1f, 0x18, 0x18, 0x18 },
++	/* 0xd6 '\xd6' */ { 0x00, 0x00, 0x00, 0x00, 0x3f, 0x36, 0x36, 0x36 },
++	/* 0xd7 '\xd7' */ { 0x36, 0x36, 0x36, 0x36, 0xff, 0x36, 0x36, 0x36 },
++	/* 0xd8 '\xd8' */ { 0x18, 0x18, 0xff, 0x18, 0xff, 0x18, 0x18, 0x18 },
++	/* 0xd9 '\xd9' */ { 0x18, 0x18, 0x18, 0x18, 0xf8, 0x00, 0x00, 0x00 },
++	/* 0xda '\xda' */ { 0x00, 0x00, 0x00, 0x00, 0x1f, 0x18, 0x18, 0x18 },
++	/* 0xdb '\xdb' */ { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
++	/* 0xdc '\xdc' */ { 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff },
++	/* 0xdd '\xdd' */ { 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0 },
++	/* 0xde '\xde' */ { 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f },
++	/* 0xdf '\xdf' */ { 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00 },
++	/* 0xe0 '\xe0' */ { 0x00, 0x00, 0x76, 0xdc, 0xc8, 0xdc, 0x76, 0x00 },
++	/* 0xe1 '\xe1' */ { 0x00, 0x78, 0xcc, 0xf8, 0xcc, 0xf8, 0xc0, 0xc0 },
++	/* 0xe2 '\xe2' */ { 0x00, 0xfc, 0xcc, 0xc0, 0xc0, 0xc0, 0xc0, 0x00 },
++	/* 0xe3 '\xe3' */ { 0x00, 0xfe, 0x6c, 0x6c, 0x6c, 0x6c, 0x6c, 0x00 },
++	/* 0xe4 '\xe4' */ { 0xfc, 0xcc, 0x60, 0x30, 0x60, 0xcc, 0xfc, 0x00 },
++	/* 0xe5 '\xe5' */ { 0x00, 0x00, 0x7e, 0xd8, 0xd8, 0xd8, 0x70, 0x00 },
++	/* 0xe6 '\xe6' */ { 0x00, 0x66, 0x66, 0x66, 0x66, 0x7c, 0x60, 0xc0 },
++	/* 0xe7 '\xe7' */ { 0x00, 0x76, 0xdc, 0x18, 0x18, 0x18, 0x18, 0x00 },
++	/* 0xe8 '\xe8' */ { 0xfc, 0x30, 0x78, 0xcc, 0xcc, 0x78, 0x30, 0xfc },
++	/* 0xe9 '\xe9' */ { 0x38, 0x6c, 0xc6, 0xfe, 0xc6, 0x6c, 0x38, 0x00 },
++	/* 0xea '\xea' */ { 0x38, 0x6c, 0xc6, 0xc6, 0x6c, 0x6c, 0xee, 0x00 },
++	/* 0xeb '\xeb' */ { 0x1c, 0x30, 0x18, 0x7c, 0xcc, 0xcc, 0x78, 0x00 },
++	/* 0xec '\xec' */ { 0x00, 0x00, 0x7e, 0xdb, 0xdb, 0x7e, 0x00, 0x00 },
++	/* 0xed '\xed' */ { 0x06, 0x0c, 0x7e, 0xdb, 0xdb, 0x7e, 0x60, 0xc0 },
++	/* 0xee '\xee' */ { 0x38, 0x60, 0xc0, 0xf8, 0xc0, 0x60, 0x38, 0x00 },
++	/* 0xef '\xef' */ { 0x78, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0x00 },
++	/* 0xf0 '\xf0' */ { 0x00, 0xfc, 0x00, 0xfc, 0x00, 0xfc, 0x00, 0x00 },
++	/* 0xf1 '\xf1' */ { 0x30, 0x30, 0xfc, 0x30, 0x30, 0x00, 0xfc, 0x00 },
++	/* 0xf2 '\xf2' */ { 0x60, 0x30, 0x18, 0x30, 0x60, 0x00, 0xfc, 0x00 },
++	/* 0xf3 '\xf3' */ { 0x18, 0x30, 0x60, 0x30, 0x18, 0x00, 0xfc, 0x00 },
++	/* 0xf4 '\xf4' */ { 0x0e, 0x1b, 0x1b, 0x18, 0x18, 0x18, 0x18, 0x18 },
++	/* 0xf5 '\xf5' */ { 0x18, 0x18, 0x18, 0x18, 0x18, 0xd8, 0xd8, 0x70 },
++	/* 0xf6 '\xf6' */ { 0x30, 0x30, 0x00, 0xfc, 0x00, 0x30, 0x30, 0x00 },
++	/* 0xf7 '\xf7' */ { 0x00, 0x76, 0xdc, 0x00, 0x76, 0xdc, 0x00, 0x00 },
++	/* 0xf8 '\xf8' */ { 0x38, 0x6c, 0x6c, 0x38, 0x00, 0x00, 0x00, 0x00 },
++	/* 0xf9 '\xf9' */ { 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00 },
++	/* 0xfa '\xfa' */ { 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00 },
++	/* 0xfb '\xfb' */ { 0x0f, 0x0c, 0x0c, 0x0c, 0xec, 0x6c, 0x3c, 0x1c },
++	/* 0xfc '\xfc' */ { 0x78, 0x6c, 0x6c, 0x6c, 0x6c, 0x00, 0x00, 0x00 },
++	/* 0xfd '\xfd' */ { 0x70, 0x18, 0x30, 0x60, 0x78, 0x00, 0x00, 0x00 },
++	/* 0xfe '\xfe' */ { 0x5a, 0x5a, 0x00, 0x3c, 0x7e, 0x7e, 0x3c, 0x00 },  /* bear paw — F E R M I ∞ H A R T */
++	/* 0xff '\xff' */ { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
++};
++
++#endif
+diff --git a/kernel/vga_text50.c b/kernel/vga_text50.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..21a8deff169b37a487a92c3de9064469e6886f76
+--- /dev/null
++++ b/kernel/vga_text50.c
+@@ -0,0 +1,95 @@
++/*
++ *  vga_text50.c
++ *
++ * Switch VGA from default 80x25 to 80x50 in standard text mode (0xB8000
++ * buffer). We carry a PC-compatible 8x8 font as embedded data (see
++ * vga_font8x8.h) and write it into
++ * plane 2 at offset 0x8000 (font slot 2) at boot. Then we point the
++ * Character Map Select at slot 2 and halve the CRTC max scan line.
++ *
++ * Why embedded and not a firmware font: the direct KVM machine has no BIOS
++ * font loaded but not the 8x8 — slot 2 of plane 2 is empty at boot.
++ * Earlier attempts at downsampling 8x16 -> 8x8 in software produced
++ * either broken glyphs (every-other-row dropped cross-bars) or unreadably
++ * thick ones (OR-fold blurred letters together). A properly designed
++ * 8x8 font simply renders cleaner.
++ *
++ * Must run before kernel/console.c con_init() so its geometry is set up
++ * for LINES=50.
++ *
++ * F E R M I ∞ H A R T
++ */
++#include <asm/io.h>
++#include "vga_font8x8.h"
++
++#define PLANE2 ((unsigned char *)0xA0000)
++
++void vga_set_50_rows(void)
++{
++	unsigned char saved_s2, saved_s4, saved_g4, saved_g5, saved_g6;
++	unsigned char msl;
++	int c, r;
++
++	/* Stash the sequencer + graphics-controller bits we're about to
++	 * stomp on so we can restore the text-mode display afterwards. */
++	outb_p(0x02, 0x3C4); saved_s2 = inb_p(0x3C5);
++	outb_p(0x04, 0x3C4); saved_s4 = inb_p(0x3C5);
++	outb_p(0x04, 0x3CE); saved_g4 = inb_p(0x3CF);
++	outb_p(0x05, 0x3CE); saved_g5 = inb_p(0x3CF);
++	outb_p(0x06, 0x3CE); saved_g6 = inb_p(0x3CF);
++
++	/* Sequencer: write to plane 2 only; sequential addressing, odd/even
++	 * disabled, extended memory enabled. */
++	outb_p(0x02, 0x3C4); outb_p(0x04, 0x3C5);
++	outb_p(0x04, 0x3C4); outb_p(0x07, 0x3C5);
++
++	/* Graphics controller: read from plane 2; mode 0 read & write, no
++	 * odd/even; map 64K window at A0000 in linear graphics layout. */
++	outb_p(0x04, 0x3CE); outb_p(0x02, 0x3CF);
++	outb_p(0x05, 0x3CE); outb_p(0x00, 0x3CF);
++	outb_p(0x06, 0x3CE); outb_p(0x04, 0x3CF);
++
++	/* Write the embedded PC-compatible 8x8 font into slot 2 at offset
++	 * 0x8000. Each slot reserves 32 bytes per glyph; we use the first 8
++	 * and leave the rest at whatever it was (the CRTC only reads the
++	 * first MSL+1 = 8 rows so the tail is invisible). */
++	for (c = 0; c < 256; c++) {
++		unsigned char *dst = PLANE2 + 0x8000 + (c * 32);
++		for (r = 0; r < 8; r++)
++			dst[r] = vga_font8x8[c][r];
++	}
++
++	/* Restore text-mode access pattern. */
++	outb_p(0x04, 0x3CE); outb_p(saved_g4, 0x3CF);
++	outb_p(0x05, 0x3CE); outb_p(saved_g5, 0x3CF);
++	outb_p(0x06, 0x3CE); outb_p(saved_g6, 0x3CF);
++	outb_p(0x02, 0x3C4); outb_p(saved_s2, 0x3C5);
++	outb_p(0x04, 0x3C4); outb_p(saved_s4, 0x3C5);
++
++	/* Point both Character Map A and Map B at font slot 2 (offset 0x8000
++	 * — our freshly-written 8x8 set). Sequencer reg 3 encoding: bits
++	 * 5,3 = Map A; bits 4,1 = Map B; bit pattern for slot 2 = 0x0A. */
++	outb_p(0x03, 0x3C4);
++	outb_p(0x0A, 0x3C5);
++
++	/* CRTC Max Scan Line: cell height 8 (was 16). Preserve bits 5-7 —
++	 * they carry vertical timing. */
++	outb_p(0x09, 0x3D4);
++	msl = inb_p(0x3D5);
++	outb_p((msl & 0xE0) | 0x07, 0x3D5);
++
++	/* Cursor scan start/end inside the new 8-pixel cell. */
++	outb_p(0x0A, 0x3D4); outb_p(0x06, 0x3D5);
++	outb_p(0x0B, 0x3D4); outb_p(0x07, 0x3D5);
++
++	/* Sequencer reg 1 (Clocking Mode) bit 0: 0 = 9-dot character clock
++	 * (default — gives a 1-pixel padding column between glyphs); 1 = 8-dot
++	 * (glyphs sit edge-to-edge). Going 8-dot shrinks total screen width
++	 * 720 -> 640 pixels and removes the inter-character gap, making the
++	 * text feel slightly tighter / smaller. */
++	outb_p(0x01, 0x3C4);
++	{
++		unsigned char clk = inb_p(0x3C5);
++		outb_p(clk | 0x01, 0x3C5);
++	}
++}
+diff --git a/kernel/vsprintf.c b/kernel/vsprintf.c
+index 69c0578c07202ad7a2576f57e93dce631af22664..ae04e73ff1b350ab75487973dea2ea6a66d80464 100644
+--- a/kernel/vsprintf.c
++++ b/kernel/vsprintf.c
+@@ -49,9 +49,10 @@ static char * number(char * str, int num, int base, int size, int precision
+ 	} else
+ 		sign=(type&PLUS) ? '+' : ((type&SPACE) ? ' ' : 0);
+ 	if (sign) size--;
+-	if (type&SPECIAL)
++	if (type&SPECIAL) {
+ 		if (base==16) size -= 2;
+ 		else if (base==8) size--;
++	}
+ 	i=0;
+ 	if (num==0)
+ 		tmp[i++]='0';
+@@ -64,13 +65,14 @@ static char * number(char * str, int num, int base, int size, int precision
+ 			*str++ = ' ';
+ 	if (sign)
+ 		*str++ = sign;
+-	if (type&SPECIAL)
++	if (type&SPECIAL) {
+ 		if (base==8)
+ 			*str++ = '0';
+ 		else if (base==16) {
+ 			*str++ = '0';
+ 			*str++ = digits[33];
+ 		}
++	}
+ 	if (!(type&LEFT))
+ 		while(size-->0)
+ 			*str++ = c;
+@@ -96,8 +98,6 @@ int vsprintf(char *buf, const char *fmt, va_list args)
+ 	int field_width;	/* width of output field */
+ 	int precision;		/* min. # of digits for integers; max
+ 				   number of chars for from string */
+-	int qualifier;		/* 'h', 'l', or 'L' for integer fields */
+-
+ 	for (str=buf ; *fmt ; ++fmt) {
+ 		if (*fmt != '%') {
+ 			*str++ = *fmt;
+@@ -144,9 +144,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
+ 		}
+ 
+ 		/* get the conversion qualifier */
+-		qualifier = -1;
+ 		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L') {
+-			qualifier = *fmt;
+ 			++fmt;
+ 		}
+ 
+@@ -160,9 +158,11 @@ int vsprintf(char *buf, const char *fmt, va_list args)
+ 				*str++ = ' ';
+ 			break;
+ 
+-		case 's':
+-			s = va_arg(args, char *);
+-			len = strlen(s);
++	case 's':
++		s = va_arg(args, char *);
++		if (!s)
++			s = "(null)";
++		len = strlen(s);
+ 			if (precision < 0)
+ 				precision = len;
+ 			else if (len > precision)
+diff --git a/lib/_exit.c b/lib/_exit.c
+index 44a74e1116817cfff827da1d0b3c7a2c6722c49b..342cc62c5d10627768263cbc4ec5c11355e69d78 100644
+--- a/lib/_exit.c
++++ b/lib/_exit.c
+@@ -1,7 +1,8 @@
+ #define __LIBRARY__
+ #include <unistd.h>
+ 
+-volatile void _exit(int exit_code)
++__attribute__((noreturn)) void _exit(int exit_code)
+ {
+ 	__asm__("int $0x80"::"a" (__NR_exit),"b" (exit_code));
++	for(;;);
+ }
+diff --git a/lib/open.c b/lib/open.c
+index 057039cab5e0095dd60429b2ad0478b9191fd418..c9b1fff2a1a589372a694c85a23299b1f6b93573 100644
+--- a/lib/open.c
++++ b/lib/open.c
+@@ -1,17 +1,26 @@
+ #define __LIBRARY__
+ #include <unistd.h>
+ #include <stdarg.h>
++#include <fcntl.h>
+ 
+ int open(const char * filename, int flag, ...)
+ {
+ 	register int res;
+ 	va_list arg;
++	int mode = 0;
+ 
+ 	va_start(arg,flag);
++	if (flag & O_CREAT) {
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Warray-bounds"
++		mode = va_arg(arg,int);
++#pragma GCC diagnostic pop
++	}
++	va_end(arg);
+ 	__asm__("int $0x80"
+ 		:"=a" (res)
+ 		:"0" (__NR_open),"b" (filename),"c" (flag),
+-		"d" (va_arg(arg,int)));
++		"d" (mode));
+ 	if (res>=0)
+ 		return res;
+ 	errno = -res;
+diff --git a/lib/sync.c b/lib/sync.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..8cb154af4923275b04ff055b44dcca40ccb629cd
+--- /dev/null
++++ b/lib/sync.c
+@@ -0,0 +1,4 @@
++#define __LIBRARY__
++#include <unistd.h>
++
++_syscall0(int, sync)
+diff --git a/mm/memory.c b/mm/memory.c
+index 7cdcfb62417ee740bbc064fd59c084adbfbcbfc4..ad5557c6dcc70f100a495173d17839afd2308f82 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -25,35 +25,51 @@ __asm__("movl %%eax,%%cr3"::"a" (0))
+ #error "Won't work"
+ #endif
+ 
+-#define copy_page(from,to) \
+-__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024):"cx","di","si")
++#define copy_page(from,to) do { \
++	unsigned long __cp_from = (unsigned long)(from); \
++	unsigned long __cp_to = (unsigned long)(to); \
++	unsigned long __cp_count = 1024; \
++	__asm__ volatile("cld ; rep ; movsl" \
++		: "+S" (__cp_from), "+D" (__cp_to), "+c" (__cp_count) \
++		: \
++		: "memory"); \
++} while (0)
+ 
+ static unsigned short mem_map [ PAGING_PAGES ] = {0,};
+ 
++/* next-fit hint: avoids full scan on every allocation */
++static unsigned short free_page_hint = 0;
++
+ /*
+- * Get physical address of first (actually last :-) free page, and mark it
+- * used. If no free pages left, return 0.
++ * Get physical address of a free page and mark it used.
++ * Uses next-fit with free_page_hint to avoid O(n) scan.
++ * Returns 0 if out of memory.
+  */
+ unsigned long get_free_page(void)
+ {
+-register unsigned long __res asm("ax");
++	unsigned short i, start = free_page_hint;
++	unsigned long addr, count;
++
++	for (i = start; i < PAGING_PAGES; i++)
++		if (!mem_map[i])
++			goto found;
++	for (i = 0; i < start; i++)
++		if (!mem_map[i])
++			goto found;
++	return 0;
+ 
+-__asm__("std ; repne ; scasw\n\t"
+-	"jne 1f\n\t"
+-	"movw $1,2(%%edi)\n\t"
+-	"sall $12,%%ecx\n\t"
+-	"movl %%ecx,%%edx\n\t"
+-	"addl %2,%%edx\n\t"
+-	"movl $1024,%%ecx\n\t"
+-	"leal 4092(%%edx),%%edi\n\t"
+-	"rep ; stosl\n\t"
+-	"movl %%edx,%%eax\n"
+-	"1:"
+-	:"=a" (__res)
+-	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
+-	"D" (mem_map+PAGING_PAGES-1)
+-	:"di","cx","dx");
+-return __res;
++found:
++	mem_map[i] = 1;
++	free_page_hint = (i + 1) & 0xFFFF;	/* wrap at 64K, fine for < 65536 pages */
++	if (free_page_hint >= PAGING_PAGES)
++		free_page_hint = 0;
++	addr = LOW_MEM + ((unsigned long)i << 12);
++	count = 1024;
++	__asm__ volatile ("cld ; rep ; stosl"
++		: "+c" (count), "+D" (addr)
++		: "a" (0)
++		: "memory");
++	return addr - 4096;
+ }
+ 
+ /*
+@@ -68,7 +84,7 @@ void free_page(unsigned long addr)
+ 	addr -= LOW_MEM;
+ 	addr >>= 12;
+ 	if (mem_map[addr]--) return;
+-	mem_map[addr]=0;
++	mem_map[addr]=1;
+ 	panic("trying to free free page");
+ }
+ 
+@@ -76,7 +92,7 @@ void free_page(unsigned long addr)
+  * This function frees a continuos block of page tables, as needed
+  * by 'exit()'. As does copy_page_tables(), this handles only 4Mb blocks.
+  */
+-int free_page_tables(unsigned long from,unsigned long size)
++int free_page_tables(unsigned long from,long size)
+ {
+ 	unsigned long *pg_table;
+ 	unsigned long * dir, nr;
+@@ -238,7 +254,7 @@ void do_no_page(unsigned long error_code,unsigned long address)
+ {
+ 	unsigned long tmp;
+ 
+-	if (tmp=get_free_page())
++	if ((tmp=get_free_page()))
+ 		if (put_page(tmp,address))
+ 			return;
+ 	do_exit(SIGSEGV);
+diff --git a/mm/page.s b/mm/page.s
+index 27488c20ddc871ce095a93d4e5e408d265a6597c..7bca7854c830cccc2af924f36c0dc356f7c1c9ef 100644
+--- a/mm/page.s
++++ b/mm/page.s
+@@ -6,6 +6,7 @@
+ .globl _page_fault
+ 
+ _page_fault:
++	cld				# faulting user code may have set DF
+ 	xchgl %eax,(%esp)
+ 	pushl %ecx
+ 	pushl %edx

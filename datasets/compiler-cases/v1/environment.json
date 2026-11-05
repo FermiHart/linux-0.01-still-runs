@@ -1,0 +1,101 @@
+{
+  "abis": [
+    {
+      "elf_class": "ELF64",
+      "elf_machine": "Advanced Micro Devices X86-64",
+      "execution_model": "hosted GNU/Linux process",
+      "id": "hosted-x86_64-sysv",
+      "libc_name": "libc.so.6",
+      "libc_sha256": "8db37cf3f2169f59a0f07ef1fea308c35656668c64c8ff294e1860f4121eb161",
+      "loader_name": "ld-linux-x86-64.so.2",
+      "loader_sha256": "cd4df4f3c7b83673d61189bf2eaebd33ca4f2853ab9772b8a25e025ef99b1e81"
+    },
+    {
+      "elf_class": "ELF32",
+      "elf_machine": "Intel 80386",
+      "execution_model": "hosted GNU/Linux process",
+      "id": "hosted-i386-sysv",
+      "libc_name": "libc.so.6",
+      "libc_sha256": "a561fa70cf2598ecce1e34c3a0bb8d3eb46bfd0759382cbc34317015495ce421",
+      "loader_name": "ld-linux.so.2",
+      "loader_sha256": "8228542107069b0ffe686f0815581c995cb7bc17ba234f04159511a1f11b6178"
+    }
+  ],
+  "compiler": {
+    "cc1_name": "cc1",
+    "cc1_sha256": "5d1679131184e2de4435b426eb264bf13472fe026db8e5c6bc97445814e8e2f4",
+    "collect2_name": "collect2",
+    "collect2_sha256": "4d1f341ae5b763b513258ee2812422a45e063c30a2f1924a0cf63d3699f3a158",
+    "executable_name": "x86_64-linux-gnu-gcc-13",
+    "executable_sha256": "1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26",
+    "family": "GCC",
+    "id": "CC-GCC-13.3.0-X86_64-LINUX-GNU",
+    "target": "x86_64-linux-gnu",
+    "version": "13.3.0",
+    "version_output": "x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+  },
+  "host": {
+    "architecture": "x86_64",
+    "kernel_release": "7.0.0-30-generic",
+    "operating_system": {
+      "id": "linuxmint",
+      "version_id": "22.3"
+    }
+  },
+  "multilib_packages": [
+    {
+      "name": "lib32gcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "sha256": "0850e0555c86f2ce7a954158eb47df42d7645bfa4f12f29ea2df76459c930ac0"
+    },
+    {
+      "name": "lib32gcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "sha256": "1802dc75345ccce457b44110a3819ca74ff8c33fc62394a78d0e59a11c0cf770"
+    },
+    {
+      "name": "libc6-dev-i386_2.39-0ubuntu8.8_amd64.deb",
+      "sha256": "b560b6f53e60ef83320c2c170d890074dcb4bdd077dcea03ff98a030ae9c635e"
+    },
+    {
+      "name": "libc6-dev_2.39-0ubuntu8.8_amd64.deb",
+      "sha256": "bb8741966e7c1d2e2c0b84bb311717a0908fb563d9b2247b7212710e3cd88b94"
+    },
+    {
+      "name": "libc6-i386_2.39-0ubuntu8.8_amd64.deb",
+      "sha256": "7c373e63a02bda5d8da4363a899c24622b1234f658b5fca78a9a4d8b1017b079"
+    }
+  ],
+  "multilib_root_derivation": "dpkg-deb --extract in sorted name order plus canonical /lib32 and /lib/ld-linux.so.2 symlinks",
+  "path_binding_contract": {
+    "${CC}": "compiler executable identified by compiler.executable_sha256",
+    "${DATASET_ROOT}": "root of this dataset directory",
+    "${MULTILIB_ROOT}": "root produced by extracting the five identified package archives"
+  },
+  "schema_version": 1,
+  "tools": {
+    "as": {
+      "executable_sha256": "21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0",
+      "name": "x86_64-linux-gnu-as",
+      "version_output_first_line": "GNU assembler (GNU Binutils for Ubuntu) 2.42"
+    },
+    "dpkg-deb": {
+      "executable_sha256": "fc9dde782ca8309b65ab92e61d13318bf463cd1aa71daa8967b87b81b48b63d2",
+      "name": "dpkg-deb",
+      "version_output_first_line": "Debian 'dpkg-deb' package archive backend version 1.22.6 (amd64)."
+    },
+    "ld": {
+      "executable_sha256": "e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b",
+      "name": "x86_64-linux-gnu-ld.bfd",
+      "version_output_first_line": "GNU ld (GNU Binutils for Ubuntu) 2.42"
+    },
+    "objdump": {
+      "executable_sha256": "325c4205a4c658a9d1e1ebc469ae55975a2b897a3d3c1e79d9b158612d37f745",
+      "name": "x86_64-linux-gnu-objdump",
+      "version_output_first_line": "GNU objdump (GNU Binutils for Ubuntu) 2.42"
+    },
+    "readelf": {
+      "executable_sha256": "64c58e15274bbbb5153f31078e455e9e77ee5f51489e709bba5bb788ce9df2b0",
+      "name": "x86_64-linux-gnu-readelf",
+      "version_output_first_line": "GNU readelf (GNU Binutils for Ubuntu) 2.42"
+    }
+  }
+}

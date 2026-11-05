@@ -1,0 +1,14 @@
+{
+  "schema": "linux001.experiment.v1",
+  "id": "minix-link-persistence",
+  "kind": "filesystem",
+  "seed": 25001,
+  "timeout_seconds": 120,
+  "max_exits": 5000000,
+  "operations": [
+    {"op": "create", "path": "/tmp/r25/proof"},
+    {"op": "write", "path": "/tmp/r25/proof", "data": "R25_PAYLOAD"},
+    {"op": "link", "path": "/tmp/r25/proof", "target": "/tmp/r25/alias"},
+    {"op": "unlink", "path": "/tmp/r25/proof"}
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "abi_count": 2,
+  "assembly_normalization": "replace ephemeral multilib-root prefix with ${MULTILIB_ROOT}; strip trailing horizontal whitespace",
+  "case_count": 3,
+  "compiler_identity_count": 1,
+  "dataset_id": "linux-0.01-reduced-compiler-cases-v1",
+  "fail_count": 1,
+  "generator_path": "scripts/build-compiler-case-dataset.py",
+  "generator_sha256": "66e3e1071a0096f809d5881a63074deb2c462cc04cee6159c4de7d80f2d047f0",
+  "non_claims": [
+    "not_a_compiler_version_matrix",
+    "not_a_freestanding_kernel_abi_run",
+    "not_proof_that_o1_is_minimal_or_necessary",
+    "not_proof_of_a_gcc_bug",
+    "not_a_reproduction_of_unobserved_historical_symptoms",
+    "not_a_complete_archive_of_every_host_build_input"
+  ],
+  "observation_count": 18,
+  "optimization_count": 3,
+  "pass_count": 17,
+  "reference_scope": "one compiler identity x two hosted ABIs",
+  "schema_version": 1,
+  "source_commit": "86cc23d776e8c7c49061892b1ec4f93f5fb4ad9c",
+  "sources": [
+    {
+      "case_id": "C-BUFFER-FREELIST",
+      "embedded_comment_status": "inherited_hypothesis_not_dataset_conclusion",
+      "historical_core_path": "fs/buffer.c",
+      "path": "sources/buffer_freelist.c",
+      "repository_path": "tests/compiler-cases/buffer_freelist.c",
+      "sha256": "860170c5a28c2fcdc1f1f6ae8cc5ee4b47853ae46f2c9a297e67a0a656630880"
+    },
+    {
+      "case_id": "C-BITMAP-INLINE-ASM",
+      "embedded_comment_status": "inherited_hypothesis_not_dataset_conclusion",
+      "historical_core_path": "fs/bitmap.c",
+      "path": "sources/bitmap_inline_asm.c",
+      "repository_path": "tests/compiler-cases/bitmap_inline_asm.c",
+      "sha256": "4646109faed296c3b60ea0083936d1567a8377f036f0d2ddd1f1775123ad44b6"
+    },
+    {
+      "case_id": "C-VSPRINTF-PERCENT-S",
+      "embedded_comment_status": "inherited_hypothesis_not_dataset_conclusion",
+      "historical_core_path": "kernel/vsprintf.c",
+      "path": "sources/vsprintf_percent_s.c",
+      "repository_path": "tests/compiler-cases/vsprintf_percent_s.c",
+      "sha256": "2b3ad0cc793cde99196420fb902f1033b168b345fee3df74e4f20410eb3ccd9d"
+    }
+  ],
+  "unique_compiler_version_count": 1
+}

@@ -1,0 +1,50 @@
+{
+  "cases": [
+    {
+      "case_id": "C-BUFFER-FREELIST",
+      "classification": "HISTORICAL_HYPOTHESIS_NOT_REPRODUCED",
+      "gcc_bug_status": "NOT_ESTABLISHED",
+      "observation_ids": [
+        "OBS-GCC13-BUFFER-FREELIST-X86_64-O0",
+        "OBS-GCC13-BUFFER-FREELIST-X86_64-O1",
+        "OBS-GCC13-BUFFER-FREELIST-X86_64-O2",
+        "OBS-GCC13-BUFFER-FREELIST-I386-O0",
+        "OBS-GCC13-BUFFER-FREELIST-I386-O1",
+        "OBS-GCC13-BUFFER-FREELIST-I386-O2"
+      ],
+      "rationale": "All six retained cells pass. This reduction does not reproduce the historical symptom and does not establish why the full kernel used -O1.",
+      "source_contract_status": "NOT_ESTABLISHED"
+    },
+    {
+      "case_id": "C-BITMAP-INLINE-ASM",
+      "classification": "SOURCE_CONTRACT_VIOLATION_OBSERVED",
+      "gcc_bug_status": "NOT_SUPPORTED",
+      "observation_ids": [
+        "OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O0",
+        "OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O1",
+        "OBS-GCC13-BITMAP-INLINE-ASM-X86_64-O2",
+        "OBS-GCC13-BITMAP-INLINE-ASM-I386-O0",
+        "OBS-GCC13-BITMAP-INLINE-ASM-I386-O1",
+        "OBS-GCC13-BITMAP-INLINE-ASM-I386-O2"
+      ],
+      "rationale": "The x86_64 -O2 cell alone observes a stale value after inline asm whose memory operand is declared input-only. This supports a source constraint violation in the reduction, not a GCC defect or kernel-level necessity claim.",
+      "source_contract_status": "SUPPORTED_FOR_REDUCED_X86_64_O2_CASE"
+    },
+    {
+      "case_id": "C-VSPRINTF-PERCENT-S",
+      "classification": "HISTORICAL_HYPOTHESIS_NOT_REPRODUCED",
+      "gcc_bug_status": "NOT_ESTABLISHED",
+      "observation_ids": [
+        "OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O0",
+        "OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O1",
+        "OBS-GCC13-VSPRINTF-PERCENT-S-X86_64-O2",
+        "OBS-GCC13-VSPRINTF-PERCENT-S-I386-O0",
+        "OBS-GCC13-VSPRINTF-PERCENT-S-I386-O1",
+        "OBS-GCC13-VSPRINTF-PERCENT-S-I386-O2"
+      ],
+      "rationale": "All six retained cells pass. This single-string hosted reduction does not reproduce the historical full-printk symptom or exclude other contexts.",
+      "source_contract_status": "NOT_ESTABLISHED"
+    }
+  ],
+  "schema_version": 1
+}

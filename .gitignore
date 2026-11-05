@@ -1,0 +1,46 @@
+# Build artifacts
+build/
+release/
+/state/
+*.o
+*.d
+*.a
+*.bin
+!datasets/compiler-cases/v1/binaries/
+!datasets/compiler-cases/v1/binaries/*.bin
+*.elf
+*.iso
+__pycache__/
+*.pyc
+
+# OS / editor crumbs
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# Upstream extraction output
+upstream/extracted/
+
+*.log
+serial.log
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+secrets/
+
+# Local editor / IDE / tool config (never committed)
+.cache/
+.local/
+*.local
+.tool-*
+
+# Local working folder for raw screenshots (curated copies live in docs/screenshots/)
+/Screenshots/
